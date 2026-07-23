@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/query-reading.schema.json",
+  "title": "QueryReading",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "query_reading_id", "semantic_head", "passages", "gaps"],
+  "properties": { "schema_version": { "const": "QueryReading@1" }, "query_reading_id": { "type": "string" }, "semantic_head": { "type": "string" }, "passages": { "type": "array" }, "gaps": { "type": "array" } }
+}

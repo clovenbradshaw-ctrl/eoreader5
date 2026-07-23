@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/query-request.schema.json",
+  "title": "QueryRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "query"],
+  "properties": { "schema": { "const": "QueryRequest@1" }, "query": { "type": "string" }, "limit": { "type": "integer", "minimum": 1 }, "frame": { "type": "string" }, "lens": { "type": "string" } }
+}

@@ -34,7 +34,7 @@ export function readingSnapshot(state, { frame = "frame:default", lens = "lens:n
     semantic_head: state.semanticHead,
     units: bundle.spans.map((span) => {
       const operator_events = state.events
-        .filter((event) => event.payload?.source_id === span.source_id || event.payload?.fields?.some?.((field) => field.field_id === span.field_id) || event.inputs?.some((input) => state.events.some((candidate) => candidate.event_id === input && candidate.payload?.source_id === span.source_id)))
+        .filter((event) => (event.payload?.envelope?.source_id ?? event.payload?.source_id) === span.source_id || (event.payload?.envelope?.fields ?? event.payload?.fields)?.some?.((field) => field.field_id === span.field_id) || event.inputs?.some((input) => state.events.some((candidate) => candidate.event_id === input && candidate.payload?.source_id === span.source_id)))
         .map((event) => event.event_id);
       return { unit_id: span.span_id, operator_events, provenance: { source_id: span.source_id, field_id: span.field_id }, held: state.hypotheses.held.length > 0, alternatives: state.hypotheses.competing };
     }),
