@@ -36,7 +36,7 @@ export const OPERATOR_CODES = Object.freeze(
 export const LEGACY_OPERATOR_MAP = Object.freeze({
   ALT: Object.freeze({ status: "mapped", to: "DEF", epoch: "eo-legacy-pre-2026" }),
   SUP: Object.freeze({ status: "mapped", to: "EVA", epoch: "eo-legacy-pre-2026" }),
-  DES: Object.freeze({ status: "unmapped", to: null, epoch: "eo-legacy-pre-2026" }),
+  DES: Object.freeze({ status: "mapped", to: "SIG", epoch: "eo-legacy-pre-2026" }),
 });
 
 export function isCurrentOperator(code) {
