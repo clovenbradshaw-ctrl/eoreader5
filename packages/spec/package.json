@@ -11,7 +11,8 @@
     "./operators": "./operators/epoch.js",
     "./schemas/*": "./schemas/*",
     "./holons": "./holons/index.js",
-    "./fixed-point": "./fixed-point.js"
+    "./fixed-point": "./fixed-point.js",
+    "./row-shapes": "./row-shapes/index.js"
   },
   "scripts": {
     "test": "node --test"
