@@ -1,8 +1,17 @@
-export { projectReferents, surfacesIndicateSameReferent } from "./referents/index.js";
+export {
+  projectReferents,
+  surfacesIndicateSameReferent,
+  INDIVIDUATION_TYPES,
+  classifyIndividuationType,
+  individuateReferent,
+  applyNameBind,
+} from "./referents/index.js";
 export { CORE_SUBASSEMBLIES, assembleWatchmaker, defineSubassembly } from "./subassemblies/index.js";
 export { createState, applyCommand, appendEvents, replay, read } from "./replay/index.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
+export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";
+export { jaccardDistance, computeBoundaryStabilityGate } from "./emergence/boundaries/index.js";
 
 export { search } from "./search/index.js";
 
