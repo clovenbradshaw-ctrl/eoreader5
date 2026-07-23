@@ -13,3 +13,4 @@ export {
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
 export { induceOperators, behavioralFingerprint } from "./operators/index.js";
 export { induceKind } from "./kinds/index.js";
+export { induceCalculus } from "./calculus/index.js";
