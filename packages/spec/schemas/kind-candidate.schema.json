@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/kind-candidate.schema.json",
+  "title": "KindCandidate",
+  "description": "A Level-2 mathematical kind (spec 'EO Emergent Mathematics for Predictive Competency' section 11.3): a regime partition of a series, carved by SEG on a selector's output, under which a predictor's competency against a reference baseline differs across regimes. Promotion requires a permutation-derived null (section 12.8), held-out transfer (invariant 7.6), and a relative effect-size floor (section 1's governing criterion / section 20) — never a hand-set absolute threshold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "selector", "selector_operator_id", "predictor", "reference_baseline_id", "threshold", "regimes", "differential", "holdout_differential", "reference_scale", "relative_effect", "partition_null", "lens", "emergence", "content_hash"],
+  "properties": {
+    "schema": { "const": "KindCandidate@1" },
+    "id": { "type": "string" },
+    "selector": { "type": "object", "description": "Scalar program carving the regime; may reference a promoted operator." },
+    "selector_operator_id": { "type": ["string", "null"], "description": "Provenance: the operator id if the selector is a promoted operator." },
+    "predictor": { "type": "object", "description": "Scalar program whose regime-conditional competency is examined." },
+    "reference_baseline_id": { "type": "string" },
+    "threshold": { "type": "number" },
+    "regimes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["above", "below"],
+      "properties": {
+        "above": { "type": "object", "additionalProperties": false, "required": ["n", "mean_gain"], "properties": { "n": { "type": "integer", "minimum": 0 }, "mean_gain": { "type": "number" } } },
+        "below": { "type": "object", "additionalProperties": false, "required": ["n", "mean_gain"], "properties": { "n": { "type": "integer", "minimum": 0 }, "mean_gain": { "type": "number" } } }
+      }
+    },
+    "differential": { "type": "number", "minimum": 0 },
+    "holdout_differential": { "type": "number" },
+    "reference_scale": { "type": "number" },
+    "relative_effect": { "type": "number" },
+    "partition_null": {
+      "type": "object",
+      "description": "NullProtocol@1 record (see null-protocol.schema.json) for the regime-label permutation gate.",
+      "required": ["schema"],
+      "properties": { "schema": { "const": "NullProtocol@1" } }
+    },
+    "lens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_type", "horizon", "scoring_rule", "reference_baseline_id", "population"],
+      "properties": {
+        "target_type": { "type": "string" },
+        "horizon": { "type": "object" },
+        "scoring_rule": { "type": "string" },
+        "reference_baseline_id": { "type": "string" },
+        "population": { "type": "string" }
+      }
+    },
+    "emergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator_epoch", "carved_by", "from_selector"],
+      "properties": {
+        "operator_epoch": { "type": "string" },
+        "carved_by": { "const": "SEG" },
+        "from_selector": { "type": "string" }
+      }
+    },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

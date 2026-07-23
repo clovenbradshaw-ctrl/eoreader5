@@ -182,3 +182,32 @@ export function validateCompetencyRecord(value, name = "CompetencyRecord") {
   hash(v.content_hash, name, "content_hash");
   return v;
 }
+
+export function validateKindCandidate(value, name = "KindCandidate") {
+  const v = object(value, name);
+  if (v.schema !== "KindCandidate@1") fail(name, "schema must be KindCandidate@1");
+  string(v.id, name, "id");
+  object(v.selector, name); object(v.predictor, name);
+  if (v.selector_operator_id !== null) string(v.selector_operator_id, name, "selector_operator_id");
+  string(v.reference_baseline_id, name, "reference_baseline_id");
+  if (typeof v.threshold !== "number") fail(name, "threshold must be a number");
+  const regimes = object(v.regimes, `${name}.regimes`);
+  for (const side of ["above", "below"]) {
+    const r = object(regimes[side], `${name}.regimes.${side}`);
+    if (!Number.isInteger(r.n) || r.n < 0) fail(name, `regimes.${side}.n must be a non-negative integer`);
+    if (typeof r.mean_gain !== "number") fail(name, `regimes.${side}.mean_gain must be a number`);
+  }
+  if (typeof v.differential !== "number" || v.differential < 0) fail(name, "differential must be a non-negative number");
+  if (typeof v.holdout_differential !== "number") fail(name, "holdout_differential must be a number");
+  if (typeof v.reference_scale !== "number") fail(name, "reference_scale must be a number");
+  if (typeof v.relative_effect !== "number") fail(name, "relative_effect must be a number");
+  validateNullProtocol(v.partition_null, `${name}.partition_null`);
+  const lens = object(v.lens, `${name}.lens`);
+  string(lens.target_type, name, "lens.target_type"); object(lens.horizon, name); string(lens.scoring_rule, name, "lens.scoring_rule"); string(lens.reference_baseline_id, name, "lens.reference_baseline_id"); string(lens.population, name, "lens.population");
+  const emergence = object(v.emergence, `${name}.emergence`);
+  string(emergence.operator_epoch, name, "emergence.operator_epoch");
+  if (emergence.carved_by !== "SEG") fail(name, 'emergence.carved_by must be "SEG"');
+  string(emergence.from_selector, name, "emergence.from_selector");
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
