@@ -14,7 +14,7 @@ export function project(state, { frame = "frame:default", lens = "lens:neutral",
     spans,
     nesting: state.observations.flatMap((observation) => (observation.axes ?? []).map((axis) => ({ parent_id: observation.source_id, child_id: axis.axis_id, relation: "axis" }))),
     relations: referents.flatMap((referent) => referent.surfaces.map((surface) => ({ relation_id: id("relation", { referent: referent.id, surface }), type: "names", from: referent.id, to: surface }))),
-    parameters: state.hypotheses.held.map((h) => ({ parameter_id: h.hypothesis_id ?? h.event_id, status: h.status ?? "held", evidence: h.evidence ?? null })),
+    parameters: [state.hypotheses.accepted, state.hypotheses.competing, state.hypotheses.held].flat().map((h) => ({ parameter_id: h.hypothesis_id ?? h.event_id, status: h.status ?? "held", evidence: h.evidence ?? null })),
     evidence_links: state.events.map((event) => ({ event_id: event.event_id, inputs: event.inputs, provenance: event.provenance })),
     navigation_hints: [{ rel: "semantic-head", target: state.semanticHead }, ...referents.map((r) => ({ rel: "referent", target: r.id }))],
   };
@@ -32,7 +32,12 @@ export function readingSnapshot(state, { frame = "frame:default", lens = "lens:n
     lens_id: lens,
     source_id,
     semantic_head: state.semanticHead,
-    units: bundle.spans.map((span) => ({ unit_id: span.span_id, operator_events: state.events.map((event) => event.event_id), provenance: { source_id: span.source_id, field_id: span.field_id }, held: state.hypotheses.held.length > 0, alternatives: state.hypotheses.competing })),
+    units: bundle.spans.map((span) => {
+      const operator_events = state.events
+        .filter((event) => event.payload?.source_id === span.source_id || event.payload?.fields?.some?.((field) => field.field_id === span.field_id) || event.inputs?.some((input) => state.events.some((candidate) => candidate.event_id === input && candidate.payload?.source_id === span.source_id)))
+        .map((event) => event.event_id);
+      return { unit_id: span.span_id, operator_events, provenance: { source_id: span.source_id, field_id: span.field_id }, held: state.hypotheses.held.length > 0, alternatives: state.hypotheses.competing };
+    }),
   };
   return validateReadingSnapshot(snapshot);
 }

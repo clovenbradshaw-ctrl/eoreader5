@@ -9,6 +9,7 @@ function stableId(prefix, value) {
 
 export function createState({ engineVersion, operatorEpoch, priorSnapshot }) {
   validatePriorSnapshot(priorSnapshot);
+  if (operatorEpoch !== priorSnapshot.operator_epoch) throw new TypeError("engine operator epoch must match prior snapshot epoch");
   return {
     engineVersion,
     operatorEpoch,
@@ -29,6 +30,8 @@ export function appendEvents(state, events) {
   const known = new Set(seen);
   for (const event of events) {
     validateSemanticEvent(event);
+    if (event.operator_epoch !== state.operatorEpoch) throw new TypeError(`semantic ledger epoch mismatch for ${event.event_id}`);
+    if (event.authority?.grant?.prior_id && event.authority.grant.prior_id !== state.priorSnapshot.prior_id) throw new TypeError(`semantic ledger prior mismatch for ${event.event_id}`);
     if (seen.has(event.event_id)) throw new TypeError(`semantic ledger duplicate event: ${event.event_id}`);
     if (!isCurrentOperator(event.op)) throw new TypeError(`semantic ledger invalid operator: ${event.op}`);
     for (const input of event.inputs) {
@@ -49,8 +52,13 @@ export function applyCommand(state, command) {
   const inputs = command.inputs ?? [];
   if (command.type === "observation.admit") return appendEvents(state, [baseEvent(state, "observation.admitted", "NUL", command.payload, inputs)]);
   if (command.type === "effect.result.admit") return appendEvents(state, [baseEvent(state, "effect.result.admitted", "INS", command.payload, inputs)]);
+  if (command.type === "hypothesis.accept") return appendEvents(state, [baseEvent(state, "hypothesis.accepted", "EVA", { ...command.payload, status: "accepted" }, inputs)]);
+  if (command.type === "hypothesis.compete") return appendEvents(state, [baseEvent(state, "hypothesis.competing", "EVA", { ...command.payload, status: "competing" }, inputs)]);
   if (command.type === "hypothesis.hold") return appendEvents(state, [baseEvent(state, "hypothesis.held", "EVA", { ...command.payload, status: "held" }, inputs)]);
   if (command.type === "hypothesis.supersede") return appendEvents(state, [baseEvent(state, "hypothesis.superseded", "REC", { ...command.payload, status: "superseded" }, inputs)]);
+  if (command.type === "referent.merge") return appendEvents(state, [baseEvent(state, "referent.merged", "REC", command.payload, inputs)]);
+  if (command.type === "referent.split") return appendEvents(state, [baseEvent(state, "referent.split", "REC", command.payload, inputs)]);
+  if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs)]);
   if (command.type === "discovery.advance" || command.type === "discovery.resume") {
     const remaining = Math.max(0, (command.budget?.max_events ?? 1) - 1);
     const next = appendEvents(state, [baseEvent(state, "discovery.abstained", "EVA", { reason: remaining === 0 ? "held:budget_exhausted" : "no_candidate_cleared_null" }, inputs)]);
@@ -70,7 +78,8 @@ function baseEvent(state, eventType, op, payload, inputs) {
 
 function reduceEvents(state) {
   const observations = [];
-  const held = [], accepted = [], competing = [], abstentions = [];
+  const byId = new Map();
+  const abstentions = [];
   const referentEvents = [];
   const frames = new Map(state.frames);
   let resolution = { verdict: "unresolved", evidence_event_ids: [] };
@@ -79,11 +88,24 @@ function reduceEvents(state) {
       observations.push(event.payload);
       for (const surface of event.payload?.anchors?.surfaces ?? []) referentEvents.push({ type: "admit", referent_id: surface.referent_id, surface: surface.text, provenance: { event_id: event.event_id } });
     }
-    if (event.event_type === "hypothesis.held") held.push({ ...event.payload, event_id: event.event_id });
-    if (event.event_type === "hypothesis.superseded") held.push({ ...event.payload, event_id: event.event_id });
+    if (event.event_type === "referent.merged") referentEvents.push({ type: "merge", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (event.event_type === "referent.split") referentEvents.push({ type: "split", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (event.event_type === "referent.same_as") referentEvents.push({ type: "same_as", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (["hypothesis.accepted", "hypothesis.competing", "hypothesis.held"].includes(event.event_type)) byId.set(event.payload.hypothesis_id ?? event.event_id, { ...event.payload, event_id: event.event_id });
+    if (event.event_type === "hypothesis.superseded") {
+      const ids = [event.payload.hypothesis_id, event.payload.supersedes, ...(event.payload.superseded_ids ?? [])].filter(Boolean);
+      for (const id of ids) byId.delete(id);
+      byId.set(event.payload.replacement_id ?? event.event_id, { ...event.payload, event_id: event.event_id, status: "superseded" });
+    }
     if (event.event_type === "discovery.abstained") abstentions.push({ ...event.payload, event_id: event.event_id });
     if (event.payload?.frame) frames.set(event.payload.frame.frame_id, event.payload.frame);
     if (event.payload?.resolution) resolution = { ...event.payload.resolution, evidence_event_ids: event.inputs };
+  }
+  const accepted = [], competing = [], held = [];
+  for (const hypothesis of byId.values()) {
+    if (hypothesis.status === "accepted") accepted.push(hypothesis);
+    else if (hypothesis.status === "competing") competing.push(hypothesis);
+    else held.push(hypothesis);
   }
   const semanticHead = state.events.length ? stableId("head", state.events.map((event) => event.event_id)) : "head:empty";
   const referents = projectReferents(referentEvents);
