@@ -1,9 +1,10 @@
 # eoreader5 Parity Checklist — completed pass
 
-Status: **filled in, 2026-07-23.** This is the gate described in the migration
-brief: every 4.2 investment gets a deliberate disposition — **Ported /
-Re-housed / Rebuilt / Deprecated / Not yet started** — with evidence, so
-nothing is dropped by silence.
+Status: **filled in, 2026-07-23; retirement-gate items 1–2 landed later the
+same day** (build-order Phase 0 — see "What's Next" build-order brief). This
+is the gate described in the migration brief: every 4.2 investment gets a
+deliberate disposition — **Ported / Re-housed / Rebuilt / Deprecated / Not
+yet started** — with evidence, so nothing is dropped by silence.
 
 ## How to read the verdicts
 
@@ -17,13 +18,15 @@ nothing is dropped by silence.
 
 ## Executive verdict (answers the two operational questions)
 
-**Does eoreader5 actually work?** Yes, as a *pure engine skeleton*. All 68
-package tests pass (`spec` 17, `engine` 46, `conformance` 3, `compat-4.2` 2) —
+**Does eoreader5 actually work?** Yes, as a *pure engine skeleton*. All 105
+package tests pass (`spec` 35, `engine` 46, `conformance` 20, `compat-4.2` 2) —
 the individuation gate (deriveNull, boundary stability, mass × coupling
 typing, name-bind promotion) added in the "EO Terrain Promotion and
-Predictive Prior Induction v0.2" pass accounts for most of the growth over
-the previous 35 — and `createEOReaderEngine` runs full public-domain books
-end-to-end,
+Predictive Prior Induction v0.2" pass, and the corpus-role + row-stance
+fabrication firewalls (retirement gate items 1–2, `docs/corpus-role.md` /
+`docs/row-stance-templates.md`) added in the build-order Phase 0 pass,
+account for most of the growth over the original 35 — and
+`createEOReaderEngine` runs full public-domain books end-to-end,
 deterministically, with byte-anchored search — see
 `docs/evidence/book-run-2026-07-23.md` (Frankenstein: 797 paragraph units;
 Heart of Darkness: 206; identical event tape on replay; queries localize to
@@ -93,7 +96,7 @@ cannot host a UI component. It may only emit neutral projection data.*
 
 - [ ] **Lens as first-class object (`src/perceiver/lens.js`)** — **Re-housed under eoPriors, with a documented reframing.** `eoreader4.2:src/perceiver/lens.js` defines a Lens `{gamma,horizon,corpus}`. `eoPriors:SPEC.md` §5.5 explicitly states "A basis is a Lens (`lens.js`, first-class object, already built)…a second basis…is a second Lens" — a deliberate, written carry-forward into the exemplar-basis (source-genre) role, not two clashing concepts. `eoreader5` has zero `lens` hits, so the engine does not consume it directly yet; the reframing lives in eoPriors's SPEC referencing still-4.2-resident code.
 
-- [ ] **`role:'corpus'` firewall (never-citable corpus content, pinned by `tests/corpus-role.test.js`)** — **Not yet started — NON-NEGOTIABLE, blocks retirement.** `eoreader4.2:tests/corpus-role.test.js` pins it: `role:'corpus'` events may never mint an entity/edge/merge/void/retraction in `src/core/project.js`. Search for corpus-role in `eoreader5`/`eoPriors` returns zero; `eoreader5:packages/conformance/invariants/` has only `forbidden-dependencies.test.js`. This must be ported and conformance-pinned in `eoreader5/packages/conformance/invariants/` before any citing surface ships.
+- [x] **`role:'corpus'` firewall (never-citable corpus content, pinned by `tests/corpus-role.test.js`)** — **Ported and conformance-pinned.** `packages/spec/schemas/semantic-event.schema.json` gained an optional `role` property (`enum: ["corpus"]`); `packages/engine/replay/index.js`'s `applyCommand` seals `role:'corpus'` onto every event a marked command produces (the chokepoint), and `reduceEvents` skips every `role:'corpus'` event unconditionally, before any other handling, so it can never mint an observation/referent/relation/merge/hypothesis/frame/resolution that `project()`/`readingSnapshot()` can see — while still being retained in `state.events` and `project()`'s `evidence_links` (the ledger never refuses to store one, matching 4.2's F6). Conformance-pinned in `packages/conformance/invariants/corpus-role.test.js` (9 tests). Doc: `docs/corpus-role.md`.
 
 - [ ] **OPFS binary store + export-pointer manifest (`src/organs/ingest/opfs-store.js`)** — **Re-housed to eoreaderapp (storage is app-owned); not yet built there.** Confirmed present in 4.2. `eoreader5` may not touch browser storage at all. `eoreaderapp:src/state/` (`event-log.js`, `records.js`) and `src/senses/` model the intended replacement (event-sourced SourceRecord/ObservationArtifact) but no OPFS adapter or export-pointer manifest exists yet. `navigator.storage.persist()`/export requirements need explicit re-statement in the app.
 
@@ -111,7 +114,7 @@ cannot host a UI component. It may only emit neutral projection data.*
 
 - [ ] **`composeEssay`/`composeEssayGrounded`, `src/weave/longgen/walk.js`** — **Not yet started; scope decision pending.** Present in `eoreader4.2:src/weave/longgen/walk.js` + `src/weave/essay/driver.js`. Zero hits in `eoreader5`/`eoreaderapp`. No decision yet on whether long-form generation stays in scope (it would live in eoreaderapp per the split). The fold-kernel routing requirement is moot until it exists. Decide explicitly: augmentation-only (deprecate generation) vs. keep a gloss layer.
 
-- [ ] **`generate-row-stance-templates.md` contract (four shapes, stance-legality over ρ, entailment/fabrication vetoes, exactly-1 token-trace, Cultivating fallback, SYN·Cultivating forbidden)** — **Not yet started — hard fabrication-firewall requirement.** Marked "Landed" in 4.2, implemented by `eoreader4.2:src/weave/generate-row/` + `src/enactor/ground/row-veto.js`. Search for `Cultivating`/`stanceLegal` in `eoreader5`/`eoreaderapp` returns zero. No generated-prose surface exists new yet to route through it. Forward dependency: any gloss/blurb/caption surface in eoreaderapp must go through this contract.
+- [x] **`generate-row-stance-templates.md` contract (four shapes, stance-legality over ρ, entailment/fabrication vetoes, exactly-1 token-trace, Cultivating fallback, SYN·Cultivating forbidden)** — **Fabrication-firewall contract ported and conformance-pinned; the spectral `stanceLegality` chooser itself deliberately deferred.** `packages/spec/row-shapes/index.js` ports `SHAPES`, `DESERT_CELL`/`isDesertCell`, `LEGAL_CELLS`/`legalCellFor` (the four concrete cells, hardcoded — 4.2's own chooser structurally never produces a fifth), `tokenize`/`tokenCount`, `KNOWN_CONNECTIVE_IDS`, `checkTraceCoverage` (exactly-1 bijection, §8), `bidirectionallyEntails` (§7, trace-based per 4.2's own as-built divergence, no NLI model), and the `ROW_VETOES`/`runRowVetoes` battery. Conformance-pinned in `packages/conformance/invariants/stance-templates.test.js` (8 tests): the desert cell is unreachable from any shape, both vetoes catch their named failure modes with no false positive on worked examples. `stanceLegality`'s spectral shape chooser (`buildDensity`/`eigenLenses`), `join.js`, `slots.js`, `plan.js`'s eight composed plans, and `render.js`'s `realizeSlot`/`prosify` remain not ported — they need the terrain/stance enums + diagonal-coherence validator (next item) and real proposition data neither of which exist yet; wiring a spectral chooser on top of a missing cube would be unverifiable. Doc: `docs/row-stance-templates.md`. No generated-prose surface exists yet to route through it — any gloss/blurb/caption surface in eoreaderapp must go through this contract from day one.
 
 - [ ] **Tiny-LLM-for-captioning-only rule** — **Not yet started; no surface yet to test the boundary.** Source: `eoreader4.2:docs/tiny-model-form-surface.md` — summarizer contract `ops=DEF, terrains=Lens, stances=Making` (`src/weave/topline/surface.js`), `classifyToken` treats invented fact/thesis/polarity-flip as a violation. Search for `caption` in `eoreaderapp` returns zero — no LLM-touching reading surface exists there yet. Carry forward and re-apply the moment eoreaderapp adds any such surface.
 
@@ -129,11 +132,18 @@ cannot host a UI component. It may only emit neutral projection data.*
 
 ## Retirement gate (what must be true to freeze-and-forget 4.2)
 
-1. **§4.2 corpus-role firewall** ported and conformance-pinned in `eoreader5/packages/conformance/invariants/`. *(hard blocker)*
-2. **§5 stance-templates + row-veto** ported before any generated prose ships. *(hard blocker — fabrication firewall)*
+1. **§4.2 corpus-role firewall** ported and conformance-pinned in `eoreader5/packages/conformance/invariants/`. *(hard blocker)* — **done**, `corpus-role.test.js`.
+2. **§5 stance-templates + row-veto** ported before any generated prose ships. *(hard blocker — fabrication firewall)* — **done** as a contract (`stance-templates.test.js`); the spectral shape-chooser itself stays open, see the item above.
 3. **§1 physics primitives** (born/deriveNull/relax) and **§2 surprise/individuation/waveform** ported or explicitly deprecated with a recorded reason. `deriveNull` and the individuation gate (mass/coupling/boundary-stability typing) are done; `bornSalience`, `relax`, the surprise math, and the waveform are still open.
 4. Every remaining "Not yet started" item either lands or gets a one-line deprecation, and each transferred capability has a golden fixture or parity result per `docs/invariants.md` "migration ratchet."
 5. The two missing docs: `individuation-gate.md` **now written** (see above); `competency-corpora-status-and-remaining-work.md` is still either written or the checklist corrected to stop citing it.
+
+Both hard blockers (items 1–2) are now landed. Item 3 remains the next
+concrete build-order step (`bornSalience`, `relax`, the physics primitives
+that `src/turn/meta-route.js` composes) — see the "What's Next" build-order
+brief for the full remaining sequence (fold-grid axes, individuation
+rebuild-vs-port reconciliation, entity-to-kind prior induction, deviation
+waveform). Item 4 stays open across most of the checklist above.
 
 Re-run this checklist at each milestone (Page/Outline/Orbit, or whatever the app
 surfaces become) — features get dropped mid-rewrite, not just at planning.

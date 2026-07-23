@@ -55,19 +55,24 @@ export function appendEvents(state, events) {
 export function applyCommand(state, command) {
   validateCommand(command);
   const inputs = command.inputs ?? [];
+  // Corpus-role firewall (docs/corpus-role.md): a command may mark itself
+  // role:'corpus' -- the chokepoint, mirroring eoreader4.2's
+  // createLog({role:'corpus'})/per-event role -- and every event it
+  // produces is sealed with that mark, never trusted from anywhere else.
+  const role = command.role === "corpus" ? "corpus" : undefined;
   if (command.type === "observation.admit") {
     const payload = command.payload?.envelope ? command.payload : { envelope: command.payload, blocks: command.blocks ?? [] };
     verifyObservationBundle(payload.envelope, payload.blocks ?? []);
-    return appendEvents(state, [baseEvent(state, "observation.admitted", "NUL", payload, inputs)]);
+    return appendEvents(state, [baseEvent(state, "observation.admitted", "NUL", payload, inputs, role)]);
   }
-  if (command.type === "effect.result.admit") return appendEvents(state, [baseEvent(state, "effect.result.admitted", "INS", command.payload, inputs)]);
-  if (command.type === "hypothesis.accept") return appendEvents(state, [baseEvent(state, "hypothesis.accepted", "EVA", { ...command.payload, status: "accepted" }, inputs)]);
-  if (command.type === "hypothesis.compete") return appendEvents(state, [baseEvent(state, "hypothesis.competing", "EVA", { ...command.payload, status: "competing" }, inputs)]);
-  if (command.type === "hypothesis.hold") return appendEvents(state, [baseEvent(state, "hypothesis.held", "EVA", { ...command.payload, status: "held" }, inputs)]);
-  if (command.type === "hypothesis.supersede") return appendEvents(state, [baseEvent(state, "hypothesis.superseded", "REC", { ...command.payload, status: "superseded" }, inputs)]);
-  if (command.type === "referent.merge") return appendEvents(state, [baseEvent(state, "referent.merged", "REC", command.payload, inputs)]);
-  if (command.type === "referent.split") return appendEvents(state, [baseEvent(state, "referent.split", "REC", command.payload, inputs)]);
-  if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs)]);
+  if (command.type === "effect.result.admit") return appendEvents(state, [baseEvent(state, "effect.result.admitted", "INS", command.payload, inputs, role)]);
+  if (command.type === "hypothesis.accept") return appendEvents(state, [baseEvent(state, "hypothesis.accepted", "EVA", { ...command.payload, status: "accepted" }, inputs, role)]);
+  if (command.type === "hypothesis.compete") return appendEvents(state, [baseEvent(state, "hypothesis.competing", "EVA", { ...command.payload, status: "competing" }, inputs, role)]);
+  if (command.type === "hypothesis.hold") return appendEvents(state, [baseEvent(state, "hypothesis.held", "EVA", { ...command.payload, status: "held" }, inputs, role)]);
+  if (command.type === "hypothesis.supersede") return appendEvents(state, [baseEvent(state, "hypothesis.superseded", "REC", { ...command.payload, status: "superseded" }, inputs, role)]);
+  if (command.type === "referent.merge") return appendEvents(state, [baseEvent(state, "referent.merged", "REC", command.payload, inputs, role)]);
+  if (command.type === "referent.split") return appendEvents(state, [baseEvent(state, "referent.split", "REC", command.payload, inputs, role)]);
+  if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs, role)]);
   if (command.type === "discovery.advance" || command.type === "discovery.resume") {
     const budget = command.budget ?? {};
     const candidates = discoverCandidates(state, { maxCandidates: budget.max_candidates ?? 100 });
@@ -76,24 +81,25 @@ export function applyCommand(state, command) {
     let knownInputs = inputs;
     for (const candidate of candidates) {
       if (events.length + 2 > maxEvents) break;
-      const proposed = baseEvent(state, "observable.proposed", "SIG", { candidate, status: "candidate" }, knownInputs);
+      const proposed = baseEvent(state, "observable.proposed", "SIG", { candidate, status: "candidate" }, knownInputs, role);
       const decision = evaluate(state, candidate);
-      const evaluated = baseEvent(state, decision.status === "accepted" ? "kind.accepted" : "hypothesis.held", decision.status === "accepted" ? "DEF" : "EVA", { ...candidate, ...decision }, [proposed.event_id]);
+      const evaluated = baseEvent(state, decision.status === "accepted" ? "kind.accepted" : "hypothesis.held", decision.status === "accepted" ? "DEF" : "EVA", { ...candidate, ...decision }, [proposed.event_id], role);
       events.push(proposed, evaluated);
       knownInputs = [evaluated.event_id];
     }
-    if (events.length === 0) events.push(baseEvent(state, "discovery.abstained", "EVA", { reason: (budget.max_events ?? 0) <= 1 ? "held:budget_exhausted" : "no_observation_values" }, inputs));
+    if (events.length === 0) events.push(baseEvent(state, "discovery.abstained", "EVA", { reason: (budget.max_events ?? 0) <= 1 ? "held:budget_exhausted" : "no_observation_values" }, inputs, role));
     const next = appendEvents(state, events);
     return { ...next, continuation: stableId("continuation", { head: next.semanticHead, emitted: events.length, remaining_candidates: Math.max(0, candidates.length - Math.floor(events.length / 2)) }) };
   }
 }
 
-function baseEvent(state, eventType, op, payload, inputs) {
+function baseEvent(state, eventType, op, payload, inputs, role) {
   const body = {
     schema_version: "SemanticEvent@1", operator_epoch: state.operatorEpoch, event_type: eventType, op, inputs,
     provenance: { depends_on: inputs, transformations: [{ id: eventType, engine_version: state.engineVersion }] },
     authority: { actor_id: "engine", grant: { engine_version: state.engineVersion, prior_id: state.priorSnapshot.prior_id } },
     context: { engine_version: state.engineVersion, prior_snapshot: state.priorSnapshot.prior_id }, payload,
+    ...(role ? { role } : {}),
   };
   return { ...body, event_id: stableId("event", body) };
 }
@@ -107,6 +113,16 @@ function reduceEvents(state) {
   const frames = new Map(state.frames);
   let resolution = { verdict: "unresolved", evidence_event_ids: [] };
   for (const event of state.events) {
+    // Corpus-role firewall (docs/corpus-role.md; ported from eoreader4.2
+    // tests/corpus-role.test.js, src/core/project.js "THE FIREWALL (F4)").
+    // A role:'corpus' event is reference-corpus content admitted for
+    // prior/lens calibration, never a document being read. It stays in
+    // state.events (the append-only ledger never refuses to store one,
+    // matching 4.2's F6), so it still appears in project()'s evidence_links,
+    // but it is skipped here unconditionally so it can never mint an
+    // observation/referent/relation/merge/hypothesis/frame/resolution that
+    // a citing surface (search, projection, query) can see.
+    if (event.role === "corpus") continue;
     if (event.event_type === "observation.admitted") {
       const envelope = event.payload.envelope ?? event.payload;
       observations.push(envelope);

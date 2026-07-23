@@ -105,6 +105,13 @@
         "type": "string"
       }
     },
+    "role": {
+      "type": "string",
+      "enum": [
+        "corpus"
+      ],
+      "description": "Corpus-role firewall (docs/corpus-role.md; ported from eoreader4.2 tests/corpus-role.test.js, src/core/project.js). Absent on a plain document event -- never a false-y default. role:'corpus' marks an event as reference-corpus content admitted for prior/lens calibration, never a document being read. The ledger stores a role:'corpus' event like any other (this schema does not refuse to append one), but packages/engine/replay MUST exclude every role:'corpus' event from the projected reading: it may never mint a referent, a relation, a merge, a hypothesis, or a retraction that a citing surface can see."
+    },
     "payload": {
       "type": "object"
     },
