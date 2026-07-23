@@ -139,12 +139,80 @@ Two honesty facts fall out and are tested:
 the promoted operators, which pass minted each, the lens and null each cleared,
 and which ones reuse a prior operator — with the noise series promoting nothing.
 
-### What this seam unlocks but does not build
+### What the operator seam unlocks but does not itself build
 
-The next rung up is **kinds** (§11.3): once an operator like a pressure/level
-tendency exists, SEG can threshold *on it* (`tendency > θ`) to carve the stream
-into regimes and report competency per regime. And the multi-lens **disagreement**
-surface — where a candidate is low-surprise under one baseline and high under
-another — is an app (eoreaderapp) concern; the engine already emits the raw
-material for it, since every `CompetencyRecord` carries per-baseline
-`competency_gain` under a named scope. Neither is implemented here.
+Once an operator like a level tendency exists, SEG can threshold *on it*
+(`tendency > θ`) to carve the stream into regimes and report competency per
+regime — that's the next section.
+
+## Level 2 — mathematical kinds: SEG doing real work (§11.3)
+
+`packages/engine/emergence/kinds` — `induceKind` runs SEG *on a selector's
+output* (a scalar program, which may itself be a promoted operator) to carve a
+series into two regimes, then asks EVA whether a predictor's competency against
+a reference baseline actually differs between them. A partition under which the
+same predictive form wins in one regime and loses in another is a **kind**:
+phase-relative state becomes predictively relevant, exactly section 11.3's
+example ("systems for which phase-relative state predicts the next value").
+
+Three gates, all reused rather than invented, and all necessary — dropping any
+one produces a false positive that was caught and fixed during development:
+
+1. **Data-derived threshold.** Candidate cut points are quantiles of the
+   selector's own fit-side values, never a hand-set constant.
+2. **Permutation null** (§12.8) — shuffle which steps carry which competency
+   gain (breaking the selector/gain association) and require the observed
+   best-threshold differential to clear the derived quantile. Answers "is this
+   split better than a random one."
+3. **Held-out transfer** (invariant 7.6) — the same threshold must still
+   separate competency, in the same direction, on data the threshold was never
+   tuned on.
+4. **Relative effect-size floor** (§1's governing criterion, §13.5/§20) —
+   the permutation null and the transfer gate together are *not* sufficient.
+   This answers a different question than #2: not "is this split
+   distinguishable from chance" but "is it big enough to matter." A
+   near-deterministic series
+   (one steady trend with almost no noise) has almost-zero-variance competency
+   gains, so its own permutation null is almost zero too — a microscopic,
+   practically meaningless differential then clears it easily. The floor
+   requires the held-out differential to be a non-trivial fraction of the
+   reference baseline's own typical loss scale (derived from the fit data, not
+   an absolute constant chosen by hand).
+
+That fourth gate exists because of a real failure caught during development,
+not a hypothetical: a single constant-slope trend (no genuine regime at all)
+cleared the permutation null with p≈0 while its actual effect size was ~0.5% of
+the reference's loss scale — statistically "significant," operationally
+worthless. Testing it required care about proposal/validation separation too:
+the first candidate negative control was a plain random walk, which turned out
+to have a *real* (mechanistic, not spurious) reason to correlate windowed
+tendency with competency gain — persistence's edge over a running mean
+genuinely grows as a random walk drifts from its own history. A stationary
+AR(1) process, which has no such accumulating-distance mechanism, was the
+correct negative control, and it (correctly) induces nothing at multiple
+persistence strengths.
+
+A load-bearing implementation detail, worth naming because it maps directly
+onto the operator-epoch table above: `mean`/`sum`/`last` reducers over `hist`
+are **cumulative since the start of the series**, not a trailing window. Fed
+the full growing history, a selector converges toward a running average and
+washes out exactly the *current* regime SEG needs to cut on. `induceKind`
+evaluates the selector over an explicit trailing `selectorWindow` instead — the
+**finite-windows primitive (INS)** from the twelve-primitives-onto-nine
+mapping, turning out to be load-bearing exactly where that mapping predicted:
+without a stable windowed instance to individuate against, SEG has nothing
+local to carve, and no kind can be minted.
+
+`scripts/induce-kinds-demo.mjs` (importable as `runKindsDemo`) runs one genuine
+regime-switching series (alternating trend/flat legs) against three negative
+controls (a homogeneous trend, a stationary AR(1) process, white noise) — only
+the genuine regime-switch induces a kind.
+
+### What remains unbuilt
+
+The multi-lens **disagreement** surface — where a candidate is low-surprise
+under one baseline/lens and high under another — is an app (eoreaderapp)
+concern; the engine already emits the raw material for it, since every
+`CompetencyRecord` carries per-baseline `competency_gain` under a named scope,
+and every `KindCandidate` names its own lens. Calculus induction (§16) and
+cross-system bridges (§17) remain later phases.
