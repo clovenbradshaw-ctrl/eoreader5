@@ -53,11 +53,14 @@ export function buildTransferPlan(sourceRoot, { excludes = DEFAULT_EXCLUDES } = 
   const files = walk(root, excludes);
   return files.map((absolutePath) => {
     const path = normalize(relative(root, absolutePath));
-    const rule = RULES.find((candidate) => candidate.patterns.some((pattern) => pattern.test(path)));
+    const classificationPath = stripSourcePrefix(path);
+    const rule = RULES.find((candidate) =>
+      candidate.patterns.some((pattern) => pattern.test(classificationPath))
+    );
     return {
       path,
       repo: rule.repo,
-      reason: rule.reason,
+      reason: classificationPath === path ? rule.reason : `${rule.reason}; matched without src/ prefix`,
       sha256: sha256File(absolutePath),
     };
   });
@@ -108,6 +111,10 @@ function sha256File(path) {
 
 function normalize(path) {
   return path.split(sep).join("/");
+}
+
+function stripSourcePrefix(path) {
+  return path.startsWith("src/") ? path.slice(4) : path;
 }
 
 function parseArgs(argv) {
