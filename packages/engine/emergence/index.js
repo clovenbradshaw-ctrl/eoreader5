@@ -11,3 +11,4 @@ export {
   isSeriesNode,
 } from "./expressions/index.js";
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
+export { induceOperators, behavioralFingerprint } from "./operators/index.js";

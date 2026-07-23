@@ -94,5 +94,57 @@ programs instead of running one fixed candidate.
 competency-ranked frontier. On the trend it rediscovers a persistence/drift
 structure (`last(hist)` and `last(hist)+1`) ranked well above the global-mean
 reference — Phase 2's exit criterion, reached by measured competency rather than
-by name. It decides nothing: search proposes and scores; promotion is a later
-phase.
+by name. It decides nothing: search proposes and scores; promotion is below.
+
+## Operator emergence — the REC → INS seam (§11.2, §15.3, §11)
+
+This is the move that turns the ranked frontier into a running **helix**. One
+pass of the nine EO operators (the `eo-2026-07` epoch) ends at REC —
+preserve / revise / promote. `emergence/operators` makes REC actually
+restructure the search grammar: a competent *composition* is minted as a
+reusable operator and re-enters enumeration as a cost-1 `opref` primitive (INS
+at the top of the next pass). Because the same nine moves now range over an
+enlarged vocabulary, the next pass reaches structures the previous one could
+not — no new mechanism, just the loop pointed at its own recent output. The
+kernel→operator mapping this rests on:
+
+```
+Identity      NUL constants     SIG field-selection   INS finite-window
+Structure     SEG comparison    CON lag               SYN fold / count
+Significance  DEF field-algebra EVA conditional        REC composition
+```
+
+The mapping lands on the right cell along *both* axes (mode and act): the
+Relate column is field-selection / lag / conditional, the Generate column is
+window / fold / composition. The scoring rule and the description-length
+penalty are deliberately *not* in it — they are what EVA judges by, and in the
+code they live in `emergence/programs` (the ranker), never as nodes in
+`emergence/expressions` (the IR).
+
+| Module | Spec | Responsibility |
+| --- | --- | --- |
+| `packages/engine/emergence/operators` | 11.2, 15.3, 22.4, 12.8, 7.6 | `induceOperators` runs the helix until a pass promotes nothing. A candidate is promoted only if it (a) combines two *structural* sub-results — a bare reducer or `reducer ± const` is a variant, not a new operator; (b) beats the reference on a **held-out tail** (transfer, invariant 7.6); and (c) clears a **born-null** derived by shuffling the series (§12.8 — no hand-set thresholds). Each promoted `OperatorCandidate` stores its lens (target/horizon/reference baseline — "surprising relative to what"), its transfer gain, its null record, and `emergence: { promoted_by: "REC", reenters_as: "INS" }`. |
+
+Two honesty facts fall out and are tested:
+
+- On a hierarchical (trend + season) series, pass 0 mints structural operators
+  (momentum, drift = `mean(diff)+last`, the §11.2 operator by competency not
+  name) and **pass 1 promotes an operator built atop a pass-0 operator** — the
+  recursion, made checkable.
+- On **white noise, nothing promotes.** The in-sample winners are all
+  `reducer ± const` constant-offset artifacts; the structural rule rejects them
+  as variants and the transfer gate refuses what does not generalize.
+
+`scripts/induce-operators-demo.mjs` (importable as `runInductionDemo`) prints
+the promoted operators, which pass minted each, the lens and null each cleared,
+and which ones reuse a prior operator — with the noise series promoting nothing.
+
+### What this seam unlocks but does not build
+
+The next rung up is **kinds** (§11.3): once an operator like a pressure/level
+tendency exists, SEG can threshold *on it* (`tendency > θ`) to carve the stream
+into regimes and report competency per regime. And the multi-lens **disagreement**
+surface — where a candidate is low-surprise under one baseline and high under
+another — is an app (eoreaderapp) concern; the engine already emits the raw
+material for it, since every `CompetencyRecord` carries per-baseline
+`competency_gain` under a named scope. Neither is implemented here.

@@ -21,7 +21,13 @@
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 
 const SERIES_OPS = new Set(["hist", "diff", "lag"]);
-const SCALAR_OPS = new Set(["const", "last", "sum", "mean", "count", "add", "sub", "mul", "div"]);
+// `opref` is a promoted operator re-entering search as a cost-1 primitive
+// (the REC->INS handoff, spec sections 11.2 / 15.3): a composition that earned
+// promotion is minted as a stable instance and reused by name, so a program
+// that uses it is *cheaper* than its expansion. It is scalar-valued: operators
+// induced by this engine are scalar programs of a history. The underlying
+// program is carried inline (node.program) so evaluation stays pure and local.
+const SCALAR_OPS = new Set(["const", "last", "sum", "mean", "count", "add", "sub", "mul", "div", "opref"]);
 
 /** Is a node series-valued (vs scalar-valued)? Throws on an unknown op. */
 export function isSeriesNode(node) {
@@ -84,6 +90,12 @@ export function evalNode(node, history) {
       const b = evalScalar(node.b, history);
       return b === 0 ? a : a / b; // protected division (Section 29.3)
     }
+    case "opref":
+      // A promoted operator: evaluate its inline program. This is the same nine
+      // moves recursing on their own output — the operator is a stable instance
+      // (INS) minted by a prior REC, now reused by name.
+      if (!node.program) throw new TypeError("expressions: opref node missing its inline program");
+      return evalNode(node.program, history);
     default:
       throw new TypeError(`expressions: unknown op ${node.op}`);
   }
@@ -106,8 +118,15 @@ export function evaluateProgram(program, history) {
   return value;
 }
 
-/** Description length: node count (proxy for spec 13.5 DescriptionLength). */
+/**
+ * Description length: node count (proxy for spec 13.5 DescriptionLength). A
+ * promoted operator (`opref`) counts as a single primitive regardless of the
+ * size of its inline program — that compression is exactly why promotion
+ * reduces description length (section 15.3) and why the utility function
+ * prefers a reused operator over its expansion.
+ */
 export function descriptionLength(node) {
+  if (node.op === "opref") return 1;
   let count = 1;
   for (const child of ["of", "a", "b"]) if (node[child]) count += descriptionLength(node[child]);
   return count;
@@ -149,8 +168,12 @@ export function predictWith(program, history, { warmup = 2 } = {}) {
  * @param {number[]} [opts.constants=[0, 1]] - constant leaves permitted.
  * @param {number[]} [opts.lags=[1]] - lag offsets permitted.
  * @param {number} [opts.maxPrograms=256] - hard cap on returned programs.
+ * @param {object[]} [opts.library=[]] - promoted operators re-entering search,
+ *   each `{ id, program }`. They join the scalar pool as cost-1 `opref` leaves
+ *   (the REC->INS handoff), so the next pass can compose atop them and reach
+ *   structures that were beyond the depth budget of raw primitives.
  */
-export function enumeratePrograms({ maxSeriesDepth = 2, constants = [0, 1], lags = [1], maxPrograms = 256 } = {}) {
+export function enumeratePrograms({ maxSeriesDepth = 2, constants = [0, 1], lags = [1], maxPrograms = 256, library = [] } = {}) {
   // Series builders, bounded in depth.
   const series = [];
   const seen = new Set();
@@ -186,6 +209,8 @@ export function enumeratePrograms({ maxSeriesDepth = 2, constants = [0, 1], lags
     pushScalar({ op: "mean", of: s });
     pushScalar({ op: "sum", of: s });
   }
+  // Promoted operators re-enter here as cost-1 scalar leaves.
+  for (const op of library) pushScalar({ op: "opref", id: op.id, program: op.program });
 
   // One layer of binary composition (add/sub) over the scalar pool.
   const composed = [...scalars];
