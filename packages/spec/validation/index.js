@@ -128,3 +128,57 @@ export function validateReadingSnapshot(value, name = "ReadingSnapshot") {
   array(v.units, name, "units");
   return v;
 }
+
+// Predictive-competency records (spec "EO Emergent Mathematics for Predictive
+// Competency", section 12.2 / 22.1, invariant 7.1 / 22.2, section 13.2 / 22.3).
+
+const PREDICTIVE_KINDS = new Set(["point", "gaussian", "categorical", "quantiles", "samples"]);
+const WARRANT_BANDS = new Set(["strong", "supported", "weak", "defeated", "unknown"]);
+const COMPETENCY_STATUSES = new Set(["experimental", "replicated", "failed", "invalidated"]);
+
+export function validatePredictionTask(value, name = "PredictionTask") {
+  const v = object(value, name);
+  if (v.schema !== "PredictionTask@1") fail(name, "schema must be PredictionTask@1");
+  string(v.id, name, "id"); string(v.target_type, name, "target_type"); string(v.scoring_rule, name, "scoring_rule"); string(v.population, name, "population");
+  object(v.horizon, name);
+  array(v.baseline_ids, name, "baseline_ids");
+  if (v.baseline_ids.length < 1) fail(name, "at least one baseline_id is required (section 13.4)");
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
+
+export function validatePredictionCommitment(value, name = "PredictionCommitment") {
+  const v = object(value, name);
+  if (v.schema !== "PredictionCommitment@1") fail(name, "schema must be PredictionCommitment@1");
+  for (const field of ["commitment_id", "task_id", "candidate_id", "candidate_version_hash", "input_snapshot_hash"]) string(v[field], name, field);
+  array(v.active_prior_hashes, name, "active_prior_hashes");
+  object(v.predictive_output, name);
+  if (!PREDICTIVE_KINDS.has(v.predictive_output.kind)) fail(name, `invalid predictive_output.kind ${v.predictive_output.kind}`);
+  if (!Number.isInteger(v.committed_at_step) || v.committed_at_step < 0) fail(name, "committed_at_step must be a non-negative integer");
+  if (!Number.isInteger(v.reveal_not_before_step) || v.reveal_not_before_step < 0) fail(name, "reveal_not_before_step must be a non-negative integer");
+  if (v.reveal_not_before_step <= v.committed_at_step) fail(name, "reveal_not_before_step must be strictly after committed_at_step (invariant 7.1)");
+  hash(v.commitment_hash, name, "commitment_hash");
+  const { commitment_id, commitment_hash, ...body } = v;
+  if (commitment_hash !== canonicalHashSync(body)) {
+    fail(name, "commitment_hash does not match canonical commitment content (invariant 7.1: predictions are sealed)");
+  }
+  return v;
+}
+
+export function validateCompetencyRecord(value, name = "CompetencyRecord") {
+  const v = object(value, name);
+  if (v.schema !== "CompetencyRecord@1") fail(name, "schema must be CompetencyRecord@1");
+  string(v.id, name, "id"); string(v.candidate_id, name, "candidate_id"); string(v.task_id, name, "task_id"); string(v.scoring_rule, name, "scoring_rule");
+  array(v.baseline_ids, name, "baseline_ids");
+  if (v.baseline_ids.length < 1) fail(name, "at least one baseline_id is required (invariant 7.5)");
+  const scope = object(v.scope, `${name}.scope`);
+  object(scope.horizon, name); string(scope.population, name, "scope.population"); array(scope.source_versions, name, "scope.source_versions"); string(scope.evaluation_protocol, name, "scope.evaluation_protocol");
+  if (!Number.isInteger(v.observations) || v.observations < 0) fail(name, "observations must be a non-negative integer");
+  if (!Number.isInteger(v.proper_observations) || v.proper_observations < 0) fail(name, "proper_observations must be a non-negative integer");
+  if (typeof v.cumulative_loss !== "number") fail(name, "cumulative_loss must be a number");
+  object(v.baseline_losses, name); object(v.competency_gain, name);
+  if (!WARRANT_BANDS.has(v.warrant_status)) fail(name, `invalid warrant_status ${v.warrant_status}`);
+  if (!COMPETENCY_STATUSES.has(v.status)) fail(name, `invalid status ${v.status}`);
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}

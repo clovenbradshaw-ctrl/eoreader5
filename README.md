@@ -6,6 +6,8 @@ full boundary and `docs/operator-epoch.md` for the P0 operator vocabulary
 decision. `docs/invariants.md`, `docs/priors-boundary.md`,
 `docs/compatibility.md`, and `docs/migration.md` define the separate-repo
 transfer boundaries for eoreader5, eoprior, and eoreaderapp.
+`docs/predictive-competency-phase0.md` documents the Phase 0 predictive-competency
+substrate (commit-before-reveal, proper scoring, baselines, competency ledger).
 
 ## Packages
 

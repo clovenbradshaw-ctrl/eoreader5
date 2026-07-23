@@ -15,5 +15,36 @@ export { jaccardDistance, computeBoundaryStabilityGate } from "./emergence/bound
 
 export { search } from "./search/index.js";
 
+// Predictive-competency substrate (spec "EO Emergent Mathematics for
+// Predictive Competency", Phase 0 / Section 29): proper scoring, minimum
+// baselines, leakage-safe prediction commitments, walk-forward tasks, and the
+// prequential competency ledger.
+export {
+  score,
+  logLoss,
+  brierScore,
+  crps,
+  pinballLoss,
+  squaredError,
+  absoluteError,
+  SCORING_RULES,
+} from "./prediction/scoring/index.js";
+export {
+  lastValue,
+  randomWalk,
+  globalMean,
+  movingMean,
+  seasonalPersistence,
+  defaultNumericBaselines,
+} from "./prediction/baselines/index.js";
+export { commitPrediction, revealAndScore } from "./prediction/commitments/index.js";
+export { createPredictionTask, walkForward } from "./prediction/tasks/index.js";
+export {
+  createLedger,
+  recordStep,
+  competencyGain,
+  finalizeCompetency,
+} from "./competency/ledger/index.js";
+
 export { createEOReaderEngine } from "./runner.js";
 export { verifyObservationBundle, materializeObservationIndex, blockContentHash } from "./observation-index.js";

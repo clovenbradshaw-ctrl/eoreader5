@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/prediction-task.schema.json",
+  "title": "PredictionTask",
+  "description": "A typed prediction task (spec 'EO Emergent Mathematics for Predictive Competency' section 12.2 / record 22.1). There is no untyped 'predict what happens next': a task names its target type, horizon, scoring rule, baselines, evaluation population, and leakage policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "target_type", "horizon", "scoring_rule", "baseline_ids", "population", "leakage_policy", "provenance", "content_hash"],
+  "properties": {
+    "schema": { "const": "PredictionTask@1" },
+    "id": { "type": "string" },
+    "target_type": { "type": "string", "description": "Type of the withheld target, e.g. 'number'." },
+    "horizon": { "type": "object", "description": "Horizon spec, e.g. { kind: 'walk-forward', h: 1 }." },
+    "scoring_rule": { "type": "string" },
+    "baseline_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "population": { "type": "string" },
+    "leakage_policy": { "type": "string" },
+    "provenance": { "type": "array" },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}
