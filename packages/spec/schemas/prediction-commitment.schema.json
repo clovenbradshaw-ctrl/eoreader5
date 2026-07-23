@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/prediction-commitment.schema.json",
+  "title": "PredictionCommitment",
+  "description": "An immutable record of a candidate's predictive output created before its target is revealed (spec invariant 7.1, record 22.2). The engine is pure and reads no ambient clock, so 'before' is a caller-supplied logical step index from the prequential walk-forward: reveal_not_before_step must be strictly after committed_at_step. commitment_hash seals every committed field so the prediction cannot be edited after the fact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "commitment_id", "task_id", "candidate_id", "candidate_version_hash", "input_snapshot_hash", "active_prior_hashes", "predictive_output", "committed_at_step", "reveal_not_before_step", "commitment_hash"],
+  "properties": {
+    "schema": { "const": "PredictionCommitment@1" },
+    "commitment_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "candidate_version_hash": { "type": "string" },
+    "input_snapshot_hash": { "type": "string", "description": "Hash of the history the prediction was allowed to see." },
+    "active_prior_hashes": { "type": "array", "items": { "type": "string" } },
+    "predictive_output": {
+      "type": "object",
+      "description": "Tagged predictive distribution: point | gaussian | categorical | quantiles | samples.",
+      "required": ["kind"],
+      "properties": { "kind": { "enum": ["point", "gaussian", "categorical", "quantiles", "samples"] } }
+    },
+    "committed_at_step": { "type": "integer", "minimum": 0 },
+    "reveal_not_before_step": { "type": "integer", "minimum": 0 },
+    "commitment_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

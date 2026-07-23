@@ -12,7 +12,15 @@
     "./replay": "./replay/index.js",
     "./projection": "./projection/index.js",
     "./search": "./search/index.js",
-    "./emergence": "./emergence/index.js"
+    "./emergence": "./emergence/index.js",
+    "./emergence/expressions": "./emergence/expressions/index.js",
+    "./emergence/programs": "./emergence/programs/index.js",
+    "./emergence/operators": "./emergence/operators/index.js",
+    "./prediction/scoring": "./prediction/scoring/index.js",
+    "./prediction/baselines": "./prediction/baselines/index.js",
+    "./prediction/commitments": "./prediction/commitments/index.js",
+    "./prediction/tasks": "./prediction/tasks/index.js",
+    "./competency/ledger": "./competency/ledger/index.js"
   },
   "scripts": {
     "test": "node --test"
