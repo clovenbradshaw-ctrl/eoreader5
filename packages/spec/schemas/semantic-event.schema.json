@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/semantic-event.schema.json",
+  "title": "SemanticEvent",
+  "description": "Canonical append-only unit of the EOReader semantic ledger. event_id MUST be a hash of the canonical (schema_version, operator_epoch, op, site, observation_id, referents, frame, resolution, provenance, authority, inputs, payload) tuple via packages/spec/canonical-json. provenance and authority are kept as separate top-level fields deliberately (section 3.2) — neither may substitute for the other.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "operator_epoch", "op", "inputs", "provenance", "authority"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "event_id": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" },
+    "operator_epoch": { "type": "string", "minLength": 1 },
+    "op": {
+      "type": "string",
+      "enum": ["NUL", "SEG", "DEF", "SIG", "CON", "EVA", "INS", "SYN", "REC"]
+    },
+    "site": { "type": "object" },
+    "observation_id": { "type": "string" },
+    "referents": { "type": "array", "items": { "type": "string" } },
+    "frame": { "type": "object" },
+    "resolution": { "type": "object" },
+    "provenance": {
+      "type": "object",
+      "description": "What this event depends on: prior observations, selectors, transformations.",
+      "additionalProperties": false,
+      "required": ["depends_on"],
+      "properties": {
+        "depends_on": { "type": "array", "items": { "type": "string" } },
+        "transformations": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "description": "What entitles the observing agent to assert this event's frame/commitment.",
+      "additionalProperties": false,
+      "required": ["actor_id", "grant"],
+      "properties": {
+        "actor_id": { "type": "string", "minLength": 1 },
+        "grant": { "type": "object" }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Causal predecessor event_ids. Canonical order is topological with deterministic tie-breaking; this array is NOT the intrinsic identity of the event, and no engine module may call Date.now() to order events.",
+      "items": { "type": "string" }
+    },
+    "payload": { "type": "object" }
+  }
+}

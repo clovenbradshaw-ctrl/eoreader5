@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/legacy42-envelope.schema.json",
+  "title": "Legacy42Envelope",
+  "description": "Wraps a 4.2 compatibility import. Preserves original identifiers without promoting app identities (room, topic, folder, turn) into engine ontology.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "legacy_version", "artifact_type", "original_ids", "source_hashes", "imported_by", "import_policy"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "legacy_version": { "type": "string", "minLength": 1 },
+    "artifact_type": { "type": "string", "minLength": 1 },
+    "original_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "source_hashes": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" } },
+    "payload": { "type": "object" },
+    "provenance": { "type": "object" },
+    "imported_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "import_policy": { "type": "string", "minLength": 1 }
+  }
+}

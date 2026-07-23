@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/prior-snapshot.schema.json",
+  "title": "PriorSnapshot",
+  "description": "Immutable, content-addressed artifact published by eoPriors and pinned by the app for a later engine run. No 'current prior' pointer belongs inside engine state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "prior_id", "operator_epoch", "ledger_head", "basis_id", "content_hash"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "prior_id": { "type": "string", "minLength": 1 },
+    "operator_epoch": { "type": "string", "minLength": 1 },
+    "ledger_head": { "type": "string", "minLength": 1 },
+    "basis_id": { "type": "string", "minLength": 1 },
+    "convention_set_id": { "type": "string" },
+    "policy_ids": { "type": "array", "items": { "type": "string" } },
+    "algorithm_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "content_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" },
+    "channels": { "type": "array", "items": { "type": "string" } }
+  }
+}

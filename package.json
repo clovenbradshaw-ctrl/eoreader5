@@ -1,0 +1,10 @@
+{
+  "name": "eoreader5",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The pure semantic engine used by an EO Reader application. See docs/architecture.md.",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "npm test --workspaces --if-present"
+  }
+}

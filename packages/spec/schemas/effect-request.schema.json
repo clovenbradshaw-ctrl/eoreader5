@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/effect-request.schema.json",
+  "title": "EffectRequest",
+  "description": "A typed description of an effect the engine would like performed, not ambient authority. The app decides whether/how to execute it via an app workflow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["effect_id", "kind", "input"],
+  "properties": {
+    "effect_id": { "type": "string", "minLength": 1 },
+    "kind": {
+      "type": "string",
+      "enum": ["search", "fetch", "embed", "classify", "model-realize", "persist", "clock", "user-decision"]
+    },
+    "input": { "type": "object" },
+    "purpose": { "type": "string" },
+    "constraints": { "type": "object" }
+  }
+}

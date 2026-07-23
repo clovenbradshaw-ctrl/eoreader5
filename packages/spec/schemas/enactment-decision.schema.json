@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/enactment-decision.schema.json",
+  "title": "EnactmentDecision",
+  "description": "Engine output for evaluate(state, candidateSurface). The engine returns evidence-bound content and ordering; the app performs realization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["admit", "qualify", "hold", "veto"] },
+    "grounded_claims": { "type": "array" },
+    "unsupported_claims": { "type": "array" },
+    "conflicting_claims": { "type": "array" },
+    "alternatives": { "type": "array" },
+    "citations": { "type": "array" },
+    "flags": { "type": "array", "items": { "type": "string" } },
+    "render_plan": { "type": "object" },
+    "commitment_events": { "type": "array", "items": { "type": "string" } }
+  }
+}

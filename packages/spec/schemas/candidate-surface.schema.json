@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/candidate-surface.schema.json",
+  "title": "CandidateSurface",
+  "description": "Submitted by any producer (human, template, deterministic renderer, LLM, code generator) for engine evaluation. The engine MUST NOT privilege model-produced content over any other producer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidate_id", "content", "producer"],
+  "properties": {
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "content": { "type": "string" },
+    "slots": { "type": "array" },
+    "claims": { "type": "array" },
+    "joins": { "type": "array" },
+    "requested_mode": { "type": "string" },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "model_id": { "type": "string" }
+      }
+    }
+  }
+}
