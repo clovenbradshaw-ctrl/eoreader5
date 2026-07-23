@@ -11,6 +11,7 @@
     "./subassemblies": "./subassemblies/index.js",
     "./replay": "./replay/index.js",
     "./projection": "./projection/index.js",
+    "./search": "./search/index.js",
     "./emergence": "./emergence/index.js"
   },
   "scripts": {
