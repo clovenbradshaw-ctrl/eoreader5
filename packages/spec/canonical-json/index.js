@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Canonical JSON and content-hash rules (spec section 8, P0 work item).
 //
 // Rules:
@@ -69,4 +70,10 @@ function defaultSubtle() {
   throw new Error(
     "canonicalHash: no WebCrypto subtle implementation available; pass { subtle } explicitly"
   );
+}
+
+
+/** Synchronous SHA-256 content hash for Node-based ledger code. */
+export function canonicalHashSync(value) {
+  return `sha256:${createHash("sha256").update(canonicalJsonStringify(value)).digest("hex")}`;
 }
