@@ -23,7 +23,7 @@ transfer boundaries for eoreader5, eoprior, and eoreaderapp.
 ## Status
 
 Phase 0/P0 in progress: operator epoch declared, core schemas published,
-canonical JSON/hash rules implemented, referent candidate/merge/split laws and the holonic watchmaker subassembly registry
+canonical JSON/hash rules implemented, referent candidate/merge/split laws, a deterministic evidence-only `search(state, QueryRequest) -> QueryReading` surface, and the holonic watchmaker subassembly registry
 implemented with provenance-preserving semantics, and a static
 forbidden-dependency purity gate is in place for `packages/engine`.
 

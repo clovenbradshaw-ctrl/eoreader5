@@ -3,3 +3,5 @@ export { CORE_SUBASSEMBLIES, assembleWatchmaker, defineSubassembly } from "./sub
 export { createState, applyCommand, appendEvents, replay, read } from "./replay/index.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
+
+export { search } from "./search/index.js";
