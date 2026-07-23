@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/run-request.schema.json",
+  "title": "RunRequest",
+  "description": "Canonical app-to-engine request. Contains normalized observations, resolved blocks, pinned prior artifacts, frame/lens context, budgets, continuation state, and optional queries without leaking app records.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "context", "prior", "observations"],
+  "properties": {
+    "schema": { "const": "RunRequest@1" },
+    "context": { "$ref": "run-context.schema.json" },
+    "prior": { "$ref": "resolved-prior-bundle.schema.json" },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["envelope", "blocks"],
+        "properties": { "envelope": { "$ref": "observation-envelope.schema.json" }, "blocks": { "type": "array", "items": { "$ref": "observation-block.schema.json" } } }
+      }
+    },
+    "budget": { "type": "object" },
+    "continuation": { "type": "object" },
+    "queries": { "type": "array", "items": { "$ref": "query-request.schema.json" } }
+  }
+}

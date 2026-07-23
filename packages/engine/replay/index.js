@@ -2,6 +2,9 @@ import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 import { validateCommand, validatePriorSnapshot, validateSemanticEvent } from "@eoreader/spec";
 import { isCurrentOperator } from "@eoreader/spec/operators";
 import { projectReferents } from "../referents/index.js";
+import { materializeObservationIndex, verifyObservationBundle } from "../observation-index.js";
+import { discoverCandidates } from "../emergence/search/index.js";
+import { evaluate } from "../emergence/evaluate/index.js";
 
 function stableId(prefix, value) {
   return `${prefix}:${canonicalHashSync(value)}`;
@@ -17,6 +20,8 @@ export function createState({ engineVersion, operatorEpoch, priorSnapshot }) {
     events: [],
     semanticHead: "head:empty",
     observations: [],
+    blockStore: new Map(),
+    observationIndex: { fields: new Map(), axes: new Map(), values: [] },
     referents: new Map(),
     hypotheses: { accepted: [], competing: [], held: [], abstentions: [] },
     frames: new Map([["frame:default", { frame_id: "frame:default", label: "Default frame" }]]),
@@ -50,7 +55,11 @@ export function appendEvents(state, events) {
 export function applyCommand(state, command) {
   validateCommand(command);
   const inputs = command.inputs ?? [];
-  if (command.type === "observation.admit") return appendEvents(state, [baseEvent(state, "observation.admitted", "NUL", command.payload, inputs)]);
+  if (command.type === "observation.admit") {
+    const payload = command.payload?.envelope ? command.payload : { envelope: command.payload, blocks: command.blocks ?? [] };
+    verifyObservationBundle(payload.envelope, payload.blocks ?? []);
+    return appendEvents(state, [baseEvent(state, "observation.admitted", "NUL", payload, inputs)]);
+  }
   if (command.type === "effect.result.admit") return appendEvents(state, [baseEvent(state, "effect.result.admitted", "INS", command.payload, inputs)]);
   if (command.type === "hypothesis.accept") return appendEvents(state, [baseEvent(state, "hypothesis.accepted", "EVA", { ...command.payload, status: "accepted" }, inputs)]);
   if (command.type === "hypothesis.compete") return appendEvents(state, [baseEvent(state, "hypothesis.competing", "EVA", { ...command.payload, status: "competing" }, inputs)]);
@@ -60,9 +69,22 @@ export function applyCommand(state, command) {
   if (command.type === "referent.split") return appendEvents(state, [baseEvent(state, "referent.split", "REC", command.payload, inputs)]);
   if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs)]);
   if (command.type === "discovery.advance" || command.type === "discovery.resume") {
-    const remaining = Math.max(0, (command.budget?.max_events ?? 1) - 1);
-    const next = appendEvents(state, [baseEvent(state, "discovery.abstained", "EVA", { reason: remaining === 0 ? "held:budget_exhausted" : "no_candidate_cleared_null" }, inputs)]);
-    return { ...next, continuation: stableId("continuation", { head: next.semanticHead, remaining }) };
+    const budget = command.budget ?? {};
+    const candidates = discoverCandidates(state, { maxCandidates: budget.max_candidates ?? 100 });
+    const maxEvents = Math.max(1, budget.max_events ?? candidates.length * 2 + 1);
+    const events = [];
+    let knownInputs = inputs;
+    for (const candidate of candidates) {
+      if (events.length + 2 > maxEvents) break;
+      const proposed = baseEvent(state, "observable.proposed", "SIG", { candidate, status: "candidate" }, knownInputs);
+      const decision = evaluate(state, candidate);
+      const evaluated = baseEvent(state, decision.status === "accepted" ? "kind.accepted" : "hypothesis.held", decision.status === "accepted" ? "DEF" : "EVA", { ...candidate, ...decision }, [proposed.event_id]);
+      events.push(proposed, evaluated);
+      knownInputs = [evaluated.event_id];
+    }
+    if (events.length === 0) events.push(baseEvent(state, "discovery.abstained", "EVA", { reason: (budget.max_events ?? 0) <= 1 ? "held:budget_exhausted" : "no_observation_values" }, inputs));
+    const next = appendEvents(state, events);
+    return { ...next, continuation: stableId("continuation", { head: next.semanticHead, emitted: events.length, remaining_candidates: Math.max(0, candidates.length - Math.floor(events.length / 2)) }) };
   }
 }
 
@@ -78,6 +100,7 @@ function baseEvent(state, eventType, op, payload, inputs) {
 
 function reduceEvents(state) {
   const observations = [];
+  const blockStore = new Map();
   const byId = new Map();
   const abstentions = [];
   const referentEvents = [];
@@ -85,8 +108,10 @@ function reduceEvents(state) {
   let resolution = { verdict: "unresolved", evidence_event_ids: [] };
   for (const event of state.events) {
     if (event.event_type === "observation.admitted") {
-      observations.push(event.payload);
-      for (const surface of event.payload?.anchors?.surfaces ?? []) referentEvents.push({ type: "admit", referent_id: surface.referent_id, surface: surface.text, provenance: { event_id: event.event_id } });
+      const envelope = event.payload.envelope ?? event.payload;
+      observations.push(envelope);
+      for (const block of event.payload.blocks ?? []) blockStore.set(block.block_id, block);
+      for (const surface of envelope?.anchors?.surfaces ?? []) referentEvents.push({ type: "admit", referent_id: surface.referent_id, surface: surface.text, provenance: { event_id: event.event_id } });
     }
     if (event.event_type === "referent.merged") referentEvents.push({ type: "merge", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
     if (event.event_type === "referent.split") referentEvents.push({ type: "split", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
@@ -109,7 +134,8 @@ function reduceEvents(state) {
   }
   const semanticHead = state.events.length ? stableId("head", state.events.map((event) => event.event_id)) : "head:empty";
   const referents = projectReferents(referentEvents);
-  return { ...state, semanticHead, observations, referents, hypotheses: { accepted, competing, held, abstentions }, frames, resolution, projectedState: { observations, referents: [...referents.values()], hypotheses: [...accepted, ...competing, ...held], frames: [...frames.values()], resolution } };
+  const observationIndex = materializeObservationIndex(observations, blockStore);
+  return { ...state, semanticHead, observations, blockStore, observationIndex, referents, hypotheses: { accepted, competing, held, abstentions }, frames, resolution, projectedState: { observations, referents: [...referents.values()], hypotheses: [...accepted, ...competing, ...held], frames: [...frames.values()], resolution } };
 }
 
 export function replay(events, options) { return appendEvents(createState({ engineVersion: options.engineVersion ?? "unknown", operatorEpoch: options.operatorEpoch ?? "unknown", priorSnapshot: options.priorSnapshot }), events); }

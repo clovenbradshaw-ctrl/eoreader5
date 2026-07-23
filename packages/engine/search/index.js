@@ -11,8 +11,11 @@ function tokenize(value) {
 }
 
 function collectUnitText(unit) {
-  return [unit.source_id, unit.field_id, unit.block_id, ...(unit.axes ?? []), ...(unit.surfaces ?? [])].filter(Boolean).join(" ");
+  return [unit.source_id, unit.field_id, unit.block_id, ...(unit.axes ?? []), ...(unit.surfaces ?? []), ...(unit.values ?? [])].filter(Boolean).join(" ");
 }
+
+function blockStoreValues(state, blockId) { return (state.blockStore?.get(blockId)?.values ?? []).filter((value) => typeof value === "string"); }
+function blockStoreSelectors(state, blockId) { return state.blockStore?.get(blockId)?.selectors ?? []; }
 
 function buildUnits(state) {
   const surfaceBySource = new Map();
@@ -31,8 +34,10 @@ function buildUnits(state) {
     block_id: field.block_id,
     axes: field.axes ?? [],
     surfaces: surfaceBySource.get(observation.source_id) ?? [],
-    evidence_event_ids: (state.events ?? [])
-      .filter((event) => event.payload?.source_id === observation.source_id || event.payload?.fields?.some?.((candidate) => candidate.field_id === field.field_id))
+      values: blockStoreValues(state, field.block_id),
+    selectors: blockStoreSelectors(state, field.block_id),
+      evidence_event_ids: (state.events ?? [])
+      .filter((event) => (event.payload?.envelope?.source_id ?? event.payload?.source_id) === observation.source_id || (event.payload?.envelope?.fields ?? event.payload?.fields)?.some?.((candidate) => candidate.field_id === field.field_id))
       .map((event) => event.event_id),
   })));
 }
@@ -63,7 +68,8 @@ export function search(state, request = {}) {
       block_id: unit.block_id,
       score,
       anchors: {
-        exact_text: unit.surfaces,
+        exact_text: unit.values.length ? unit.values : unit.surfaces,
+        selectors: unit.selectors,
         axes: unit.axes,
       },
       evidence_event_ids: unit.evidence_event_ids,

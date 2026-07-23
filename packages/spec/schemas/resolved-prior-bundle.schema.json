@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/resolved-prior-bundle.schema.json",
+  "title": "ResolvedPriorBundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "snapshot", "packs", "content_hash"],
+  "properties": {
+    "schema": { "const": "ResolvedPriorBundle@1" },
+    "snapshot": { "$ref": "prior-snapshot.schema.json" },
+    "packs": { "type": "array", "items": { "type": "object" } },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]+$" }
+  }
+}

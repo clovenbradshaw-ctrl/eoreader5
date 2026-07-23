@@ -73,7 +73,7 @@ export function validateCommand(value, name = "Command") {
   const allowed = new Set(["observation.admit", "effect.result.admit", "hypothesis.accept", "hypothesis.compete", "hypothesis.hold", "hypothesis.supersede", "referent.merge", "referent.split", "referent.same_as", "discovery.advance", "discovery.resume"]);
   if (!allowed.has(v.type)) fail(name, `unknown command type ${v.type}`);
   if (v.inputs !== undefined) array(v.inputs, name, "inputs");
-  if (v.type === "observation.admit") validateObservationEnvelope(v.payload);
+  if (v.type === "observation.admit") validateObservationEnvelope(v.payload?.envelope ?? v.payload);
   if (v.type === "effect.result.admit") validateEffectResult(v.payload);
   return v;
 }
