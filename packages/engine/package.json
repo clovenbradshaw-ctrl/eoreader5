@@ -13,6 +13,8 @@
     "./projection": "./projection/index.js",
     "./search": "./search/index.js",
     "./emergence": "./emergence/index.js",
+    "./emergence/expressions": "./emergence/expressions/index.js",
+    "./emergence/programs": "./emergence/programs/index.js",
     "./prediction/scoring": "./prediction/scoring/index.js",
     "./prediction/baselines": "./prediction/baselines/index.js",
     "./prediction/commitments": "./prediction/commitments/index.js",

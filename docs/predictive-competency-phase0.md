@@ -69,11 +69,30 @@ and it stays deterministic and replayable.
 ## Run it
 
 ```
-npm test                              # all workspaces incl. the purity gate
-node scripts/predict-series-demo.mjs  # the Section 29 slice, with replay check
+npm test                               # all workspaces incl. the purity gate
+node scripts/predict-series-demo.mjs   # the Section 29 slice, with replay check
+node scripts/search-programs-demo.mjs  # Phase 2 program search (below)
 ```
 
 The demo (`scripts/predict-series-demo.mjs`, importable as `runPredictiveSlice`
 / `runSeries`) runs three synthetic series, prints per-series competency gain
 versus every baseline and a Section-25.1 "thinking surface" for the last
 committed step, and confirms `deterministic replay: true`.
+
+## Phase 2 — bounded typed program search (§14, §29.5)
+
+On top of the substrate, a bounded typed enumerator *searches* for competent
+programs instead of running one fixed candidate.
+
+| Module | Spec | Responsibility |
+| --- | --- | --- |
+| `packages/engine/emergence/expressions` | 14, 15, 29.3-29.4 | Numeric-program IR (the Section 29 kernel as reducible compositions — `last`, `sum`, `mean`, `diff`, `lag`, `add/sub/mul`, protected `div`), evaluator, canonical-key dedup (§15), and a bounded, deterministic enumerator. |
+| `packages/engine/emergence/programs` | 14, 29.5-29.6 | `searchCompetentPrograms` scores every enumerated program prequentially (commit-before-reveal) against the standard baselines and ranks by a description-length-penalized utility (§13.5). Ranking uses **CRPS** — a proper score (§13.1) that stays robust when a program's self-derived spread is momentarily miscalibrated. |
+
+`scripts/search-programs-demo.mjs` (importable as `runSearchDemo`) enumerates
+~80 programs over a synthetic trend and a seasonal series and prints the
+competency-ranked frontier. On the trend it rediscovers a persistence/drift
+structure (`last(hist)` and `last(hist)+1`) ranked well above the global-mean
+reference — Phase 2's exit criterion, reached by measured competency rather than
+by name. It decides nothing: search proposes and scores; promotion is a later
+phase.
