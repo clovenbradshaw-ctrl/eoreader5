@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/null-protocol.schema.json",
+  "title": "NullProtocol",
+  "description": "The Born-null threshold record for one promotion-gate statistic (spec 12.8: scoring rules measure, deriveNull decides). No promotion gate may compare a statistic to a hand-set constant; every threshold traces back to one of these records, naming the exact perturbation of the actual data it was derived from.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "null_protocol", "sample_count", "quantile", "tail_direction", "threshold", "observed_statistic", "passed", "p_value"],
+  "properties": {
+    "schema": { "const": "NullProtocol@1" },
+    "null_protocol": {
+      "description": "Free-form description of the perturbation used to build the null distribution (e.g. shuffled sequence, random equal-size grouping, resampled boundary). Required for audit per spec 12.8; null only when the gate has not yet been evaluated.",
+      "type": ["object", "null"]
+    },
+    "null_samples": { "type": "array", "items": { "type": "number" } },
+    "sample_count": { "type": "integer", "minimum": 1 },
+    "quantile": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+    "tail_direction": { "enum": ["greater", "less"] },
+    "threshold": { "type": "number" },
+    "observed_statistic": { "type": "number" },
+    "passed": { "type": "boolean" },
+    "p_value": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}

@@ -78,6 +78,49 @@ export function validateCommand(value, name = "Command") {
   return v;
 }
 
+const INDIVIDUATION_TYPES = new Set(["field", "emanon", "protogon", "holon"]);
+const GATE_STATUSES = new Set(["field", "pending", "active"]);
+
+export function validateNullProtocol(value, name = "NullProtocol") {
+  const v = object(value, name);
+  if (v.schema !== "NullProtocol@1") fail(name, "schema must be NullProtocol@1");
+  if (v.null_protocol !== null) object(v.null_protocol, name);
+  if (v.null_samples !== undefined) array(v.null_samples, name, "null_samples");
+  if (!Number.isInteger(v.sample_count) || v.sample_count < 1) fail(name, "sample_count must be an integer >= 1");
+  if (typeof v.quantile !== "number" || v.quantile <= 0 || v.quantile >= 1) fail(name, "quantile must be in (0, 1)");
+  if (v.tail_direction !== "greater" && v.tail_direction !== "less") fail(name, 'tail_direction must be "greater" or "less"');
+  if (typeof v.threshold !== "number") fail(name, "threshold must be a number");
+  if (typeof v.observed_statistic !== "number") fail(name, "observed_statistic must be a number");
+  if (typeof v.passed !== "boolean") fail(name, "passed must be a boolean");
+  if (typeof v.p_value !== "number" || v.p_value < 0 || v.p_value > 1) fail(name, "p_value must be in [0, 1]");
+  return v;
+}
+
+export function validateIndividuationResult(value, name = "IndividuationResult") {
+  const v = object(value, name);
+  if (v.schema !== "IndividuationResult@1") fail(name, "schema must be IndividuationResult@1");
+  string(v.referent_id, name, "referent_id");
+  if (!INDIVIDUATION_TYPES.has(v.individuation_type)) fail(name, `invalid individuation_type ${v.individuation_type}`);
+  if (typeof v.mass !== "number") fail(name, "mass must be a number");
+  if (typeof v.coupling !== "number") fail(name, "coupling must be a number");
+  if (v.agency_signal !== null && typeof v.agency_signal !== "number") fail(name, "agency_signal must be a number or null");
+  if (typeof v.named !== "boolean") fail(name, "named must be a boolean");
+  validateNullProtocol(v.mass_null, `${name}.mass_null`);
+  validateNullProtocol(v.coupling_null, `${name}.coupling_null`);
+  if (v.boundary_stability !== null) {
+    const boundary = object(v.boundary_stability, `${name}.boundary_stability`);
+    if (typeof boundary.mean_observed_displacement !== "number") fail(name, "boundary_stability.mean_observed_displacement must be a number");
+    if (typeof boundary.boundary_stability !== "number") fail(name, "boundary_stability.boundary_stability must be a number");
+    if (typeof boundary.passed !== "boolean") fail(name, "boundary_stability.passed must be a boolean");
+    validateNullProtocol(boundary.null_result, `${name}.boundary_stability.null_result`);
+  }
+  const gate = object(v.gate_result, `${name}.gate_result`);
+  if (typeof gate.admitted !== "boolean") fail(name, "gate_result.admitted must be a boolean");
+  if (!GATE_STATUSES.has(gate.status)) fail(name, `invalid gate_result.status ${gate.status}`);
+  string(gate.reason, name, "gate_result.reason");
+  return v;
+}
+
 export function validateReadingSnapshot(value, name = "ReadingSnapshot") {
   const v = object(value, name);
   if (v.schema_version !== "ReadingSnapshot@1") fail(name, "schema_version must be ReadingSnapshot@1");

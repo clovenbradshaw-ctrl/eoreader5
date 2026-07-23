@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/individuation-result.schema.json",
+  "title": "IndividuationResult",
+  "description": "The Ground -> Figure gate result for one referent (spec section 13). A ReferentHypothesis is ambient material with a provisional handle; it becomes eligible to carry a figure history only once this gate's gate_result.admitted is true. See docs/individuation-gate.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "referent_id", "individuation_type", "mass", "coupling", "agency_signal", "named", "mass_null", "coupling_null", "boundary_stability", "gate_result"],
+  "properties": {
+    "schema": { "const": "IndividuationResult@1" },
+    "referent_id": { "type": "string", "minLength": 1 },
+    "individuation_type": { "enum": ["field", "emanon", "protogon", "holon"] },
+    "mass": { "type": "number" },
+    "coupling": { "type": "number" },
+    "agency_signal": { "type": ["number", "null"] },
+    "named": { "type": "boolean" },
+    "mass_null": { "$ref": "null-protocol.schema.json" },
+    "coupling_null": { "$ref": "null-protocol.schema.json" },
+    "boundary_stability": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mean_observed_displacement", "boundary_stability", "passed", "null_result"],
+          "properties": {
+            "mean_observed_displacement": { "type": "number" },
+            "boundary_stability": { "type": "number" },
+            "passed": { "type": "boolean" },
+            "null_result": { "$ref": "null-protocol.schema.json" }
+          }
+        }
+      ]
+    },
+    "gate_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["admitted", "status", "reason"],
+      "properties": {
+        "admitted": { "type": "boolean" },
+        "status": { "enum": ["field", "pending", "active"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

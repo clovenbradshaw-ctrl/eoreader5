@@ -91,6 +91,13 @@ export function projectReferents(events) {
   return result;
 }
 
+export {
+  INDIVIDUATION_TYPES,
+  classifyIndividuationType,
+  individuateReferent,
+  applyNameBind,
+} from "./individuation.js";
+
 /** Two admit events with the same surface do NOT imply the same referent. */
 export function surfacesIndicateSameReferent(events, surfaceA, surfaceB) {
   const projection = projectReferents(events);
