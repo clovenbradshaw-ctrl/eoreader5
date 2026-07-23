@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/observation-block.schema.json",
+  "title": "ObservationBlock",
+  "description": "Caller-supplied canonical block of normalized observation values. The engine receives resolved blocks and never dereferences URIs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "block_id", "value_type", "shape", "values", "content_hash"],
+  "properties": {
+    "schema": { "const": "ObservationBlock@1" },
+    "block_id": { "type": "string", "pattern": "^block:sha256:[0-9a-f]+$" },
+    "value_type": { "type": "string", "enum": ["signed-integer", "unsigned-integer", "decimal", "rational", "boolean", "string", "null"] },
+    "shape": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+    "axis_order": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "values": { "type": "array", "items": { "oneOf": [{"type":"string"},{"type":"integer"},{"type":"boolean"},{"type":"null"}] } },
+    "missing": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+    "loss": { "type": "array", "items": { "type": "object" } },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]+$" }
+  }
+}

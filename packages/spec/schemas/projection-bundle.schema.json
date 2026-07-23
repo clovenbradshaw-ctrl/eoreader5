@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/projection-bundle.schema.json",
+  "title": "ProjectionBundle",
+  "description": "Neutral app-rendering projection with no UI markup, layout, prose realization, colors, or gestures.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "projection_id", "semantic_head", "context", "spans", "nesting", "relations", "parameters", "evidence_links", "navigation_hints"],
+  "properties": {
+    "schema": { "const": "ProjectionBundle@1" },
+    "projection_id": { "type": "string", "minLength": 1 },
+    "semantic_head": { "type": "string", "minLength": 1 },
+    "context": { "type": "object" },
+    "spans": { "type": "array", "items": { "type": "object" } },
+    "nesting": { "type": "array", "items": { "type": "object" } },
+    "relations": { "type": "array", "items": { "type": "object" } },
+    "parameters": { "type": "array", "items": { "type": "object" } },
+    "evidence_links": { "type": "array", "items": { "type": "object" } },
+    "navigation_hints": { "type": "array", "items": { "type": "object" } }
+  }
+}

@@ -2,67 +2,150 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eoreader.dev/spec/schemas/observation-envelope.schema.json",
   "title": "ObservationEnvelope",
-  "description": "Produced by an app sense organ. Carries normalized evidence and source custody metadata across the sense/engine seam. No functions, callbacks, or live handles may appear anywhere in this document.",
+  "description": "ObservationEnvelope@1 normalized observation field. Decoders expose source-given axes, fields, anchors, missingness, and losses without asserting semantic kinds.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "observation_id", "operator_epoch", "source", "observed_by", "adapter"],
+  "required": [
+    "schema",
+    "source_id",
+    "source_media_type",
+    "decoder",
+    "axes",
+    "fields",
+    "anchors",
+    "source_content_hash",
+    "blocks_hash"
+  ],
   "properties": {
-    "schema_version": { "type": "string" },
-    "observation_id": { "type": "string", "minLength": 1 },
-    "operator_epoch": { "type": "string", "minLength": 1 },
-    "source": {
+    "schema": {
+      "const": "ObservationEnvelope@1"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_media_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decoder": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_id", "media_type", "content_hash", "byte_length"],
+      "required": [
+        "id",
+        "version"
+      ],
       "properties": {
-        "source_id": { "type": "string", "minLength": 1 },
-        "media_type": { "type": "string", "minLength": 1 },
-        "content_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" },
-        "byte_length": { "type": "integer", "minimum": 0 },
-        "rights": { "type": "object" },
-        "custody": { "type": "object" },
-        "selectors": { "type": "array", "items": { "type": "object" } }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loss": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
-    "observed_by": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["actor_id", "actor_type", "version"],
-      "properties": {
-        "actor_id": { "type": "string", "minLength": 1 },
-        "actor_type": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 }
-      }
-    },
-    "frame_hint": { "type": "object" },
-    "units": {
+    "axes": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["unit_id", "ordinal", "selector"],
+        "required": [
+          "axis_id",
+          "topology"
+        ],
         "properties": {
-          "unit_id": { "type": "string", "minLength": 1 },
-          "ordinal": { "type": "integer", "minimum": 0 },
-          "selector": { "type": "object" },
-          "normalized_form": { "type": "string" },
-          "field": { "type": "string" },
-          "weight_ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+          "axis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "topology": {
+            "enum": [
+              "ordered",
+              "categorical",
+              "grid",
+              "tree",
+              "graph",
+              "set"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "anchors": {
+            "type": "object"
+          }
         }
       }
     },
-    "segments": { "type": "array" },
-    "mentions": { "type": "array" },
-    "structural_evidence": { "type": "array" },
-    "adapter": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "version", "configuration_hash"],
-      "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
-        "configuration_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" }
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field_id",
+          "value_type",
+          "block_id"
+        ],
+        "properties": {
+          "field_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "axes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingness": {
+            "type": "object"
+          },
+          "loss": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
       }
+    },
+    "anchors": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "scheme"
+      ],
+      "properties": {
+        "scheme": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source_content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]+$"
+    },
+    "blocks_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]+$"
     }
   }
 }

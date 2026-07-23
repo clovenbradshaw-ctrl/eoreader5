@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/parameter-hypothesis.schema.json",
+  "title": "ParameterHypothesis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "parameter_id", "roles", "unit", "domain", "observed_range", "uncertainty", "member_support", "ablation_delta", "held_out_delta", "null_comparison", "stability", "provenance_expression"],
+  "properties": {
+    "schema": { "const": "ParameterHypothesis@1" },
+    "parameter_id": { "type": "string", "pattern": "^parameter:[a-z0-9]+$" },
+    "roles": { "type": "array", "minItems": 1, "items": { "type": "string", "enum": ["invariant", "equivariant", "boundary-bearing", "transition-bearing"] } },
+    "unit": { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["source", "dimensionless"] }, "unit": { "type": "string" } } },
+    "domain": { "type": "object" },
+    "observed_range": { "type": "object" },
+    "uncertainty": { "type": "object" },
+    "member_support": { "type": "array", "items": { "type": "string" } },
+    "ablation_delta": { "type": "string" },
+    "held_out_delta": { "type": "string" },
+    "null_comparison": { "type": "object" },
+    "stability": { "type": "object" },
+    "provenance_expression": { "type": "object" },
+    "external_name": { "type": "string" }
+  }
+}
