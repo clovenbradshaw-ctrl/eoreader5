@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/reading-snapshot.schema.json",
+  "title": "ReadingSnapshot",
+  "description": "Stable engine-to-priors and engine-to-app representation. Every exported reading MUST identify the exact frame/lens, prior, semantic head, engine, and operator epoch used to produce it (section 3.4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reading_id",
+    "engine_version",
+    "operator_epoch",
+    "prior_id",
+    "frame_id",
+    "lens_id",
+    "semantic_head",
+    "units"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "reading_id": { "type": "string", "minLength": 1 },
+    "engine_version": { "type": "string", "minLength": 1 },
+    "operator_epoch": { "type": "string", "minLength": 1 },
+    "prior_id": { "type": "string", "minLength": 1 },
+    "frame_id": { "type": "string", "minLength": 1 },
+    "lens_id": { "type": "string", "minLength": 1 },
+    "source_id": { "type": "string" },
+    "semantic_head": { "type": "string", "minLength": 1 },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["unit_id", "operator_events", "provenance"],
+        "properties": {
+          "unit_id": { "type": "string", "minLength": 1 },
+          "operator_events": { "type": "array", "items": { "type": "string" } },
+          "surprisal_microbits": { "type": "integer" },
+          "bayes_microbits": { "type": "integer" },
+          "held": { "type": "boolean" },
+          "alternatives": { "type": "array" },
+          "provenance": { "type": "object" }
+        }
+      }
+    }
+  }
+}

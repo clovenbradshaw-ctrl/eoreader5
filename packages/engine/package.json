@@ -1,0 +1,18 @@
+{
+  "name": "@eoreader/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure EOReader5 semantic engine. MUST NOT depend on the app, eoPriors implementation, compatibility code, storage, model/embedding packages, or organ packages. See docs/invariants.md and packages/conformance/invariants/forbidden-dependencies.test.js.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./referents": "./referents/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@eoreader/spec": "*"
+  }
+}

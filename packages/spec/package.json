@@ -1,0 +1,18 @@
+{
+  "name": "@eoreader/spec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical schemas, operator epoch, cube semantics, and canonical-JSON/hash rules for EOReader5. No runtime dependency on engine, app, compat, or eoPriors code.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./canonical-json": "./canonical-json/index.js",
+    "./operators": "./operators/epoch.js",
+    "./schemas/*": "./schemas/*"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {}
+}
