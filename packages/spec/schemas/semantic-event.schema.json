@@ -20,7 +20,7 @@
     },
     "event_id": {
       "type": "string",
-      "pattern": "^[a-z0-9]+:[0-9a-f]+$"
+      "pattern": "^event:sha256:[0-9a-f]{64}$"
     },
     "operator_epoch": {
       "type": "string",

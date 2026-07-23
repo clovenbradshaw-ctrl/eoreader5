@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canonicalJsonStringify, canonicalHash } from "./index.js";
+import { canonicalJsonStringify, canonicalHash, canonicalHashSync } from "./index.js";
 
 test("sorts object keys at every depth", () => {
   const a = canonicalJsonStringify({ b: 1, a: { d: 1, c: 2 } });
@@ -37,4 +37,9 @@ test("canonicalHash is stable across key order", async () => {
   const h2 = await canonicalHash({ b: 2, a: 1 });
   assert.equal(h1, h2);
   assert.match(h1, /^sha256:[0-9a-f]{64}$/);
+});
+
+test("canonicalHashSync matches WebCrypto canonicalHash", async () => {
+  const value = { source: "browser-safe", nested: { b: true, a: [1, 2, 3] } };
+  assert.equal(canonicalHashSync(value), await canonicalHash(value));
 });

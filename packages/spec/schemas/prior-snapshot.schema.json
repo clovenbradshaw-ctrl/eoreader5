@@ -15,7 +15,7 @@
     "convention_set_id": { "type": "string" },
     "policy_ids": { "type": "array", "items": { "type": "string" } },
     "algorithm_versions": { "type": "object", "additionalProperties": { "type": "string" } },
-    "content_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "channels": { "type": "array", "items": { "type": "string" } }
   }
 }

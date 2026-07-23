@@ -1,32 +1,63 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyCommand, createState, project, read, replay } from "../index.js";
+import { semanticEventId } from "@eoreader/spec";
+import { applyCommand, createState, project, read, replay, readingSnapshot } from "../index.js";
 
-const priorSnapshot = { schema: "PriorSnapshot@1", prior_id: "prior:sha256:abc" };
+const priorSnapshot = { schema_version: "PriorSnapshot@1", prior_id: "prior:sha256:abc", operator_epoch: "eo-2026-07", ledger_head: "head:empty", basis_id: "basis:test", content_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+const observation = { schema: "ObservationEnvelope@1", source_id: "source:1", source_media_type: "text/plain", decoder: { id: "test", version: "1" }, axes: [{ axis_id: "line", topology: "ordered" }], fields: [{ field_id: "f1", value_type: "text", block_id: "b1", axes: ["line"] }], anchors: { scheme: "test", surfaces: [{ referent_id: "ref:1", text: "alpha" }] }, source_content_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", blocks_hash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" };
+
+function state() { return createState({ engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }); }
 
 test("minimal observation ledger replays deterministically", () => {
-  const state = createState({ engineVersion: "0.1.0", operatorEpoch: "eo-3x3", priorSnapshot });
-  const once = applyCommand(state, { type: "observation.admit", payload: { observation_id: "obs:1" } });
-  const twice = applyCommand(state, { type: "observation.admit", payload: { observation_id: "obs:1" } });
+  const once = applyCommand(state(), { type: "observation.admit", payload: observation });
+  const twice = applyCommand(state(), { type: "observation.admit", payload: observation });
   assert.deepEqual(once.events, twice.events);
   assert.equal(once.semanticHead, twice.semanticHead);
-
-  const replayed = replay(once.events, { engineVersion: "0.1.0", operatorEpoch: "eo-3x3", priorSnapshot });
+  const replayed = replay(once.events, { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot });
+  assert.deepEqual(replayed.projectedState, once.projectedState);
   assert.equal(replayed.semanticHead, once.semanticHead);
 });
 
-test("discovery budget exhaustion is held as an abstention with continuation", () => {
-  const state = createState({ engineVersion: "0.1.0", operatorEpoch: "eo-3x3", priorSnapshot });
-  const next = applyCommand(state, { type: "discovery.advance", budget: { max_events: 1 } });
-  assert.equal(next.events[0].event_type, "discovery.abstained");
-  assert.equal(next.events[0].payload.reason, "held:budget_exhausted");
-  assert.match(next.continuation, /^continuation:/);
+test("ledger rejects duplicates, invalid operators, unordered dependencies, and broken provenance", () => {
+  const once = applyCommand(state(), { type: "observation.admit", payload: observation });
+  assert.throws(() => replay([once.events[0], once.events[0]], { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }), /duplicate/);
+  const badOp = { ...once.events[0], op: "BAD" }; badOp.event_id = semanticEventId(badOp);
+  assert.throws(() => replay([badOp], { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }), /invalid operator/);
+  const unordered = { ...once.events[0], inputs: ["event:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"], provenance: { depends_on: [] } }; unordered.event_id = semanticEventId(unordered);
+  assert.throws(() => replay([unordered], { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }), /unordered dependency/);
+  const broken = { ...once.events[0], provenance: { depends_on: ["event:sha256:3434343434343434343434343434343434343434343434343434343434343434"] } }; broken.event_id = semanticEventId(broken);
+  assert.throws(() => replay([broken], { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }), /broken provenance/);
+  assert.throws(() => replay([{ ...once.events[0], payload: { ...once.events[0].payload, source_id: "tampered" } }], { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot }), /event_id mismatch/);
 });
 
-test("read and project return neutral public contracts", () => {
-  const state = createState({ engineVersion: "0.1.0", operatorEpoch: "eo-3x3", priorSnapshot });
-  assert.equal(read(state).schema, "HypothesisSet@1");
-  const bundle = project(state, { frame: "frame:1", lens: "lens:neutral" });
+test("hypothesis commands update projected state and supersession removes live hypotheses", () => {
+  const held = applyCommand(state(), { type: "hypothesis.hold", payload: { hypothesis_id: "hyp:1", evidence: { event_ids: [] } } });
+  const accepted = applyCommand(held, { type: "hypothesis.accept", payload: { hypothesis_id: "hyp:2", evidence: { event_ids: [] } } });
+  const competing = applyCommand(accepted, { type: "hypothesis.compete", payload: { hypothesis_id: "hyp:3", evidence: { event_ids: [] } } });
+  const next = applyCommand(competing, { type: "hypothesis.supersede", inputs: [held.events[0].event_id], payload: { supersedes: ["hyp:1"] } });
+  assert.equal(next.hypotheses.held.length, 0);
+  assert.equal(next.hypotheses.accepted[0].hypothesis_id, "hyp:2");
+  assert.equal(next.hypotheses.competing[0].hypothesis_id, "hyp:3");
+  assert.equal(next.projectedState.hypotheses.length, 2);
+});
+
+test("discovery budget exhaustion is held as an abstention with continuation", () => {
+  const next = applyCommand(state(), { type: "discovery.advance", budget: { max_events: 1 } });
+  assert.equal(next.events[0].event_type, "discovery.abstained");
+  assert.equal(next.events[0].payload.reason, "held:budget_exhausted");
+  assert.match(next.continuation, /^continuation:sha256:/);
+});
+
+test("read, project, and readingSnapshot return evidence-bearing public contracts", () => {
+  const next = applyCommand(state(), { type: "observation.admit", payload: observation });
+  assert.equal(read(next).schema, "HypothesisSet@1");
+  const bundle = project(next, { frame: "frame:default", lens: "lens:neutral" });
   assert.equal(bundle.schema, "ProjectionBundle@1");
+  assert.equal(bundle.spans.length, 1);
+  assert.equal(bundle.relations.length, 1);
   assert.deepEqual(Object.keys(bundle).includes("markup"), false);
+  const snapshot = readingSnapshot(next, { source_id: observation.source_id });
+  assert.equal(snapshot.schema_version, "ReadingSnapshot@1");
+  assert.equal(snapshot.units.length, 1);
+  assert.deepEqual(snapshot.units[0].operator_events, [next.events[0].event_id]);
 });

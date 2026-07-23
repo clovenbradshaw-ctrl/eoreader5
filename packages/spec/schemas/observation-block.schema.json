@@ -8,13 +8,13 @@
   "required": ["schema", "block_id", "value_type", "shape", "values", "content_hash"],
   "properties": {
     "schema": { "const": "ObservationBlock@1" },
-    "block_id": { "type": "string", "pattern": "^block:sha256:[0-9a-f]+$" },
+    "block_id": { "type": "string", "pattern": "^block:sha256:[0-9a-f]{64}$" },
     "value_type": { "type": "string", "enum": ["signed-integer", "unsigned-integer", "decimal", "rational", "boolean", "string", "null"] },
     "shape": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
     "axis_order": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "values": { "type": "array", "items": { "oneOf": [{"type":"string"},{"type":"integer"},{"type":"boolean"},{"type":"null"}] } },
     "missing": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
     "loss": { "type": "array", "items": { "type": "object" } },
-    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]+$" }
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
   }
 }
