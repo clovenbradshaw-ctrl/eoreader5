@@ -20,17 +20,10 @@ const RULES = [
     reason: "pure semantic engine/spec candidate",
     patterns: [
       /^core\/(operators|cube|referents|semantic|events|frames|provenance|authority|resolution|projection|fold|enact)\//,
+      /^core\/(operators|cube|referents|semantic|events|frames|provenance|authority|resolution|projection|fold|enact)[./-]/,
+      /^(operators|cube|referents|semantic|events|frames|provenance|authority|resolution|projection|fold|enact)[./-]/,
       /^packages\/(spec|engine|conformance)\//,
       /^schemas\//,
-    ],
-  },
-  {
-    repo: "eoreaderapp",
-    reason: "app-owned sense/output/workflow/persistence/legacy route",
-    patterns: [
-      /^(app|ui|web|pages|routes|components|workflows|storage|stores|db|server|api)\//,
-      /^(organs|sense|senses|output|outputs|adapters|renderers|legacy-launch)\//,
-      /^core\/(io|files|network|models|embeddings|search|render|storage|matrix|rooms|turns)\//,
     ],
   },
   {
@@ -38,7 +31,18 @@ const RULES = [
     reason: "prior governance/build artifact source",
     patterns: [
       /^(eopriors|eoPriors|priors|prior|basis|bases|centroids|exemplars|compressors|projectors)\//,
+      /^data\/(priors|prior|basis|bases|centroids|exemplars|compressors|projectors)\//,
       /^core\/(priors|basis|centroids|exemplars|compressors|projectors)\//,
+      /^core\/(priors|basis|centroids|exemplars|compressors|projectors)[./-]/,
+    ],
+  },
+  {
+    repo: "eoreaderapp",
+    reason: "app-owned sense/output/workflow/persistence/legacy route",
+    patterns: [
+      /^(app|ui|web|pages|routes|components|workflows|storage|stores|db|server|api|data)\//,
+      /^(organs|sense|senses|output|outputs|adapters|renderers|legacy-launch)\//,
+      /^core\/(io|files|network|models|embeddings|search|render|storage|matrix|rooms|turns)\//,
     ],
   },
   {
