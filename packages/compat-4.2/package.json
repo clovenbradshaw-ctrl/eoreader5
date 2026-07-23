@@ -1,0 +1,17 @@
+{
+  "name": "@eoreader/compat-4.2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure eoreader4.2 compatibility import helpers. No legacy app launch, storage, network, or UI responsibilities.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "@eoreader/spec": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test import/*.test.js"
+  }
+}

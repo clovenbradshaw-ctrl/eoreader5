@@ -5,6 +5,6 @@
   "description": "Purity, invariant, and metamorphic tests gating the EOReader5 engine. MUST pass with network disabled.",
   "type": "module",
   "scripts": {
-    "test": "node --test invariants/"
+    "test": "node --test invariants/*.test.js"
   }
 }

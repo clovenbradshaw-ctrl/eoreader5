@@ -7,7 +7,8 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
-    "./referents": "./referents/index.js"
+    "./referents": "./referents/index.js",
+    "./subassemblies": "./subassemblies/index.js"
   },
   "scripts": {
     "test": "node --test"

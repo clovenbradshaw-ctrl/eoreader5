@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "The pure semantic engine used by an EO Reader application. See docs/architecture.md.",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present && node --test scripts/__tests__/*.test.mjs",
+    "transfer:eoreader42:plan": "node scripts/transfer-eoreader42.mjs"
   }
 }
