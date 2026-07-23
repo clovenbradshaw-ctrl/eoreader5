@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/run-context.schema.json",
+  "title": "RunContext",
+  "description": "Pinned execution context for a pure deterministic engine run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "frame_id", "lens_ids", "horizon", "prior_snapshot_id", "engine_version", "operator_epoch", "source_null_policy", "validation_risk_budget", "compute_budget", "requested_projections"],
+  "properties": {
+    "schema": { "const": "RunContext@1" },
+    "frame_id": { "type": "string", "minLength": 1 },
+    "lens_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "horizon": { "type": "object" },
+    "prior_snapshot_id": { "type": "string", "minLength": 1 },
+    "engine_version": { "type": "string", "minLength": 1 },
+    "operator_epoch": { "type": "string", "minLength": 1 },
+    "source_null_policy": { "type": "object" },
+    "validation_risk_budget": { "type": "object" },
+    "compute_budget": { "type": "object", "properties": { "max_events": { "type": "integer", "minimum": 0 }, "max_candidates": { "type": "integer", "minimum": 0 }, "seed": { "type": "string" } } },
+    "requested_projections": { "type": "array", "items": { "type": "string" } }
+  }
+}

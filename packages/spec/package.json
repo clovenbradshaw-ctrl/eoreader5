@@ -10,7 +10,8 @@
     "./canonical-json": "./canonical-json/index.js",
     "./operators": "./operators/epoch.js",
     "./schemas/*": "./schemas/*",
-    "./holons": "./holons/index.js"
+    "./holons": "./holons/index.js",
+    "./fixed-point": "./fixed-point.js"
   },
   "scripts": {
     "test": "node --test"

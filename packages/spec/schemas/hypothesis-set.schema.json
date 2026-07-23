@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/hypothesis-set.schema.json",
+  "title": "HypothesisSet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "hypothesis_set_id", "semantic_head", "context", "accepted", "competing", "held", "abstentions"],
+  "properties": {
+    "schema": { "const": "HypothesisSet@1" },
+    "hypothesis_set_id": { "type": "string", "minLength": 1 },
+    "semantic_head": { "type": "string", "minLength": 1 },
+    "context": { "type": "object" },
+    "accepted": { "type": "array", "items": { "type": "object" } },
+    "competing": { "type": "array", "items": { "type": "object" } },
+    "held": { "type": "array", "items": { "type": "object" } },
+    "abstentions": { "type": "array", "items": { "type": "object" } }
+  }
+}

@@ -29,3 +29,7 @@ EOReader5 consumes priors; it does not build, select, fetch, or mutate them. The
 ## Prohibited coupling
 
 `packages/engine` MUST NOT import `eoprior`, query a "latest" prior, inspect eoprior ledgers, or read sibling repository files. Any eoprior information needed by the engine must be present in the supplied `PriorSnapshot` value.
+
+## Emergence clarification
+
+eoPriors may use emergence algorithms offline to build reusable empirical prior artifacts. EOReader5 alone performs semantic emergence for the source currently being read, and only from caller-supplied observations plus a pinned prior snapshot.
