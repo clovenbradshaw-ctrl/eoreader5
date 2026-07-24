@@ -39,6 +39,14 @@ export {
   defaultNumericBaselines,
 } from "./prediction/baselines/index.js";
 export { commitPrediction, revealAndScore } from "./prediction/commitments/index.js";
+export {
+  normalizePrior,
+  priorPredictor,
+  blendedPriorPredictor,
+  uniformPredictor,
+  surpriseReduction,
+  sequenceSurpriseReduction,
+} from "./prediction/priors/index.js";
 export { createPredictionTask, walkForward } from "./prediction/tasks/index.js";
 export {
   createLedger,
