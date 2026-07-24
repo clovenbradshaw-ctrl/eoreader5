@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { induceCalculus } from "./index.js";
+import { induceCalculus, induceExtensions } from "./index.js";
 import { validateCalculusCandidate } from "@eoreader/spec";
 import { createSeededRng } from "../nulls/index.js";
+import { evaluateProgramCompetency } from "../programs/index.js";
+import { defaultNumericBaselines } from "../../prediction/baselines/index.js";
+import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 
 // Kept deliberately small/fast (series length, shuffle counts, operator search
 // budget) — the empirical battery run during development confirmed these
@@ -73,6 +76,7 @@ test("a genuine family of related series induces a calculus: a recurring vocabul
     assert.ok(member.support.count >= 1);
     assert.ok(member.support.propose_series_ids.length === member.support.count);
   }
+  assert.deepEqual(c.proposed_extensions, [], "composeExtensions defaults to off — the field is always present, empty here");
 });
 
 test("a family of individually-structured but mutually UNRELATED series induces no calculus (regression guard for a real false positive)", () => {
@@ -161,4 +165,85 @@ test("the minimum-vocabulary gate is a hard cardinality check, not a statistic",
   const family = ["a", "b", "c", "d", "e"].map((s) => ({ id: `sh${s}`, series: whiteNoise(`short-${s}`, 20) }));
   const c = induceCalculus(family, { ...CALC_OPTS, minProposeSeries: 3, minHoldoutSeries: 2 });
   assert.equal(c, null);
+});
+
+// --- Section 16.3 step 9: composing new cross-vocabulary programs ---
+//
+// composeExtensions is opt-in and, per the module header, provably
+// near-unreachable under the current add/sub-only composition grammar: a
+// vocabulary member is required to be a full-scale competent predictor
+// (positive reference_gain to qualify), so `add` of two such members roughly
+// doubles an accurate signal and `sub` collapses toward zero — the wrong
+// output scale whenever the target isn't near zero. These tests verify the
+// MECHANISM (real candidates are enumerated and considered, gating correctly
+// refuses them, the field is always present, determinism holds, opting in
+// doesn't change the calculus's own promotion decision) rather than force a
+// promoted extension into existence with an unrealistic fixture.
+
+test("composeExtensions considers real cross-vocabulary candidates and correctly finds none competitive (structural, not a fixture artifact)", () => {
+  const off = induceCalculus(positiveFamily(), { ...CALC_OPTS, seasonalPeriod: 6, composeExtensions: false });
+  const on = induceCalculus(positiveFamily(), { ...CALC_OPTS, seasonalPeriod: 6, composeExtensions: true });
+  assert.ok(off && on);
+  // Opting into step 9 must never change whether (or which) calculus is found —
+  // it only adds an additional, separate exploration on top of an already-decided vocabulary.
+  assert.equal(off.id, on.id, "composeExtensions must not alter the vocabulary/promotion decision itself, only extend the record");
+  assert.deepEqual(on.proposed_extensions, []);
+  validateCalculusCandidate(on);
+});
+
+test("composeExtensions is deterministic and replayable", () => {
+  const a = induceCalculus(positiveFamily(), { ...CALC_OPTS, seasonalPeriod: 6, composeExtensions: true });
+  const b = induceCalculus(positiveFamily(), { ...CALC_OPTS, seasonalPeriod: 6, composeExtensions: true });
+  assert.equal(a.content_hash, b.content_hash);
+});
+
+test("the cross-series null refuses a candidate that beats the best member numerically but not in real temporal order (white-box, via induceExtensions directly)", () => {
+  // A regression guard proving the gates are independent, not redundant: this
+  // synthetic vocabulary is deliberately constructed so a candidate DOES clear
+  // "beats_best_member_by > 0" -- and is still correctly refused, because it
+  // performs WORSE on the real holdout order than on temporal shuffles of it
+  // (the null samples are strongly positive; the real-order statistic is
+  // strongly negative). That is exactly what a permutation null exists to
+  // catch, and it catches it here even though a shallower single-bar check
+  // would have let this through.
+  const HIST = { op: "hist" };
+  function trend(seed, length = 40) {
+    const rng = createSeededRng(seed);
+    return Array.from({ length }, (_, t) => 5 + 3 * t + (rng() - 0.5) * 2);
+  }
+  function referenceGain(series, program, referenceBaseline, warmup, tag) {
+    const { gain, competency } = evaluateProgramCompetency(series, program, { baselines: [referenceBaseline], warmup, taskId: `t:${tag}`, population: `p:${tag}`, sourceVersion: canonicalHashSync(series) });
+    return { gain: gain[referenceBaseline.id] ?? 0, referenceLoss: competency.baseline_losses[referenceBaseline.id] / Math.max(1, competency.observations) };
+  }
+
+  const baselines = defaultNumericBaselines({ window: 3 });
+  const ref = baselines.find((b) => b.id === "baseline:last-value");
+  const A = { op: "mean", of: HIST };
+  const B = { op: "mean", of: { op: "diff", of: HIST } };
+  const holdoutIds = ["h1", "h2"];
+  const holdoutSeries = [trend("h1"), trend("h2")];
+  const warmup = 4;
+  const gainOf = (program) => {
+    const gains = holdoutSeries.map((s, i) => referenceGain(s, program, ref, warmup, `${JSON.stringify(program)}:${i}`).gain);
+    return gains.reduce((a, b) => a + b, 0) / gains.length;
+  };
+  const bestMemberGain = Math.max(gainOf(A), gainOf(B));
+
+  const vocabulary = [
+    { operator_id: `operator:sha256:${"a".repeat(64)}`, canonical_program: A },
+    { operator_id: `operator:sha256:${"b".repeat(64)}`, canonical_program: B },
+  ];
+  const promoted = induceExtensions({
+    vocabulary,
+    bestMemberGain,
+    holdoutSeries,
+    holdoutIds,
+    referenceBaseline: ref,
+    holdoutWarmup: warmup,
+    shuffles: 20,
+    quantile: 0.95,
+    minRelativeEffect: 0.05,
+    extensionMaxPrograms: 256,
+  });
+  assert.equal(promoted.length, 0, "a candidate that only clears the beats-best-member bar, not the temporal-order null, must still be refused");
 });

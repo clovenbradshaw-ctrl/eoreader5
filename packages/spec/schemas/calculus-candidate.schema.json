@@ -5,7 +5,7 @@
   "description": "A Level-3 calculus candidate (spec 'EO Emergent Mathematics for Predictive Competency' section 16, section 11.4): a vocabulary of operators that recurred across a majority of a family's PROPOSE series and whose collective (mean-over-members) competency gain over a reference baseline transfers to entirely held-out SOURCES the vocabulary was never shown. Promotion requires a minimum vocabulary size (section 16.2: more than one successful expression), a cross-series permutation null (section 12.8), and a relative effect-size floor (section 1's governing criterion / section 20) — never a hand-set absolute threshold. Identified by content hash and dependency graph, not by name (section 16.4).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "id", "vocabulary", "dependency_graph", "closure_domain", "propose_series_ids", "holdout_series_ids", "split", "min_support_fraction", "reference_baseline_id", "aggregate_transfer_gain", "reference_scale", "relative_effect", "transfer_null", "vs_uncompressed_pool", "vs_foil_bundle", "lens", "novelty_status", "status", "emergence", "content_hash"],
+  "required": ["schema", "id", "vocabulary", "proposed_extensions", "dependency_graph", "closure_domain", "propose_series_ids", "holdout_series_ids", "split", "min_support_fraction", "reference_baseline_id", "aggregate_transfer_gain", "reference_scale", "relative_effect", "transfer_null", "vs_uncompressed_pool", "vs_foil_bundle", "lens", "novelty_status", "status", "emergence", "content_hash"],
   "properties": {
     "schema": { "const": "CalculusCandidate@1" },
     "id": { "type": "string" },
@@ -39,6 +39,38 @@
             "properties": {
               "per_series": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["series_id", "gain"], "properties": { "series_id": { "type": "string" }, "gain": { "type": "number" } } } },
               "mean_gain": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "proposed_extensions": {
+      "type": "array",
+      "description": "Section 16.3 step 9: NEW cross-vocabulary programs (composed from >=2 distinct vocabulary members) that cleared the same cross-series permutation null and effect-size floor as the vocabulary itself, AND beat the best single member's own holdout gain. Always present; empty when composeExtensions was not requested or nothing cleared every gate — never omitted to signal 'not applicable'.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["canonical_program", "program_key", "member_operator_ids", "aggregate_transfer_gain", "relative_effect", "beats_best_member_by", "transfer_null", "emergence"],
+        "properties": {
+          "canonical_program": { "type": "object" },
+          "program_key": { "type": "string" },
+          "member_operator_ids": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+          "aggregate_transfer_gain": { "type": "number" },
+          "relative_effect": { "type": "number" },
+          "beats_best_member_by": { "type": "number", "exclusiveMinimum": 0 },
+          "transfer_null": {
+            "type": "object",
+            "required": ["schema"],
+            "properties": { "schema": { "const": "NullProtocol@1" } }
+          },
+          "emergence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operator_epoch", "promoted_by", "reenters_as"],
+            "properties": {
+              "operator_epoch": { "type": "string" },
+              "promoted_by": { "const": "REC" },
+              "reenters_as": { "const": "INS" }
             }
           }
         }

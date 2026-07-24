@@ -19,6 +19,18 @@
 // happened to help on each series, even when the members DISAGREED IN SIGN
 // across sources — helping hugely on one, hurting hugely on another. The fix
 // (mean-over-members, not max) is what this demo's second case guards.
+//
+// The genuine family also opts into section 16.3 step 9 (composeExtensions):
+// composing NEW cross-vocabulary programs from the promoted vocabulary,
+// gated the same way plus one more bar — beating the best single member's own
+// holdout gain. This is honestly expected to stay empty here: a vocabulary
+// member is required to be a full-scale competent predictor to qualify, so
+// `add` of two such members roughly doubles an accurate signal and `sub`
+// collapses toward the wrong output scale — see packages/engine/emergence/
+// calculus/index.js's header for the structural (not fixture-specific)
+// argument, and its test file for a white-box case proving the gates are
+// independent: a candidate that numerically clears "beats best member" is
+// still correctly refused by the temporal-order permutation null.
 
 import { induceCalculus } from "@eoreader/engine/emergence/calculus";
 import { createSeededRng } from "@eoreader/engine";
@@ -26,6 +38,7 @@ import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 
 const FAST_OPTS = { shuffles: 15, maxRounds: 2, maxOperators: 2, enumeration: { lags: [1, 6], maxSeriesDepth: 2 } };
 const OPTS = { operatorOptions: FAST_OPTS, shuffles: 20 };
+const GENUINE_OPTS = { ...OPTS, composeExtensions: true };
 
 function trendSeason(seed, length = 36) {
   const rng = createSeededRng(seed);
@@ -74,7 +87,7 @@ export function runCalculusDemo() {
     {
       label: "family:trend-season (independent noise realizations of one generative structure)",
       family: ["a", "b", "c", "d", "e"].map((s) => ({ id: `series:${s}`, series: trendSeason(`fam-${s}`) })),
-      opts: { ...OPTS, seasonalPeriod: 6 },
+      opts: { ...GENUINE_OPTS, seasonalPeriod: 6 },
     },
     {
       label: "family:unrelated (individually structured, mutually unrelated — the caught false positive)",
@@ -111,6 +124,14 @@ function present(results) {
     console.log(`  transfer   : aggregate=${calculus.aggregate_transfer_gain.toFixed(3)}  rel.effect=${(calculus.relative_effect * 100).toFixed(1)}% of reference scale`);
     console.log(`  null       : p=${calculus.transfer_null.p_value.toFixed(3)} (${calculus.transfer_null.null_protocol.name}, ${calculus.transfer_null.sample_count} shuffles)`);
     console.log(`  emergence  : ${calculus.emergence.synthesized_by} assembled it, ${calculus.emergence.validated_by} judged it against ${calculus.reference_baseline_id}`);
+    if (calculus.proposed_extensions.length === 0) {
+      console.log(`  step 9     : proposed_extensions=[] — composing members via add/sub found no candidate that beats the best member (structural, see module header)`);
+    } else {
+      console.log(`  step 9     : ${calculus.proposed_extensions.length} extension(s) promoted:`);
+      for (const e of calculus.proposed_extensions) {
+        console.log(`    - ${e.program_key.slice(0, 20)}  beats best member by +${e.beats_best_member_by.toFixed(3)}  rel.effect=${(e.relative_effect * 100).toFixed(1)}%`);
+      }
+    }
   }
 }
 
