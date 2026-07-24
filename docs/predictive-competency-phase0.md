@@ -247,11 +247,9 @@ The algorithm, reusing existing machinery wherever §16.3's twelve steps allow:
 
 Steps 4 (formation/transformation rules), 6-8 (executor/checker, regeneration)
 are inherited verbatim from `enumeratePrograms`' grammar, `induceOperators`'
-own promotion gate, and `evalNode`/`evaluateProgram` — no new mechanism.
-**Explicitly deferred, not silently dropped:** §16.3 step 9 (composing *new*
-cross-vocabulary forms and searching that expanded grammar) — v1 validates
-package-level transfer of the existing vocabulary first; a second full
-promotion-gate surface is a later pass, same posture as bridges (§17).
+own promotion gate, and `evalNode`/`evaluateProgram` — no new mechanism. Step
+9 (composing *new* cross-vocabulary forms) is opt-in via `composeExtensions`
+— see below for what building it found.
 
 ### A real false positive, found and fixed before this shipped
 
@@ -291,11 +289,60 @@ so the negative-control battery — one genuine family, one mutually-unrelated
 family, one white-noise family — was designed and run before any candidate was
 trusted, not added after a result looked clean.
 
+### Step 9 — composing new cross-vocabulary programs: a structural finding, not just an empirical one
+
+`composeExtensions: true` runs §16.3 step 9: compose vocabulary members
+through the existing add/sub grammar (`enumeratePrograms` with the vocabulary
+as `library`), filter to genuine cross-vocabulary forms (≥2 distinct members
+referenced), and gate each candidate through the same permutation null and
+effect-size floor as the vocabulary's own step-10 claim — plus one more bar
+the members never had to clear: beat the best single member's own holdout
+gain. "Useful NEW," not merely "also transfers."
+
+`proposed_extensions` is **provably near-unreachable** with the current
+grammar — confirmed empirically across three independently-designed
+vocabularies (redundant near-identical members, a richer/more diverse
+vocabulary, a low-signal-to-noise fixture meant to leave room for a
+correction term), where not one composed candidate ever beat its best member,
+but the reason is structural, not fixture-specific: a vocabulary member is
+*required* to be a full-scale competent predictor of the target to qualify
+(support-qualified membership requires positive `reference_gain`). Composing
+two such full-scale predictors via `add` roughly doubles an already-accurate
+signal (catastrophic overshoot); via `sub` it collapses toward zero — the
+wrong output scale entirely whenever the target isn't near zero. Only a
+scale-preserving combinator (a weighted average, absent from the current
+composition grammar) could plausibly exploit complementary, anti-correlated
+member errors.
+
+A follow-on white-box test (`packages/engine/emergence/calculus/index.test.js`,
+calling the exported `induceExtensions` directly with a hand-constructed
+vocabulary) went further and confirmed the gates are independent, not
+redundant: a synthetic candidate that numerically clears "beats best member"
+is still correctly refused, because it performs *worse* on the real holdout
+order than on temporal shuffles of it — exactly what the permutation null
+exists to catch, catching it even where a shallower single-bar check would
+have let it through.
+
+**Multiple-testing correction** (§20.1): evaluating N independent composed
+candidates against the same per-candidate null lets the family-wise
+false-positive rate climb with N — the same shape of gap as every prior gate
+in this session (a null answers "not chance for *this* test," not "not chance
+across every test I happened to run"). The per-candidate quantile is
+Bonferroni-corrected by the actual count of cross-vocabulary candidates
+considered (data-derived, never a hand-set constant), added proactively
+before any positive case was ever observed to need it.
+
+The gate is implemented in full, not stubbed, so a richer grammar — a later,
+separate change — would be recognized and promoted correctly without
+touching this logic again.
+
 ### `CalculusCandidate` records
 
 Content-hash-sealed (§16.4: identified by hash and dependency graph, not
 name), carrying: the `vocabulary` (member programs with per-member support and
-per-series holdout gain), a `dependency_graph`, the declared `closure_domain`
+per-series holdout gain), `proposed_extensions` (§16.3 step 9, always present,
+empty unless `composeExtensions` was requested and something cleared every
+gate), a `dependency_graph`, the declared `closure_domain`
 (type closure: `number[] -> number`, unrelated to the transfer statistic),
 propose/holdout provenance, `aggregate_transfer_gain`, `reference_scale`,
 `relative_effect`, `transfer_null`, two diagnostic-only comparison fields
@@ -306,7 +353,11 @@ parts is literally Structure×Generate in the operator-epoch table; `EVA`
 because cross-series validation is the Interpretation×Relate act judging the
 bundle. A calculus doesn't re-enter search as one `opref` leaf the way an
 operator does — it's a bundle, not a node — so there is no `reenters_as`
-analogue; it packages a claim about existing `INS` instances.
+analogue; it packages a claim about existing `INS` instances. (Each promoted
+extension, when one clears every gate, *does* carry `emergence: {promoted_by:
+"REC", reenters_as: "INS"}` — the same act as basic operator promotion, one
+level higher, with calculus-vocabulary members as available primitives
+instead of raw kernel primitives.)
 
 `scripts/induce-calculus-demo.mjs` (importable as `runCalculusDemo`) runs the
 same three-family battery (genuine, mutually-unrelated, white-noise) and
@@ -319,5 +370,7 @@ The multi-lens **disagreement** surface — where a candidate is low-surprise
 under one baseline/lens and high under another — is an app (eoreaderapp)
 concern; the engine already emits the raw material for it, since every
 `CompetencyRecord`, `KindCandidate`, and now `CalculusCandidate` names its own
-lens. Composing *new* cross-vocabulary programs (§16.3 step 9) and
-cross-system bridges (§17) remain later phases.
+lens. Cross-system bridges (§17) remain a later phase. A scale-preserving
+composition combinator (the one addition step 9's own finding shows would be
+needed to ever reach a non-empty `proposed_extensions` in practice) is a
+candidate follow-on to the grammar, not built here.

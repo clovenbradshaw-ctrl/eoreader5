@@ -235,6 +235,22 @@ export function validateCalculusCandidate(value, name = "CalculusCandidate") {
     array(holdoutTransfer.per_series, name, "vocabulary[].holdout_transfer.per_series");
     if (typeof holdoutTransfer.mean_gain !== "number") fail(name, "vocabulary[].holdout_transfer.mean_gain must be a number");
   }
+  array(v.proposed_extensions, name, "proposed_extensions");
+  for (const ext of v.proposed_extensions) {
+    const e = object(ext, `${name}.proposed_extensions[]`);
+    object(e.canonical_program, name);
+    string(e.program_key, name, "proposed_extensions[].program_key");
+    array(e.member_operator_ids, name, "proposed_extensions[].member_operator_ids");
+    if (e.member_operator_ids.length < 2) fail(name, "proposed_extensions[].member_operator_ids must reference at least 2 distinct members");
+    if (typeof e.aggregate_transfer_gain !== "number") fail(name, "proposed_extensions[].aggregate_transfer_gain must be a number");
+    if (typeof e.relative_effect !== "number") fail(name, "proposed_extensions[].relative_effect must be a number");
+    if (typeof e.beats_best_member_by !== "number" || e.beats_best_member_by <= 0) fail(name, "proposed_extensions[].beats_best_member_by must be a positive number");
+    validateNullProtocol(e.transfer_null, `${name}.proposed_extensions[].transfer_null`);
+    const extEmergence = object(e.emergence, `${name}.proposed_extensions[].emergence`);
+    string(extEmergence.operator_epoch, name, "proposed_extensions[].emergence.operator_epoch");
+    if (extEmergence.promoted_by !== "REC") fail(name, 'proposed_extensions[].emergence.promoted_by must be "REC"');
+    if (extEmergence.reenters_as !== "INS") fail(name, 'proposed_extensions[].emergence.reenters_as must be "INS"');
+  }
   const depGraph = object(v.dependency_graph, `${name}.dependency_graph`);
   array(depGraph.edges, name, "dependency_graph.edges");
   array(depGraph.imported_primitives, name, "dependency_graph.imported_primitives");
