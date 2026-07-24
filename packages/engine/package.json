@@ -22,7 +22,8 @@
     "./prediction/baselines": "./prediction/baselines/index.js",
     "./prediction/commitments": "./prediction/commitments/index.js",
     "./prediction/tasks": "./prediction/tasks/index.js",
-    "./competency/ledger": "./competency/ledger/index.js"
+    "./competency/ledger": "./competency/ledger/index.js",
+    "./motif": "./motif/index.js"
   },
   "scripts": {
     "test": "node --test"
