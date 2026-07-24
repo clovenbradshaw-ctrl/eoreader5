@@ -14,6 +14,7 @@ export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/in
 export { jaccardDistance, computeBoundaryStabilityGate } from "./emergence/boundaries/index.js";
 
 export { search } from "./search/index.js";
+export { detectMotifs } from "./motif/index.js";
 
 // Predictive-competency substrate (spec "EO Emergent Mathematics for
 // Predictive Competency", Phase 0 / Section 29): proper scoring, minimum
