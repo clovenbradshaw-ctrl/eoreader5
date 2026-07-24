@@ -17,6 +17,7 @@
     "./emergence/programs": "./emergence/programs/index.js",
     "./emergence/operators": "./emergence/operators/index.js",
     "./emergence/kinds": "./emergence/kinds/index.js",
+    "./emergence/calculus": "./emergence/calculus/index.js",
     "./prediction/scoring": "./prediction/scoring/index.js",
     "./prediction/baselines": "./prediction/baselines/index.js",
     "./prediction/commitments": "./prediction/commitments/index.js",

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/calculus-candidate.schema.json",
+  "title": "CalculusCandidate",
+  "description": "A Level-3 calculus candidate (spec 'EO Emergent Mathematics for Predictive Competency' section 16, section 11.4): a vocabulary of operators that recurred across a majority of a family's PROPOSE series and whose collective (mean-over-members) competency gain over a reference baseline transfers to entirely held-out SOURCES the vocabulary was never shown. Promotion requires a minimum vocabulary size (section 16.2: more than one successful expression), a cross-series permutation null (section 12.8), and a relative effect-size floor (section 1's governing criterion / section 20) — never a hand-set absolute threshold. Identified by content hash and dependency graph, not by name (section 16.4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "vocabulary", "dependency_graph", "closure_domain", "propose_series_ids", "holdout_series_ids", "split", "min_support_fraction", "reference_baseline_id", "aggregate_transfer_gain", "reference_scale", "relative_effect", "transfer_null", "vs_uncompressed_pool", "vs_foil_bundle", "lens", "novelty_status", "status", "emergence", "content_hash"],
+  "properties": {
+    "schema": { "const": "CalculusCandidate@1" },
+    "id": { "type": "string" },
+    "vocabulary": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operator_id", "canonical_program", "program_key", "input_types", "output_type", "support", "holdout_transfer"],
+        "properties": {
+          "operator_id": { "type": "string" },
+          "canonical_program": { "type": "object" },
+          "program_key": { "type": "string" },
+          "input_types": { "type": "array", "items": { "type": "string" } },
+          "output_type": { "type": "string" },
+          "support": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["count", "fraction", "propose_series_ids"],
+            "properties": {
+              "count": { "type": "integer", "minimum": 1 },
+              "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+              "propose_series_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "holdout_transfer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["per_series", "mean_gain"],
+            "properties": {
+              "per_series": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["series_id", "gain"], "properties": { "series_id": { "type": "string" }, "gain": { "type": "number" } } } },
+              "mean_gain": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "dependency_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edges", "imported_primitives"],
+      "properties": {
+        "edges": { "type": "array" },
+        "imported_primitives": { "type": "array" }
+      }
+    },
+    "closure_domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "input_types", "output_type"],
+      "properties": {
+        "description": { "type": "string" },
+        "input_types": { "type": "array", "items": { "type": "string" } },
+        "output_type": { "type": "string" }
+      }
+    },
+    "propose_series_ids": { "type": "array", "items": { "type": "string" } },
+    "holdout_series_ids": { "type": "array", "items": { "type": "string" } },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed_purpose", "propose_fraction", "propose_count", "holdout_count"],
+      "properties": {
+        "seed_purpose": { "type": "string" },
+        "propose_fraction": { "type": "number" },
+        "propose_count": { "type": "integer", "minimum": 1 },
+        "holdout_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "min_support_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+    "reference_baseline_id": { "type": "string" },
+    "aggregate_transfer_gain": { "type": "number" },
+    "reference_scale": { "type": "number" },
+    "relative_effect": { "type": "number" },
+    "transfer_null": {
+      "type": "object",
+      "description": "NullProtocol@1 record (see null-protocol.schema.json) for the cross-series permutation gate.",
+      "required": ["schema"],
+      "properties": { "schema": { "const": "NullProtocol@1" } }
+    },
+    "vs_uncompressed_pool": {
+      "type": ["object", "null"],
+      "description": "Diagnostic only: the same transfer statistic computed against every promoted operator across the family, not just support-qualified vocabulary members. Never gates promotion.",
+      "properties": { "aggregate_transfer_gain": { "type": "number" } }
+    },
+    "vs_foil_bundle": {
+      "type": ["object", "null"],
+      "description": "Optional diagnostic: the same statistic against a same-size bundle drawn from below-threshold candidates. Not computed in v1 (always null); reserved for a future pass."
+    },
+    "lens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_type", "horizon", "scoring_rule", "baseline_ids", "population"],
+      "properties": {
+        "target_type": { "type": "string" },
+        "horizon": { "type": "object" },
+        "scoring_rule": { "type": "string" },
+        "baseline_ids": { "type": "array", "items": { "type": "string" } },
+        "population": { "type": "string" }
+      }
+    },
+    "novelty_status": { "enum": ["unknown", "equivalent_known", "variant", "candidate_novel"] },
+    "status": { "enum": ["experimental", "replicated", "failed", "invalidated"] },
+    "emergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator_epoch", "synthesized_by", "validated_by", "member_count"],
+      "properties": {
+        "operator_epoch": { "type": "string" },
+        "synthesized_by": { "const": "SYN" },
+        "validated_by": { "const": "EVA" },
+        "member_count": { "type": "integer", "minimum": 2 }
+      }
+    },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

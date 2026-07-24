@@ -208,11 +208,116 @@ regime-switching series (alternating trend/flat legs) against three negative
 controls (a homogeneous trend, a stationary AR(1) process, white noise) — only
 the genuine regime-switch induces a kind.
 
+### What the kinds module unlocks but does not itself build
+
+Once a `KindCandidate` exists, a genuine "coherent package" claim becomes
+answerable: does a whole *vocabulary* of operators recur across, and transfer
+to, a **family** of series — not just one series' own held-out tail? That's
+the next section.
+
+## Level 3 — calculus induction: SYN assembling, EVA judging across sources (§16)
+
+`packages/engine/emergence/calculus` — `induceCalculus` is the genuine
+escalation invariant 7.6 names beyond Levels 1-2. Operators and kinds both
+demonstrate transfer across a held-out **time** tail of one series. Section
+16.1 draws the line sharply: "a fitted formula is not automatically a new
+mathematics... EO SHALL call a structure a calculus candidate only when it
+provides reusable rules for constructing and transforming a **family** of
+models" — plural. A calculus must transfer across held-out **sources**: a
+family of series the vocabulary was never shown at all (§16.3 step 10).
+
+The algorithm, reusing existing machinery wherever §16.3's twelve steps allow:
+
+1. **Deterministic propose/holdout split over sources** (not time) — a seeded
+   shuffle of the series ids, so the split is replayable and never biased by
+   caller ordering.
+2. **Cluster by structural similarity** (§16.3 steps 1-3) — run
+   `induceOperators` independently per propose series, then group every
+   promoted program by `canonicalKey`. Because `enumeratePrograms` is
+   series-independent for a fixed enumeration config, "the same structure
+   recurred" is exact set membership, not a fuzzy similarity judgment.
+3. **Support gate** — a program enters the vocabulary only if it was
+   independently promoted in at least half (a documented convention, same
+   idiom as `quantile=0.95` elsewhere) of the propose series.
+4. **Minimum vocabulary gate** (§16.2: "more than one successful expression")
+   — a hard cardinality check, not a statistic. Fewer than 2 members is not a
+   calculus.
+5. **Cross-series transfer statistic, its own permutation null, and a relative
+   effect-size floor** — the genuinely new logic, detailed below.
+
+Steps 4 (formation/transformation rules), 6-8 (executor/checker, regeneration)
+are inherited verbatim from `enumeratePrograms`' grammar, `induceOperators`'
+own promotion gate, and `evalNode`/`evaluateProgram` — no new mechanism.
+**Explicitly deferred, not silently dropped:** §16.3 step 9 (composing *new*
+cross-vocabulary forms and searching that expanded grammar) — v1 validates
+package-level transfer of the existing vocabulary first; a second full
+promotion-gate surface is a later pass, same posture as bridges (§17).
+
+### A real false positive, found and fixed before this shipped
+
+The transfer statistic was originally **max-over-vocabulary-members** per
+holdout series — a "closure" framing: the calculus offers several
+transformations, apply whichever fits. The empirical battery (built and run
+*before* trusting any candidate, per the working principle below) caught this
+immediately: a family of individually-structured but mutually **unrelated**
+series (a trend+season series, a stationary AR(1) process, a regime-switching
+series, a drift-free random walk, homogeneous flat noise) produced a
+2-member "vocabulary" — because a generic drift-like operator recurred
+across two of them by coincidence, not shared structure. On the held-out
+series it helped enormously on one and hurt enormously on the other, and
+**max**-over-members laundered that disagreement into an apparently strong
+positive aggregate, clearing the null with p≈0.
+
+The fix is **mean-over-members**, not max. A statistic that lets you always
+pick whichever tool happens to work is not testing whether the *package*
+transfers — it's testing whether at least one member is occasionally useful
+against a weak reference (`baseline:global-mean`, easily beaten by almost any
+momentum-style predictor on almost any non-stationary series), which is a much
+lower and much more gameable bar. The mean cannot be gamed the same way:
+members that disagree in sign across sources pull the aggregate toward (or
+past) zero — the honest signal that the "vocabulary" was never a coherent
+package. With the fix, the same unrelated-series family now correctly induces
+no calculus, and the genuine family (independent noise realizations of one
+trend+season structure) still does, with a large positive margin.
+
+**Working principle, carried forward from kinds and made explicit for
+calculus specifically**: every gate answers a narrower question than it sounds
+like it does — the permutation null answers "distinguishable from chance," the
+effect-size floor answers "big enough to matter," and (new here) the
+transfer-statistic's aggregation rule answers "is this a package, or a
+grab-bag." Calculus induction has more surface for a false positive than kinds
+did (support/recurrence *and* cross-series transfer both have to hold at once),
+so the negative-control battery — one genuine family, one mutually-unrelated
+family, one white-noise family — was designed and run before any candidate was
+trusted, not added after a result looked clean.
+
+### `CalculusCandidate` records
+
+Content-hash-sealed (§16.4: identified by hash and dependency graph, not
+name), carrying: the `vocabulary` (member programs with per-member support and
+per-series holdout gain), a `dependency_graph`, the declared `closure_domain`
+(type closure: `number[] -> number`, unrelated to the transfer statistic),
+propose/holdout provenance, `aggregate_transfer_gain`, `reference_scale`,
+`relative_effect`, `transfer_null`, two diagnostic-only comparison fields
+(`vs_uncompressed_pool`, `vs_foil_bundle` — never gate promotion), a `lens`,
+and `emergence: { operator_epoch, synthesized_by: "SYN", validated_by: "EVA",
+member_count }`. `SYN` because assembling a coherent structure from recurring
+parts is literally Structure×Generate in the operator-epoch table; `EVA`
+because cross-series validation is the Interpretation×Relate act judging the
+bundle. A calculus doesn't re-enter search as one `opref` leaf the way an
+operator does — it's a bundle, not a node — so there is no `reenters_as`
+analogue; it packages a claim about existing `INS` instances.
+
+`scripts/induce-calculus-demo.mjs` (importable as `runCalculusDemo`) runs the
+same three-family battery (genuine, mutually-unrelated, white-noise) and
+prints the vocabulary, transfer statistics, and null for whichever family
+induces a calculus.
+
 ### What remains unbuilt
 
 The multi-lens **disagreement** surface — where a candidate is low-surprise
 under one baseline/lens and high under another — is an app (eoreaderapp)
 concern; the engine already emits the raw material for it, since every
-`CompetencyRecord` carries per-baseline `competency_gain` under a named scope,
-and every `KindCandidate` names its own lens. Calculus induction (§16) and
+`CompetencyRecord`, `KindCandidate`, and now `CalculusCandidate` names its own
+lens. Composing *new* cross-vocabulary programs (§16.3 step 9) and
 cross-system bridges (§17) remain later phases.

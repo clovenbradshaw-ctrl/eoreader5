@@ -211,3 +211,61 @@ export function validateKindCandidate(value, name = "KindCandidate") {
   hash(v.content_hash, name, "content_hash");
   return v;
 }
+
+const NOVELTY_STATUSES = new Set(["unknown", "equivalent_known", "variant", "candidate_novel"]);
+
+export function validateCalculusCandidate(value, name = "CalculusCandidate") {
+  const v = object(value, name);
+  if (v.schema !== "CalculusCandidate@1") fail(name, "schema must be CalculusCandidate@1");
+  string(v.id, name, "id");
+  array(v.vocabulary, name, "vocabulary");
+  if (v.vocabulary.length < 2) fail(name, "vocabulary must have at least 2 members (section 16.2: more than one successful expression)");
+  for (const member of v.vocabulary) {
+    const m = object(member, `${name}.vocabulary[]`);
+    string(m.operator_id, name, "vocabulary[].operator_id");
+    object(m.canonical_program, name);
+    string(m.program_key, name, "vocabulary[].program_key");
+    array(m.input_types, name, "vocabulary[].input_types");
+    string(m.output_type, name, "vocabulary[].output_type");
+    const support = object(m.support, `${name}.vocabulary[].support`);
+    if (!Number.isInteger(support.count) || support.count < 1) fail(name, "vocabulary[].support.count must be a positive integer");
+    if (typeof support.fraction !== "number" || support.fraction < 0 || support.fraction > 1) fail(name, "vocabulary[].support.fraction must be in [0, 1]");
+    array(support.propose_series_ids, name, "vocabulary[].support.propose_series_ids");
+    const holdoutTransfer = object(m.holdout_transfer, `${name}.vocabulary[].holdout_transfer`);
+    array(holdoutTransfer.per_series, name, "vocabulary[].holdout_transfer.per_series");
+    if (typeof holdoutTransfer.mean_gain !== "number") fail(name, "vocabulary[].holdout_transfer.mean_gain must be a number");
+  }
+  const depGraph = object(v.dependency_graph, `${name}.dependency_graph`);
+  array(depGraph.edges, name, "dependency_graph.edges");
+  array(depGraph.imported_primitives, name, "dependency_graph.imported_primitives");
+  const closure = object(v.closure_domain, `${name}.closure_domain`);
+  string(closure.description, name, "closure_domain.description");
+  array(closure.input_types, name, "closure_domain.input_types");
+  string(closure.output_type, name, "closure_domain.output_type");
+  array(v.propose_series_ids, name, "propose_series_ids");
+  array(v.holdout_series_ids, name, "holdout_series_ids");
+  const split = object(v.split, `${name}.split`);
+  string(split.seed_purpose, name, "split.seed_purpose");
+  if (typeof split.propose_fraction !== "number") fail(name, "split.propose_fraction must be a number");
+  if (!Number.isInteger(split.propose_count) || split.propose_count < 1) fail(name, "split.propose_count must be a positive integer");
+  if (!Number.isInteger(split.holdout_count) || split.holdout_count < 1) fail(name, "split.holdout_count must be a positive integer");
+  if (typeof v.min_support_fraction !== "number" || v.min_support_fraction < 0 || v.min_support_fraction > 1) fail(name, "min_support_fraction must be in [0, 1]");
+  string(v.reference_baseline_id, name, "reference_baseline_id");
+  if (typeof v.aggregate_transfer_gain !== "number") fail(name, "aggregate_transfer_gain must be a number");
+  if (typeof v.reference_scale !== "number") fail(name, "reference_scale must be a number");
+  if (typeof v.relative_effect !== "number") fail(name, "relative_effect must be a number");
+  validateNullProtocol(v.transfer_null, `${name}.transfer_null`);
+  if (v.vs_uncompressed_pool !== null) object(v.vs_uncompressed_pool, name);
+  if (v.vs_foil_bundle !== null) object(v.vs_foil_bundle, name);
+  const lens = object(v.lens, `${name}.lens`);
+  string(lens.target_type, name, "lens.target_type"); object(lens.horizon, name); string(lens.scoring_rule, name, "lens.scoring_rule"); array(lens.baseline_ids, name, "lens.baseline_ids"); string(lens.population, name, "lens.population");
+  if (!NOVELTY_STATUSES.has(v.novelty_status)) fail(name, `invalid novelty_status ${v.novelty_status}`);
+  if (!COMPETENCY_STATUSES.has(v.status)) fail(name, `invalid status ${v.status}`);
+  const emergence = object(v.emergence, `${name}.emergence`);
+  string(emergence.operator_epoch, name, "emergence.operator_epoch");
+  if (emergence.synthesized_by !== "SYN") fail(name, 'emergence.synthesized_by must be "SYN"');
+  if (emergence.validated_by !== "EVA") fail(name, 'emergence.validated_by must be "EVA"');
+  if (!Number.isInteger(emergence.member_count) || emergence.member_count < 2) fail(name, "emergence.member_count must be an integer >= 2");
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
