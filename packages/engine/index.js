@@ -49,3 +49,4 @@ export {
 
 export { createEOReaderEngine } from "./runner.js";
 export { verifyObservationBundle, materializeObservationIndex, blockContentHash } from "./observation-index.js";
+export { auditTrail, auditTrailForUnit, auditTrailForReferent, auditTrailForHypothesis } from "./audit/index.js";

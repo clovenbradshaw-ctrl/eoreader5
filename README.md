@@ -8,6 +8,11 @@ decision. `docs/invariants.md`, `docs/priors-boundary.md`,
 transfer boundaries for eoreader5, eoprior, and eoreaderapp.
 `docs/predictive-competency-phase0.md` documents the Phase 0 predictive-competency
 substrate (commit-before-reveal, proper scoring, baselines, competency ledger).
+`docs/audit-trail.md` documents the audit trail (spec 7.11, "recursive audit"):
+given any surface the engine produced, reconstruct its full causal derivation
+— every semantic event it depends on, the decisions those events recorded,
+the observations it bottoms out at, and the exact pinned prior identity
+active throughout.
 
 ## Packages
 
@@ -27,7 +32,9 @@ substrate (commit-before-reveal, proper scoring, baselines, competency ledger).
 Phase 0/P0 in progress: operator epoch declared, core schemas published,
 canonical JSON/hash rules implemented, referent candidate/merge/split laws, a deterministic evidence-only `search(state, QueryRequest) -> QueryReading` surface, and the holonic watchmaker subassembly registry
 implemented with provenance-preserving semantics, and a static
-forbidden-dependency purity gate is in place for `packages/engine`.
+forbidden-dependency purity gate is in place for `packages/engine`. An
+`auditTrail` query (`packages/engine/audit/`) reconstructs the full causal
+derivation and activated-prior identity behind any produced surface.
 
 Run everything:
 

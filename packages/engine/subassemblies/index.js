@@ -67,6 +67,7 @@ export const CORE_SUBASSEMBLIES = assembleWatchmaker([
   defineSubassembly({ id: "prior-boundary", kind: "prior-boundary", version: "0.1.0", inputs: ["prior-snapshot"], outputs: ["pinned-prior-context"], depends_on: ["canonical-json"], owns: ["prior artifact membrane"] }),
   defineSubassembly({ id: "semantic-ledger", kind: "semantic-ledger", version: "0.1.0", inputs: ["semantic-events"], outputs: ["semantic-head"], depends_on: ["canonical-json", "operator-epoch", "referent-laws"], owns: ["append-only semantic event fold"] }),
   defineSubassembly({ id: "reading-snapshot", kind: "reading-snapshot", version: "0.1.0", inputs: ["semantic-head", "frame", "lens", "prior-snapshot"], outputs: ["reading-snapshot"], depends_on: ["semantic-ledger", "prior-boundary"], owns: ["external app citation artifact"] }),
+  defineSubassembly({ id: "audit-trail", kind: "audit-trail", version: "0.1.0", inputs: ["semantic-events", "prior-snapshot"], outputs: ["audit-trail"], depends_on: ["semantic-ledger", "prior-boundary"], owns: ["causal provenance and activated-prior reconstruction for any surface (spec 7.11, \"recursive audit\")"] }),
   defineSubassembly({ id: "enactment-boundary", kind: "enactment-boundary", version: "0.1.0", inputs: ["candidate-surface", "reading-snapshot"], outputs: ["enactment-decision", "effect-request"], depends_on: ["reading-snapshot"], owns: ["admit/hold/veto decision seam"] }),
 ]);
 
