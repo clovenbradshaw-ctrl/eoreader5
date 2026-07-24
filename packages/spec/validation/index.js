@@ -78,8 +78,8 @@ export function validateCommand(value, name = "Command") {
   return v;
 }
 
-const INDIVIDUATION_TYPES = new Set(["field", "emanon", "protogon", "holon"]);
-const GATE_STATUSES = new Set(["field", "pending", "active"]);
+const INDIVIDUATION_TYPES = new Set(["field", "emanon", "protogon", "holon", "apparatus"]);
+const GATE_STATUSES = new Set(["field", "pending", "active", "apparatus"]);
 
 export function validateNullProtocol(value, name = "NullProtocol") {
   const v = object(value, name);
@@ -107,6 +107,16 @@ export function validateIndividuationResult(value, name = "IndividuationResult")
   if (typeof v.named !== "boolean") fail(name, "named must be a boolean");
   validateNullProtocol(v.mass_null, `${name}.mass_null`);
   validateNullProtocol(v.coupling_null, `${name}.coupling_null`);
+  if (v.attributive_share !== null && (typeof v.attributive_share !== "number" || v.attributive_share < 0 || v.attributive_share > 1)) fail(name, "attributive_share must be in [0, 1] or null");
+  if (v.coupling_dispersion !== null && (typeof v.coupling_dispersion !== "number" || v.coupling_dispersion < 0 || v.coupling_dispersion > 1)) fail(name, "coupling_dispersion must be in [0, 1] or null");
+  if (v.attributive_null !== null) validateNullProtocol(v.attributive_null, `${name}.attributive_null`);
+  if (v.dispersion_null !== null) validateNullProtocol(v.dispersion_null, `${name}.dispersion_null`);
+  if (v.subject_reentry !== null) {
+    const reentry = object(v.subject_reentry, `${name}.subject_reentry`);
+    if (typeof reentry.passed !== "boolean") fail(name, "subject_reentry.passed must be a boolean");
+    if (!["patient", "agentive", "none"].includes(reentry.basis)) fail(name, "subject_reentry.basis is invalid");
+    validateNullProtocol(reentry.null_result, `${name}.subject_reentry.null_result`);
+  }
   if (v.boundary_stability !== null) {
     const boundary = object(v.boundary_stability, `${name}.boundary_stability`);
     if (typeof boundary.mean_observed_displacement !== "number") fail(name, "boundary_stability.mean_observed_displacement must be a number");
@@ -126,6 +136,14 @@ export function validateReadingSnapshot(value, name = "ReadingSnapshot") {
   if (v.schema_version !== "ReadingSnapshot@1") fail(name, "schema_version must be ReadingSnapshot@1");
   for (const field of ["reading_id", "engine_version", "operator_epoch", "prior_id", "frame_id", "lens_id", "semantic_head"]) string(v[field], name, field);
   array(v.units, name, "units");
+  if (v.provenance_layer !== undefined) {
+    array(v.provenance_layer, name, "provenance_layer");
+    for (const entry of v.provenance_layer) {
+      object(entry, `${name}.provenance_layer[]`);
+      string(entry.referent_id, name, "provenance_layer[].referent_id");
+      string(entry.reason, name, "provenance_layer[].reason");
+    }
+  }
   return v;
 }
 

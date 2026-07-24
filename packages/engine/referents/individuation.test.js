@@ -7,8 +7,8 @@ const COUPLING_NULL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const STABLE_BOUNDARY = { observedDisplacements: [0.05, 0.08, 0.06], nullDisplacements: [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85], quantile: 0.9 };
 const UNSTABLE_BOUNDARY = { observedDisplacements: [0.68, 0.7, 0.66], nullDisplacements: [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85], quantile: 0.9 };
 
-test("INDIVIDUATION_TYPES enumerates the four terrain types from spec 13.2", () => {
-  assert.deepEqual(INDIVIDUATION_TYPES, ["field", "emanon", "protogon", "holon"]);
+test("INDIVIDUATION_TYPES enumerates the five terrain types from spec 13.2 plus apparatus", () => {
+  assert.deepEqual(INDIVIDUATION_TYPES, ["field", "emanon", "protogon", "holon", "apparatus"]);
 });
 
 test("classifyIndividuationType: low mass + low coupling types field", () => {

@@ -18,7 +18,7 @@
 import { deriveNull } from "../emergence/nulls/index.js";
 import { computeBoundaryStabilityGate } from "../emergence/boundaries/index.js";
 
-export const INDIVIDUATION_TYPES = Object.freeze(["field", "emanon", "protogon", "holon"]);
+export const INDIVIDUATION_TYPES = Object.freeze(["field", "emanon", "protogon", "holon", "apparatus"]);
 
 /**
  * Type a referent by mass x coupling, with the named/INS bit deciding
@@ -49,6 +49,14 @@ export function classifyIndividuationType({
   named,
   massNullSamples,
   couplingNullSamples,
+  attributiveShare = null,
+  couplingDispersion = null,
+  attributiveNullSamples,
+  dispersionNullSamples,
+  patientShare = null,
+  patientNullSamples,
+  agentiveShare = null,
+  agentiveNullSamples,
   quantile = 0.95,
 }) {
   if (typeof mass !== "number" || Number.isNaN(mass)) throw new TypeError("classifyIndividuationType: mass must be a number");
@@ -81,13 +89,32 @@ export function classifyIndividuationType({
     individuationType = "field";
   }
 
-  return Object.freeze({
+  const frame = computeFrameDemotionEvidence({
+    individuationType,
+    attributiveShare,
+    couplingDispersion,
+    attributiveNullSamples,
+    dispersionNullSamples,
+    patientShare,
+    patientNullSamples,
+    agentiveShare,
+    agentiveNullSamples,
+    quantile,
+  });
+  if (frame.demotes) individuationType = "apparatus";
+
+  return deepFreeze({
     individuation_type: individuationType,
     high_mass: highMass,
     high_coupling: highCoupling,
     named: Boolean(named),
     mass_null: massNull,
     coupling_null: couplingNull,
+    attributive_share: attributiveShare,
+    coupling_dispersion: couplingDispersion,
+    attributive_null: frame.attributiveNull,
+    dispersion_null: frame.dispersionNull,
+    subject_reentry: frame.subjectReentry,
   });
 }
 
@@ -119,12 +146,35 @@ export function individuateReferent({
   couplingNullSamples,
   quantile = 0.95,
   boundary,
+  attributiveShare = null,
+  couplingDispersion = null,
+  attributiveNullSamples,
+  dispersionNullSamples,
+  patientShare = null,
+  patientNullSamples,
+  agentiveShare = null,
+  agentiveNullSamples,
 }) {
   if (typeof referentId !== "string" || referentId.length === 0) {
     throw new TypeError("individuateReferent: referentId must be a non-empty string");
   }
 
-  const typing = classifyIndividuationType({ mass, coupling, named, massNullSamples, couplingNullSamples, quantile });
+  const typing = classifyIndividuationType({
+    mass,
+    coupling,
+    named,
+    massNullSamples,
+    couplingNullSamples,
+    attributiveShare,
+    couplingDispersion,
+    attributiveNullSamples,
+    dispersionNullSamples,
+    patientShare,
+    patientNullSamples,
+    agentiveShare,
+    agentiveNullSamples,
+    quantile,
+  });
   const boundaryStability = boundary ? computeBoundaryStabilityGate(boundary) : null;
 
   const isField = typing.individuation_type === "field";
@@ -143,6 +193,9 @@ export function individuateReferent({
   } else if (boundaryFailed) {
     status = "field";
     reason = "boundary does not stay put under re-segmentation - remains field, not admitted, despite mass/coupling typing";
+  } else if (typing.individuation_type === "apparatus") {
+    status = "apparatus";
+    reason = "admitted as apparatus: attributive share and coupling dispersion clear Born-null thresholds without subject re-entry";
   } else {
     status = "active";
     reason = `admitted as ${typing.individuation_type}: mass/coupling typing and boundary stability both passed`;
@@ -153,7 +206,7 @@ export function individuateReferent({
   // candidate, but it cannot promote one past what mass/coupling earned.
   const individuationType = isField ? "field" : boundaryFailed ? "field" : typing.individuation_type;
 
-  return Object.freeze({
+  return deepFreeze({
     schema: "IndividuationResult@1",
     referent_id: referentId,
     individuation_type: individuationType,
@@ -163,9 +216,68 @@ export function individuateReferent({
     named: typing.named,
     mass_null: typing.mass_null,
     coupling_null: typing.coupling_null,
+    attributive_share: typing.attributive_share,
+    coupling_dispersion: typing.coupling_dispersion,
+    attributive_null: typing.attributive_null,
+    dispersion_null: typing.dispersion_null,
+    subject_reentry: typing.subject_reentry,
     boundary_stability: boundaryStability,
     gate_result: Object.freeze({ admitted, status, reason }),
   });
+}
+
+function computeFrameDemotionEvidence({
+  individuationType,
+  attributiveShare,
+  couplingDispersion,
+  attributiveNullSamples,
+  dispersionNullSamples,
+  patientShare,
+  patientNullSamples,
+  agentiveShare,
+  agentiveNullSamples,
+  quantile,
+}) {
+  const attributiveNull = deriveOptionalNull(attributiveNullSamples, attributiveShare, quantile, "shuffled-predicate-attribution");
+  const dispersionNull = deriveOptionalNull(dispersionNullSamples, couplingDispersion, quantile, "shuffled-incidence-dispersion");
+  const patientNull = deriveOptionalNull(patientNullSamples, patientShare, quantile, "shuffled-predicate-patient");
+  const agentiveNull = deriveOptionalNull(agentiveNullSamples, agentiveShare, quantile, "shuffled-predicate-agentive");
+
+  let subjectReentry = null;
+  if (patientNull?.passed) {
+    subjectReentry = { passed: true, basis: "patient", null_result: patientNull };
+  } else if (agentiveNull?.passed) {
+    subjectReentry = { passed: true, basis: "agentive", null_result: agentiveNull };
+  } else if (patientNull || agentiveNull) {
+    subjectReentry = { passed: false, basis: "none", null_result: patientNull ?? agentiveNull };
+  }
+
+  const eligible = individuationType === "holon" || individuationType === "emanon";
+  return {
+    attributiveNull,
+    dispersionNull,
+    subjectReentry,
+    demotes: eligible && Boolean(attributiveNull?.passed) && Boolean(dispersionNull?.passed) && !Boolean(subjectReentry?.passed),
+  };
+}
+
+function deriveOptionalNull(nullSamples, observedStatistic, quantile, name) {
+  if (observedStatistic === null || observedStatistic === undefined) return null;
+  if (!Array.isArray(nullSamples)) return null;
+  return deriveNull({
+    nullSamples,
+    observedStatistic,
+    tailDirection: "greater",
+    quantile,
+    protocol: { name },
+  });
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const child of Object.values(value)) deepFreeze(child);
+  return value;
 }
 
 /**
@@ -197,5 +309,44 @@ export function applyNameBind(individuationResult) {
           quantile: individuationResult.boundary_stability.null_result.quantile,
         }
       : undefined,
+  });
+}
+
+
+export function applyFrameDemotion(individuationResult, evidence) {
+  if (individuationResult.individuation_type !== "holon" && individuationResult.individuation_type !== "emanon") {
+    throw new Error(`applyFrameDemotion: frame demotion only applies to a holon or emanon (got "${individuationResult.individuation_type}")`);
+  }
+  const post = deepFreeze({
+    ...individuationResult,
+    individuation_type: "apparatus",
+    attributive_share: evidence.attributiveShare ?? individuationResult.attributive_share ?? null,
+    coupling_dispersion: evidence.couplingDispersion ?? individuationResult.coupling_dispersion ?? null,
+    attributive_null: evidence.attributiveNull ?? individuationResult.attributive_null ?? null,
+    dispersion_null: evidence.dispersionNull ?? individuationResult.dispersion_null ?? null,
+    subject_reentry: individuationResult.subject_reentry ?? null,
+    gate_result: { admitted: true, status: "apparatus", reason: "admitted as apparatus: frame demotion retained in ledger" },
+  });
+  return deepFreeze({
+    result: post,
+    rec: { operator: "REC", held: false, transition: "frame-demotion", pre: individuationResult, post },
+  });
+}
+
+export function applySubjectReentry(individuationResult, evidence) {
+  if (individuationResult.individuation_type !== "apparatus") {
+    throw new Error(`applySubjectReentry: subject re-entry only applies to apparatus (got "${individuationResult.individuation_type}")`);
+  }
+  const restoredType = individuationResult.named ? "holon" : "emanon";
+  const nullResult = evidence.nullResult ?? evidence.patientNull ?? evidence.agentiveNull;
+  const post = deepFreeze({
+    ...individuationResult,
+    individuation_type: restoredType,
+    subject_reentry: { passed: true, basis: evidence.basis, null_result: nullResult },
+    gate_result: { admitted: true, status: "active", reason: `subject re-entry restored ${restoredType}: ${evidence.basis} evidence cleared its Born null` },
+  });
+  return deepFreeze({
+    result: post,
+    rec: { operator: "REC", held: true, transition: "subject-reentry", pre: individuationResult, post },
   });
 }

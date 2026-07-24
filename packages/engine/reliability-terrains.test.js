@@ -12,8 +12,8 @@
 // referents/individuation.test.js (per-threshold, spec-section by spec-section).
 // This file is deliberately not a duplicate of that: it pins the two
 // reliability guarantees the battery cares about across the whole gate —
-//   * completeness: every one of the four terrain types (field / protogon /
-//     emanon / holon) is reachable from the same call surface with only the
+//   * completeness: every terrain type (field / protogon / emanon / holon /
+//     apparatus) is reachable from the same call surface with only the
 //     mass × coupling × named observables changing; and
 //   * safety: the gate never admits a figure on ambient material, and never
 //     defaults admission to true when the boundary evidence is missing.
@@ -40,17 +40,28 @@ const STABLE_BOUNDARY = {
   quantile: 0.9,
 };
 
-// The four terrain cases, one per individuation type, described the way the
-// evidence talks about them. Only mass/coupling/named change.
+// Terrain cases, one per individuation type, described the way the
+// evidence talks about them. Apparatus also supplies null-gated frame evidence.
 const TERRAINS = [
   { type: "field", mass: 3, coupling: 3, named: false, gloss: "ambient, not individuated" },
   { type: "protogon", mass: 3, coupling: 9.5, named: false, gloss: "orbited but absent (Kurtz)" },
   { type: "emanon", mass: 9.5, coupling: 9.5, named: false, gloss: "present, agentive, unnamed" },
   { type: "holon", mass: 9.5, coupling: 9.5, named: true, gloss: "present and name-bound" },
+  {
+    type: "apparatus",
+    mass: 9.5,
+    coupling: 9.5,
+    named: true,
+    attributiveShare: 1,
+    couplingDispersion: 0.97,
+    attributiveNullSamples: [0.1, 0.2, 0.3, 0.4, 0.5],
+    dispersionNullSamples: [0.1, 0.2, 0.3, 0.4, 0.5],
+    gloss: "provenance frame, not content figure",
+  },
 ];
 
-test("[terrain] the four individuation types are exactly field/emanon/protogon/holon", () => {
-  assert.deepEqual(INDIVIDUATION_TYPES, ["field", "emanon", "protogon", "holon"]);
+test("[terrain] individuation types include apparatus provenance typing", () => {
+  assert.deepEqual(INDIVIDUATION_TYPES, ["field", "emanon", "protogon", "holon", "apparatus"]);
 });
 
 test("[terrain] completeness: every terrain type is reachable from one call surface", () => {
@@ -63,11 +74,15 @@ test("[terrain] completeness: every terrain type is reachable from one call surf
       massNullSamples: MASS_NULL,
       couplingNullSamples: COUPLING_NULL,
       quantile: 0.9,
+      attributiveShare: t.attributiveShare,
+      couplingDispersion: t.couplingDispersion,
+      attributiveNullSamples: t.attributiveNullSamples,
+      dispersionNullSamples: t.dispersionNullSamples,
     });
     assert.equal(result.individuation_type, t.type, `${t.gloss} must type as ${t.type}`);
     seen.add(result.individuation_type);
   }
-  assert.deepEqual([...seen].sort(), [...INDIVIDUATION_TYPES].sort(), "all four types were produced");
+  assert.deepEqual([...seen].sort(), [...INDIVIDUATION_TYPES].sort(), "all types were produced");
 });
 
 test("[terrain] safety: ambient material (low mass, low coupling) is never admitted as a figure", () => {

@@ -32,6 +32,7 @@ export function readingSnapshot(state, { frame = "frame:default", lens = "lens:n
     lens_id: lens,
     source_id,
     semantic_head: state.semanticHead,
+    provenance_layer: provenanceLayer(state),
     units: bundle.spans.map((span) => {
       const operator_events = state.events
         .filter((event) => (event.payload?.envelope?.source_id ?? event.payload?.source_id) === span.source_id || (event.payload?.envelope?.fields ?? event.payload?.fields)?.some?.((field) => field.field_id === span.field_id) || event.inputs?.some((input) => state.events.some((candidate) => candidate.event_id === input && candidate.payload?.source_id === span.source_id)))
@@ -40,4 +41,11 @@ export function readingSnapshot(state, { frame = "frame:default", lens = "lens:n
     }),
   };
   return validateReadingSnapshot(snapshot);
+}
+
+function provenanceLayer(state) {
+  return [...(state.individuationResults ?? [])]
+    .map((entry) => entry?.result ?? entry)
+    .filter((result) => result?.individuation_type === "apparatus")
+    .map((result) => ({ referent_id: result.referent_id, reason: result.gate_result.reason }));
 }
