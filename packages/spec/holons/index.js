@@ -11,6 +11,7 @@ export const SUBASSEMBLY_KINDS = Object.freeze([
   "reading-snapshot",
   "enactment-boundary",
   "compatibility-import",
+  "audit-trail",
 ]);
 
 export const REQUIRED_PORTS = Object.freeze({
@@ -24,6 +25,7 @@ export const REQUIRED_PORTS = Object.freeze({
   "reading-snapshot": Object.freeze({ inputs: ["semantic-head", "frame", "lens", "prior-snapshot"], outputs: ["reading-snapshot"] }),
   "enactment-boundary": Object.freeze({ inputs: ["candidate-surface", "reading-snapshot"], outputs: ["enactment-decision", "effect-request"] }),
   "compatibility-import": Object.freeze({ inputs: ["legacy42-envelope"], outputs: ["observation-envelope", "held-review"] }),
+  "audit-trail": Object.freeze({ inputs: ["semantic-events", "prior-snapshot"], outputs: ["audit-trail"] }),
 });
 
 export function isSubassemblyKind(kind) {

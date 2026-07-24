@@ -78,14 +78,31 @@ export function applyCommand(state, command) {
     const candidates = discoverCandidates(state, { maxCandidates: budget.max_candidates ?? 100 });
     const maxEvents = Math.max(1, budget.max_events ?? candidates.length * 2 + 1);
     const events = [];
-    let knownInputs = inputs;
+    // Observation-admitted events indexed by source_id so a discovered
+    // candidate's declared inputs/provenance.depends_on reach back to the
+    // observations its sightings were actually mined from (spec 3.2:
+    // provenance shows where a claim came from) -- otherwise an audit trail
+    // rooted at a discovery decision could never walk to the Given it was
+    // derived from. Each candidate depends only on the command's own inputs
+    // plus its own evidence, not on sibling candidates evaluated earlier in
+    // this batch: batch order is incidental scheduling, not a causal edge,
+    // and folding it into provenance would make every later candidate's
+    // audit trail falsely implicate every earlier one's observations too.
+    const observationEventsBySource = new Map();
+    for (const event of state.events) {
+      if (event.event_type !== "observation.admitted") continue;
+      const sourceId = (event.payload.envelope ?? event.payload).source_id;
+      if (!sourceId) continue;
+      observationEventsBySource.set(sourceId, [...(observationEventsBySource.get(sourceId) ?? []), event.event_id]);
+    }
     for (const candidate of candidates) {
       if (events.length + 2 > maxEvents) break;
-      const proposed = baseEvent(state, "observable.proposed", "SIG", { candidate, status: "candidate" }, knownInputs, role);
+      const evidenceInputs = (candidate.sightings ?? []).flatMap((sighting) => observationEventsBySource.get(sighting.source_id) ?? []);
+      const proposedInputs = [...new Set([...inputs, ...evidenceInputs])];
+      const proposed = baseEvent(state, "observable.proposed", "SIG", { candidate, status: "candidate" }, proposedInputs, role);
       const decision = evaluate(state, candidate);
       const evaluated = baseEvent(state, decision.status === "accepted" ? "kind.accepted" : "hypothesis.held", decision.status === "accepted" ? "DEF" : "EVA", { ...candidate, ...decision }, [proposed.event_id], role);
       events.push(proposed, evaluated);
-      knownInputs = [evaluated.event_id];
     }
     if (events.length === 0) events.push(baseEvent(state, "discovery.abstained", "EVA", { reason: (budget.max_events ?? 0) <= 1 ? "held:budget_exhausted" : "no_observation_values" }, inputs, role));
     const next = appendEvents(state, events);

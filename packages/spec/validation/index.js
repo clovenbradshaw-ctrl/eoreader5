@@ -131,6 +131,53 @@ export function validateIndividuationResult(value, name = "IndividuationResult")
   return v;
 }
 
+const AUDIT_ID_RE = /^audit:sha256:[0-9a-f]{64}$/;
+const AUDIT_TARGET_TYPES = new Set(["event", "events", "unit", "referent", "hypothesis"]);
+
+export function validateAuditTrail(value, name = "AuditTrail") {
+  const v = object(value, name);
+  if (v.schema !== "AuditTrail@1") fail(name, "schema must be AuditTrail@1");
+  string(v.audit_id, name, "audit_id");
+  if (!AUDIT_ID_RE.test(v.audit_id)) fail(name, "audit_id must be audit:sha256:<64 hex>");
+  for (const field of ["engine_version", "operator_epoch", "semantic_head"]) string(v[field], name, field);
+
+  const target = object(v.target, `${name}.target`);
+  if (!AUDIT_TARGET_TYPES.has(target.type)) fail(name, `invalid target.type ${target.type}`);
+  string(target.id, name, "target.id");
+
+  const prior = object(v.prior, `${name}.prior`);
+  string(prior.prior_id, name, "prior.prior_id");
+  string(prior.basis_id, name, "prior.basis_id");
+  if (prior.convention_set_id !== null && typeof prior.convention_set_id !== "string") fail(name, "prior.convention_set_id must be a string or null");
+  array(prior.policy_ids, name, "prior.policy_ids");
+  object(prior.algorithm_versions, name);
+  hash(prior.content_hash, name, "prior.content_hash");
+  array(prior.referenced_by_event_ids, name, "prior.referenced_by_event_ids");
+
+  array(v.events, name, "events");
+  for (const event of v.events) validateSemanticEvent(event, `${name}.events[]`);
+
+  array(v.decisions, name, "decisions");
+  for (const decision of v.decisions) {
+    const d = object(decision, `${name}.decisions[]`);
+    string(d.event_id, name, "decisions[].event_id");
+    string(d.kind, name, "decisions[].kind");
+    if (d.status !== null && typeof d.status !== "string") fail(name, "decisions[].status must be a string or null");
+    if (d.reason !== null && typeof d.reason !== "string") fail(name, "decisions[].reason must be a string or null");
+  }
+
+  array(v.observations, name, "observations");
+  for (const observation of v.observations) {
+    const o = object(observation, `${name}.observations[]`);
+    string(o.event_id, name, "observations[].event_id");
+    string(o.source_id, name, "observations[].source_id");
+    hash(o.source_content_hash, name, "observations[].source_content_hash");
+  }
+
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
+
 export function validateReadingSnapshot(value, name = "ReadingSnapshot") {
   const v = object(value, name);
   if (v.schema_version !== "ReadingSnapshot@1") fail(name, "schema_version must be ReadingSnapshot@1");

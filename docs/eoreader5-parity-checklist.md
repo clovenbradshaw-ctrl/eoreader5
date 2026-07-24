@@ -18,13 +18,14 @@ yet started** — with evidence, so nothing is dropped by silence.
 
 ## Executive verdict (answers the two operational questions)
 
-**Does eoreader5 actually work?** Yes, as a *pure engine skeleton*. All 105
-package tests pass (`spec` 35, `engine` 46, `conformance` 20, `compat-4.2` 2) —
+**Does eoreader5 actually work?** Yes, as a *pure engine skeleton*. All 222
+package tests pass (`spec` 35, `engine` 163, `conformance` 22, `compat-4.2` 2) —
 the individuation gate (deriveNull, boundary stability, mass × coupling
 typing, name-bind promotion) added in the "EO Terrain Promotion and
-Predictive Prior Induction v0.2" pass, and the corpus-role + row-stance
+Predictive Prior Induction v0.2" pass, the corpus-role + row-stance
 fabrication firewalls (retirement gate items 1–2, `docs/corpus-role.md` /
-`docs/row-stance-templates.md`) added in the build-order Phase 0 pass,
+`docs/row-stance-templates.md`) added in the build-order Phase 0 pass, and
+the recursive audit trail (spec 7.11, `docs/audit-trail.md`, this pass)
 account for most of the growth over the original 35 — and
 `createEOReaderEngine` runs full public-domain books end-to-end,
 deterministically, with byte-anchored search — see
@@ -123,6 +124,8 @@ cannot host a UI component. It may only emit neutral projection data.*
 ## 6. Cross-cutting engineering requirements
 
 - [ ] **Replayability** — **Ported/rebuilt across all three repos.** `eoreader5:packages/engine/replay/index.js` is a pure event-sourced reducer (`createState`/`appendEvents`/`replay`/`read`) computing a `semanticHead` hash — verified deterministic on real books (`docs/evidence/book-run-2026-07-23.md`: identical event tape and head on repeated runs). `eoPriors:src/replay.js` does DAG-topological projection replay (`SPEC.md` §2). `eoreaderapp:src/state/event-log.js`+`records.js` is the append-only app model. The "reads with animation"/toggled-layer replay UI does not exist yet (expected — app is early).
+
+- [x] **Recursive audit trail (spec 7.11)** — **Built.** `packages/engine/audit/index.js` (`auditTrail`/`auditTrailForUnit`/`auditTrailForReferent`/`auditTrailForHypothesis`) reconstructs the full causal closure (`inputs`/`provenance.depends_on`) behind any produced surface back to its `observation.admitted` roots, normalizes the decisions along that chain (individuation gate results, discovery/evaluate outcomes, abstentions, hypothesis and referent lifecycle events), and reports the one pinned `PriorSnapshot` identity active throughout plus exactly which events in the chain carried it — consistent with `docs/priors-boundary.md`'s "the prior [is] an immutable value supplied by the caller," never a menu the engine selects from. Schema: `packages/spec/schemas/audit-trail.schema.json` (`AuditTrail@1`), validated by `validateAuditTrail`. Doc: `docs/audit-trail.md`, including a real gap the work surfaced and fixed: `discovery.advance` previously chained discovered candidates to whichever candidate was evaluated immediately before them in the same batch rather than to the observations that actually produced them — an audit trail rooted at a discovery decision could not reach its real evidence. Registered as the `audit-trail` subassembly in `packages/engine/subassemblies/index.js`. Not yet done: eoreaderapp presentation of this data to users (`docs/priors-boundary.md` keeps that app-owned) and folding individuation-gate `NullProtocol@1` records into `decisions` once that gate is wired into the runner event pipeline (see `docs/individuation-gate.md` §6 — the audit module already handles it the moment a caller supplies it, no schema change needed).
 
 - [ ] **Provenance retained through embedding** — **Re-housed to eoreaderapp (engine may not embed); not yet implemented.** `eoreader5` must not call an embedding model (architecture.md), and none exists there. Pattern carried from `eoreader4.2:docs/retrieval-spec.md` §6 and `src/perceiver/parse/clause-layer.js` (clause keeps its `sentIdx`). `eoreaderapp:src/priors/` (`cache.js`, `resolver.js`, `verify.js`) verifies snapshot hashes but has no embed-with-provenance-pointer code yet.
 

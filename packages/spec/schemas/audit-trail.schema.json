@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/audit-trail.schema.json",
+  "title": "AuditTrail",
+  "description": "Reconstructs the causal derivation of one surface (a ReadingSnapshot unit, a referent, a hypothesis, or an arbitrary event set) back through the semantic ledger: every SemanticEvent it depends on, the decisions those events recorded, the observation roots they trace to, and the exact pinned PriorSnapshot identity that was in effect (spec section 7.11, 'recursive audit'). See docs/audit-trail.md. Presentation of this data to a user is app-owned (docs/priors-boundary.md); this artifact is the engine-owned, replay-deterministic data behind that presentation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "audit_id",
+    "target",
+    "engine_version",
+    "operator_epoch",
+    "semantic_head",
+    "prior",
+    "events",
+    "decisions",
+    "observations",
+    "content_hash"
+  ],
+  "properties": {
+    "schema": { "const": "AuditTrail@1" },
+    "audit_id": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["event", "events", "unit", "referent", "hypothesis"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "engine_version": { "type": "string", "minLength": 1 },
+    "operator_epoch": { "type": "string", "minLength": 1 },
+    "semantic_head": { "type": "string", "minLength": 1 },
+    "prior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prior_id",
+        "basis_id",
+        "convention_set_id",
+        "policy_ids",
+        "algorithm_versions",
+        "content_hash",
+        "referenced_by_event_ids"
+      ],
+      "properties": {
+        "prior_id": { "type": "string", "minLength": 1 },
+        "basis_id": { "type": "string", "minLength": 1 },
+        "convention_set_id": { "type": ["string", "null"] },
+        "policy_ids": { "type": "array", "items": { "type": "string" } },
+        "algorithm_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+        "content_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" },
+        "referenced_by_event_ids": {
+          "description": "Which events in this trail actually carried a binding to prior_id (event.context.prior_snapshot). An engine-authored event always does; a hand-constructed or foreign event that lacks one is visible here as an omission, not silently assumed.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "events": {
+      "description": "The full causal closure reachable from the target's seed event(s) by following inputs and provenance.depends_on, in ledger append order.",
+      "type": "array",
+      "items": { "$ref": "semantic-event.schema.json" }
+    },
+    "decisions": {
+      "description": "Normalized view of every recognizable decision point inside events (individuation gate results, discovery/evaluate outcomes, abstentions, hypothesis status changes, referent lifecycle events). Every entry traces back to exactly one event_id in events.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "kind", "status", "reason"],
+        "properties": {
+          "event_id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "status": { "type": ["string", "null"] },
+          "reason": { "type": ["string", "null"] },
+          "detail": { "type": ["object", "null"] }
+        }
+      }
+    },
+    "observations": {
+      "description": "The Given-layer roots this trail bottoms out at: every observation.admitted event reached by the closure.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "source_id", "source_content_hash"],
+        "properties": {
+          "event_id": { "type": "string", "minLength": 1 },
+          "source_id": { "type": "string", "minLength": 1 },
+          "source_content_hash": { "type": "string", "pattern": "^[a-z0-9]+:[0-9a-f]+$" }
+        }
+      }
+    },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]+$" }
+  }
+}
