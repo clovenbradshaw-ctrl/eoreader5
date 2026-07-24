@@ -98,6 +98,11 @@ export {
   applyNameBind,
 } from "./individuation.js";
 
+export {
+  operatorCandidateToReferentArgs,
+  individuateOperatorCandidate,
+} from "./operator-adapter.js";
+
 /** Two admit events with the same surface do NOT imply the same referent. */
 export function surfacesIndicateSameReferent(events, surfaceA, surfaceB) {
   const projection = projectReferents(events);
