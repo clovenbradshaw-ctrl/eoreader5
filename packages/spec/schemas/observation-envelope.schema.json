@@ -122,6 +122,22 @@
             "items": {
               "type": "object"
             }
+          },
+          "predicate_class": {
+            "enum": [
+              "agentive",
+              "attributive",
+              "patient",
+              "unclassified"
+            ]
+          },
+          "presence_role": {
+            "enum": [
+              "foreground",
+              "present",
+              "latent",
+              "attributive"
+            ]
           }
         }
       }

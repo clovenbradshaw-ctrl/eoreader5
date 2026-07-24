@@ -96,7 +96,11 @@ export {
   classifyIndividuationType,
   individuateReferent,
   applyNameBind,
+  applyFrameDemotion,
+  applySubjectReentry,
 } from "./individuation.js";
+
+export { couplingDispersion } from "./dispersion.js";
 
 export {
   operatorCandidateToReferentArgs,

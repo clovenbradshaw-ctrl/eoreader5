@@ -98,3 +98,29 @@ test("this conformance suite itself runs with network disabled (no fetch/http us
   const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
   assert.doesNotMatch(source.replace(/FORBIDDEN_GLOBALS[\s\S]*?\];/, ""), /\bfetch\s*\(/);
 });
+
+const ATTRIBUTION_VERB_LITERALS = ["said", "reported", "wrote", "noted", "published", "according to"];
+
+test("packages/engine contains no attribution-verb literals", () => {
+  const files = walk(engineRoot);
+  const violations = [];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const literal of ATTRIBUTION_VERB_LITERALS) {
+      const quoted = new RegExp(`["']${literal.replace(/ /g, "\\\\s+")}["']`, "i");
+      if (quoted.test(source)) violations.push(`${file}: contains attribution verb literal ${literal}`);
+    }
+  }
+  assert.deepEqual(violations, []);
+});
+
+test("packages/engine does not compare apparatus observables against hand-set numeric literals", () => {
+  const files = walk(engineRoot);
+  const violations = [];
+  const comparison = /(attributiveShare|couplingDispersion|attributive_share|coupling_dispersion)\s*(?:[<>]=?|={2,3})\s*\d|\d\s*(?:[<>]=?|={2,3})\s*(attributiveShare|couplingDispersion|attributive_share|coupling_dispersion)/;
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    if (comparison.test(source)) violations.push(`${file}: compares apparatus observable to numeric literal`);
+  }
+  assert.deepEqual(violations, []);
+});
