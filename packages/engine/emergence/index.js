@@ -13,4 +13,6 @@ export {
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
 export { induceOperators, behavioralFingerprint } from "./operators/index.js";
 export { induceKind } from "./kinds/index.js";
+export { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
+export { induceEntityKinds, buildKindVocabulary, pluralize } from "./entity-kinds/index.js";
 export { induceCalculus, induceExtensions } from "./calculus/index.js";

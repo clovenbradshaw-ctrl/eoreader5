@@ -75,7 +75,8 @@ export function applyCommand(state, command) {
   if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs, role)]);
   if (command.type === "discovery.advance" || command.type === "discovery.resume") {
     const budget = command.budget ?? {};
-    const candidates = discoverCandidates(state, { maxCandidates: budget.max_candidates ?? 100 });
+    const nObs = state.observations.length;
+    const candidates = discoverCandidates(state, { maxCandidates: budget.max_candidates ?? Math.max(10, Math.round(nObs * 2)) });
     const maxEvents = Math.max(1, budget.max_events ?? candidates.length * 2 + 1);
     const events = [];
     let knownInputs = inputs;

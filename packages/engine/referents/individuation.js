@@ -57,8 +57,9 @@ export function classifyIndividuationType({
   patientNullSamples,
   agentiveShare = null,
   agentiveNullSamples,
-  quantile = 0.95,
+  quantile,
 }) {
+  quantile = quantile ?? Math.min(0.99, Math.max(0.5, 1 - 1 / Math.sqrt((massNullSamples ?? couplingNullSamples)?.length ?? 200)));
   if (typeof mass !== "number" || Number.isNaN(mass)) throw new TypeError("classifyIndividuationType: mass must be a number");
   if (typeof coupling !== "number" || Number.isNaN(coupling)) throw new TypeError("classifyIndividuationType: coupling must be a number");
 
@@ -144,7 +145,7 @@ export function individuateReferent({
   agencySignal,
   massNullSamples,
   couplingNullSamples,
-  quantile = 0.95,
+  quantile,
   boundary,
   attributiveShare = null,
   couplingDispersion = null,
@@ -158,6 +159,8 @@ export function individuateReferent({
   if (typeof referentId !== "string" || referentId.length === 0) {
     throw new TypeError("individuateReferent: referentId must be a non-empty string");
   }
+
+  quantile = quantile ?? Math.min(0.99, Math.max(0.5, 1 - 1 / Math.sqrt((massNullSamples ?? couplingNullSamples)?.length ?? 200)));
 
   const typing = classifyIndividuationType({
     mass,

@@ -232,6 +232,54 @@ export function validateKindCandidate(value, name = "KindCandidate") {
 
 const NOVELTY_STATUSES = new Set(["unknown", "equivalent_known", "variant", "candidate_novel"]);
 
+const PARAMETER_VALUE_TYPES = new Set(["string", "number", "date", "entity_reference", "boolean"]);
+
+export function validateEntityKindCandidate(value, name = "EntityKindCandidate") {
+  const v = object(value, name);
+  if (v.schema !== "EntityKindCandidate@1") fail(name, "schema must be EntityKindCandidate@1");
+  string(v.id, name, "id"); string(v.kind_id, name, "kind_id"); string(v.label, name, "label"); string(v.description, name, "description");
+  array(v.member_entity_ids, name, "member_entity_ids");
+  if (!Number.isInteger(v.member_count) || v.member_count < 1) fail(name, "member_count must be a positive integer");
+  array(v.standard_parameters, name, "standard_parameters");
+  for (const p of v.standard_parameters) {
+    object(p, `${name}.standard_parameters[]`);
+    string(p.parameter_id, name, "parameter_id"); string(p.label, name, "label");
+    if (!PARAMETER_VALUE_TYPES.has(p.value_type)) fail(name, `invalid value_type ${p.value_type}`);
+    if (typeof p.prevalence !== "number" || p.prevalence < 0 || p.prevalence > 1) fail(name, "prevalence must be in [0, 1]");
+    validateNullProtocol(p.null_protocol, `${name}.standard_parameters[].null_protocol`);
+  }
+  if (typeof v.cohesion !== "number" || v.cohesion < 0 || v.cohesion > 1) fail(name, "cohesion must be in [0, 1]");
+  validateNullProtocol(v.cohesion_null, `${name}.cohesion_null`);
+  array(v.distinguishing_parameters, name, "distinguishing_parameters");
+  const emergence = object(v.emergence, `${name}.emergence`);
+  string(emergence.operator_epoch, name, "emergence.operator_epoch");
+  if (emergence.induced_by !== "SYN") fail(name, 'emergence.induced_by must be "SYN"');
+  string(emergence.from_entities, name, "emergence.from_entities");
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
+
+export function validateEntityKindVocabulary(value, name = "EntityKindVocabulary") {
+  const v = object(value, name);
+  if (v.schema !== "EntityKindVocabulary@1") fail(name, "schema must be EntityKindVocabulary@1");
+  string(v.vocabulary_id, name, "vocabulary_id"); string(v.operator_epoch, name, "operator_epoch");
+  array(v.kinds, name, "kinds");
+  for (const k of v.kinds) {
+    object(k, `${name}.kinds[]`);
+    string(k.kind_id, name, "kind_id"); string(k.label, name, "label"); string(k.description, name, "description");
+    array(k.standard_parameters, name, "standard_parameters");
+    for (const p of k.standard_parameters) {
+      object(p, `${name}.kinds[].standard_parameters[]`);
+      string(p.parameter_id, name, "parameter_id"); string(p.label, name, "label");
+      if (!PARAMETER_VALUE_TYPES.has(p.value_type)) fail(name, `invalid value_type ${p.value_type}`);
+    }
+    if (typeof k.cohesion !== "number" || k.cohesion < 0 || k.cohesion > 1) fail(name, "cohesion must be in [0, 1]");
+  }
+  string(v.population, name, "population");
+  hash(v.content_hash, name, "content_hash");
+  return v;
+}
+
 export function validateCalculusCandidate(value, name = "CalculusCandidate") {
   const v = object(value, name);
   if (v.schema !== "CalculusCandidate@1") fail(name, "schema must be CalculusCandidate@1");

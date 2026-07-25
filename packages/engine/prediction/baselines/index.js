@@ -70,8 +70,9 @@ export function globalMean(history) {
 }
 
 /** Moving mean over the last `window` observations. Spread from the window. */
-export function movingMean(history, { window = 3 } = {}) {
+export function movingMean(history, { window } = {}) {
   requireHistory(history, "moving-mean");
+  window = window ?? Math.max(2, Math.floor(Math.sqrt(history.length) / 2));
   const w = Math.max(1, Math.min(window, history.length));
   const tail = history.slice(history.length - w);
   return gaussianOrPoint(mean(tail), stdev(tail));

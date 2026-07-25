@@ -12,6 +12,8 @@ export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";
 export { jaccardDistance, computeBoundaryStabilityGate } from "./emergence/boundaries/index.js";
+export { induceParameters, parameterProfiles, profileJaccard } from "./emergence/parameters/index.js";
+export { induceEntityKinds, buildKindVocabulary, pluralize } from "./emergence/entity-kinds/index.js";
 
 export { search } from "./search/index.js";
 export { detectMotifs } from "./motif/index.js";

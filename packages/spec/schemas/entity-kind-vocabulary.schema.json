@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/entity-kind-vocabulary.schema.json",
+  "title": "EntityKindVocabulary",
+  "description": "A vocabulary of autopoetic entity kinds and their standard parameter definitions. This is the meta-level record: once kinds are induced from entity data, this vocabulary defines what parameters any entity of a given kind is expected to carry. The vocabulary itself may evolve as new kinds emerge or existing kinds split/merge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "vocabulary_id", "operator_epoch", "kinds", "population", "content_hash"],
+  "properties": {
+    "schema": { "const": "EntityKindVocabulary@1" },
+    "vocabulary_id": { "type": "string" },
+    "operator_epoch": { "type": "string" },
+    "kinds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind_id", "label", "description", "standard_parameters", "cohesion"],
+        "properties": {
+          "kind_id": { "type": "string" },
+          "label": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "standard_parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["parameter_id", "label", "value_type"],
+              "properties": {
+                "parameter_id": { "type": "string" },
+                "label": { "type": "string", "minLength": 1 },
+                "value_type": { "enum": ["string", "number", "date", "entity_reference", "boolean"] },
+                "unit": { "type": "string" },
+                "description": { "type": "string" },
+                "required": { "type": "boolean", "description": "Whether this parameter is required for the kind (always present)." },
+                "prevalence": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          },
+          "cohesion": { "type": "number", "minimum": 0, "maximum": 1 },
+          "distinguishing_parameters": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "population": { "type": "string", "description": "The entity population these kinds were induced from." },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

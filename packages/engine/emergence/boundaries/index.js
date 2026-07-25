@@ -53,9 +53,10 @@ function mean(values) {
 export function computeBoundaryStabilityGate({
   observedDisplacements,
   nullDisplacements,
-  quantile = 0.95,
+  quantile,
   protocol,
 }) {
+  quantile = quantile ?? Math.min(0.99, Math.max(0.5, 1 - 1 / Math.sqrt(nullDisplacements.length)));
   if (!Array.isArray(observedDisplacements) || observedDisplacements.length === 0) {
     throw new TypeError("computeBoundaryStabilityGate: observedDisplacements must be a non-empty array");
   }

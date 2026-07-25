@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/entity-kind-candidate.schema.json",
+  "title": "EntityKindCandidate",
+  "description": "An entity-level kind: an autopoetic grouping of referents that share a statistically significant parameter profile. Kinds emerge from the data — they are induced by clustering entity parameter profiles and validated via Born-null gates on parameter prevalence and kind cohesion. Not to be confused with KindCandidate@1 (mathematical regime kinds).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "kind_id",
+    "label",
+    "description",
+    "member_entity_ids",
+    "member_count",
+    "standard_parameters",
+    "cohesion",
+    "cohesion_null",
+    "distinguishing_parameters",
+    "emergence"
+  ],
+  "properties": {
+    "schema": { "const": "EntityKindCandidate@1" },
+    "id": { "type": "string", "description": "Content-addressed id of this kind candidate." },
+    "kind_id": { "type": "string", "description": "Stable identifier for this kind (e.g. 'person', 'organization', 'place')." },
+    "label": { "type": "string", "minLength": 1, "description": "Human-readable label (e.g. 'Person', 'Organization')." },
+    "description": { "type": "string", "description": "What entities of this kind share." },
+    "member_entity_ids": { "type": "array", "items": { "type": "string" }, "description": "Referent IDs that belong to this kind." },
+    "member_count": { "type": "integer", "minimum": 1 },
+    "standard_parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["parameter_id", "label", "value_type", "prevalence", "null_protocol"],
+        "properties": {
+          "parameter_id": { "type": "string", "description": "Stable identifier, e.g. 'occupation', 'location', 'founded'." },
+          "label": { "type": "string", "description": "Human-readable label, e.g. 'Occupation', 'Location', 'Founded'." },
+          "value_type": { "enum": ["string", "number", "date", "entity_reference", "boolean"] },
+          "unit": { "type": "string" },
+          "prevalence": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of kind members that exhibit this parameter." },
+          "null_protocol": { "$ref": "null-protocol.schema.json" }
+        }
+      }
+    },
+    "cohesion": { "type": "number", "minimum": 0, "maximum": 1, "description": "Mean pairwise parameter-profile similarity among members." },
+    "cohesion_null": { "$ref": "null-protocol.schema.json" },
+    "distinguishing_parameters": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Parameter IDs that most distinguish this kind from others (highest mutual information / lowest cross-kind prevalence)."
+    },
+    "emergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator_epoch", "induced_by", "from_entities"],
+      "properties": {
+        "operator_epoch": { "type": "string" },
+        "induced_by": { "const": "SYN" },
+        "from_entities": { "type": "string", "description": "Population label." }
+      }
+    },
+    "content_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

@@ -76,9 +76,10 @@ export function deriveNull({
   nullSamples,
   observedStatistic,
   tailDirection = "greater",
-  quantile = 0.95,
+  quantile,
   protocol,
 }) {
+  quantile = quantile ?? Math.min(0.99, Math.max(0.5, 1 - 1 / Math.sqrt(nullSamples.length)));
   if (!Array.isArray(nullSamples) || nullSamples.length === 0) {
     throw new TypeError("deriveNull: nullSamples must be a non-empty array");
   }

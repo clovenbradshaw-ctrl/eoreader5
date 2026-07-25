@@ -1,11 +1,3 @@
-// Competency-ranked program search (spec "EO Emergent Mathematics for
-// Predictive Competency" sections 14 and 29.5-29.6). Ties the bounded typed
-// enumerator (../expressions) to the Phase 0 competency substrate: every
-// enumerated program is scored prequentially against the same baselines, under
-// the same leakage-safe commit-before-reveal protocol, and ranked by a
-// description-length-penalized utility (section 13.5). Pure and deterministic —
-// no ambient time, no randomness, no promotion decision.
-
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 import { walkForward } from "../../prediction/tasks/index.js";
 import { defaultNumericBaselines } from "../../prediction/baselines/index.js";
@@ -13,15 +5,8 @@ import { commitPrediction, revealAndScore } from "../../prediction/commitments/i
 import { createLedger, recordStep, finalizeCompetency, competencyGain } from "../../competency/ledger/index.js";
 import { enumeratePrograms, predictWith, descriptionLength, canonicalKey } from "../expressions/index.js";
 
-// CRPS is the ranking score for program search: it is a proper scoring rule
-// (section 13.1) but, unlike log-loss, it stays well-behaved when a program's
-// self-derived spread is small or momentarily miscalibrated — so an accurate
-// sharp forecaster is rewarded instead of being punished by a single
-// low-density outlier during early warmup.
 const SCORING_RULE = "crps";
 
-// A finite loss for the ledger even when a proper score is unavailable for the
-// emitted kind: fall back to absolute error and mark the step improper.
 function lossFor(commitment, observed, revealed_at_step) {
   const s = revealAndScore({ commitment, observed, revealed_at_step, scoring_rule: SCORING_RULE });
   if (s.loss !== null) return { loss: s.loss, proper: s.proper };
@@ -29,11 +14,6 @@ function lossFor(commitment, observed, revealed_at_step) {
   return { loss: fallback.loss, proper: false };
 }
 
-/**
- * Evaluate one program on one series via prequential walk-forward against the
- * given baselines. Returns { competency, gain } where competency is a sealed
- * CompetencyRecord and gain is the per-baseline competency gain.
- */
 export function evaluateProgramCompetency(series, program, { baselines, warmup, taskId, population, sourceVersion }) {
   const candidate_id = `candidate:${canonicalKey(program)}`;
   const candidate_version_hash = canonicalHashSync(program);
@@ -48,8 +28,6 @@ export function evaluateProgramCompetency(series, program, { baselines, warmup, 
     const input_snapshot_hash = canonicalHashSync(history);
     const output = predictWith(program, history, { warmup: 2 });
     if (output === null) {
-      // The program yields no forecast for this history (e.g. degenerate
-      // window). Skip the step honestly rather than fabricate a number.
       continue;
     }
     const candidateCommit = commitPrediction({
@@ -89,33 +67,26 @@ export function evaluateProgramCompetency(series, program, { baselines, warmup, 
   return { competency, gain: competencyGain(ledger) };
 }
 
-/**
- * Search enumerated programs on a series and return a ranked frontier.
- *
- * Utility (spec 13.5) = competency gain against the reference baseline
- * − lambda · description length. The reference baseline defaults to the global
- * mean, so a program earns rank only by beating a genuinely simple predictor,
- * not by beating a deliberately weak one (invariant, section 13.4).
- *
- * @returns {object[]} ranked list of { program, key, description_length,
- *   reference_gain, utility, competency, gain }, best first.
- */
 export function searchCompetentPrograms(series, {
-  warmup = 4,
-  lambda = 0.05,
+  warmup,
+  lambda,
   referenceBaselineId = "baseline:global-mean",
   enumeration = {},
   seasonalPeriod,
   population = "series:anonymous",
 } = {}) {
-  if (!Array.isArray(series) || series.length <= warmup + 1) throw new TypeError("programs: series too short for the requested warmup");
-  const baselines = defaultNumericBaselines({ window: 3, seasonalPeriod });
+  const n = series.length;
+  const resolvedWarmup = warmup ?? Math.ceil(Math.sqrt(n));
+  const resolvedLambda = lambda ?? 1 / n;
+
+  if (!Array.isArray(series) || series.length <= resolvedWarmup + 1) throw new TypeError("programs: series too short for the requested warmup");
+  const baselines = defaultNumericBaselines({ window: Math.max(3, Math.floor(Math.sqrt(n))), seasonalPeriod });
   const programs = enumeratePrograms(enumeration);
   const sourceVersion = canonicalHashSync(series);
-  const taskId = `task:${canonicalHashSync({ population, sourceVersion, warmup, rule: SCORING_RULE })}`;
+  const taskId = `task:${canonicalHashSync({ population, sourceVersion, warmup: resolvedWarmup, rule: SCORING_RULE })}`;
 
   const ranked = programs.map((program) => {
-    const { competency, gain } = evaluateProgramCompetency(series, program, { baselines, warmup, taskId, population, sourceVersion });
+    const { competency, gain } = evaluateProgramCompetency(series, program, { baselines, warmup: resolvedWarmup, taskId, population, sourceVersion });
     const dl = descriptionLength(program);
     const reference_gain = gain[referenceBaselineId] ?? 0;
     return {
@@ -123,7 +94,7 @@ export function searchCompetentPrograms(series, {
       key: canonicalKey(program),
       description_length: dl,
       reference_gain,
-      utility: reference_gain - lambda * dl,
+      utility: reference_gain - resolvedLambda * dl,
       competency,
       gain,
     };
