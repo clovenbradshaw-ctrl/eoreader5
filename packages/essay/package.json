@@ -1,0 +1,23 @@
+{
+  "name": "@eoreader/essay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic corpus essay engine. Produces provenance-bearing essays from cross-document proposition matrices. No LLM, no model calls, no temperature.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./propositions": "./propositions.js",
+    "./matrix": "./matrix.js",
+    "./spine": "./spine.js",
+    "./commitments": "./commitments.js",
+    "./log": "./log.js",
+    "./render": "./render.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@eoreader/spec": "*"
+  }
+}

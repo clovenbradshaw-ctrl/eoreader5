@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/essay/schemas/proposition.schema.json",
+  "title": "Proposition",
+  "description": "Atomic claim beneath language. A relation over entities with quantities and time. The commitment payload — text is one surface projection, a chart datum is another.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposition_id", "relation", "entities", "source_evidence"],
+  "properties": {
+    "proposition_id": {
+      "type": "string",
+      "pattern": "^prop:"
+    },
+    "relation": {
+      "type": "string",
+      "enum": ["state", "change", "creation", "end", "record"]
+    },
+    "entities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "quantities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["raw"],
+        "properties": {
+          "value": { "type": "number" },
+          "unit": { "type": ["string", "null"] },
+          "raw": { "type": "string" }
+        }
+      }
+    },
+    "time": {
+      "type": ["string", "null"]
+    },
+    "source_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "event_id", "span_text"],
+        "properties": {
+          "source_id": { "type": "string" },
+          "event_id": { "type": "string" },
+          "block_id": { "type": "string" },
+          "anchor": { "type": "object" },
+          "span_text": { "type": "string" }
+        }
+      },
+      "minItems": 1
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_a": { "type": "string" },
+        "source_b": { "type": "string" },
+        "delta": { "type": "number" },
+        "delta_pct": { "type": "number" }
+      }
+    }
+  }
+}

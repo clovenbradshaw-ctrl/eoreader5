@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/essay/schemas/essay-document.schema.json",
+  "title": "EssayDocument",
+  "description": "Three-layer output: surface prose, proposition matrix, provenance chain. The essay is a projection of the matrix; the matrix is a projection of the observations; the observations are content-addressed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["essay_id", "schema_version", "assembled", "sections", "matrix", "provenance", "essay_log"],
+  "properties": {
+    "essay_id": {
+      "type": "string",
+      "pattern": "^essay:"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "EssayDocument@1"
+    },
+    "thesis": {
+      "type": "string"
+    },
+    "assembled": {
+      "type": "string",
+      "description": "The full essay text — Layer 1 surface."
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "intent", "modality", "prose", "sentences"],
+        "properties": {
+          "id": { "type": "string" },
+          "intent": { "type": "string" },
+          "modality": { "type": "string", "enum": ["text", "chart", "pullquote"] },
+          "prose": { "type": "string" },
+          "sentences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["text", "commitment_id", "is_glue"],
+              "properties": {
+                "text": { "type": "string" },
+                "commitment_id": { "type": "string" },
+                "is_glue": { "type": "boolean" },
+                "bound_to": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "matrix": {
+      "type": "object",
+      "description": "Layer 2 — the proposition matrix.",
+      "additionalProperties": false,
+      "required": ["propositions", "commitments", "sources", "coverage"],
+      "properties": {
+        "propositions": { "type": "array" },
+        "commitments": { "type": "array" },
+        "conflicts": { "type": "array" },
+        "sources": { "type": "array" },
+        "coverage": { "type": "array" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Layer 3 — bidirectional provenance chain.",
+      "additionalProperties": false,
+      "required": ["sentence_to_proposition", "proposition_to_event", "source_to_essay", "essay_to_source"],
+      "properties": {
+        "sentence_to_proposition": { "type": "object" },
+        "proposition_to_event": { "type": "object" },
+        "event_to_observation": { "type": "object" },
+        "source_to_essay": { "type": "object" },
+        "essay_to_source": { "type": "object" }
+      }
+    },
+    "essay_log": {
+      "type": "array",
+      "description": "The 14-event append-only writing history."
+    },
+    "carry": {
+      "type": "object"
+    }
+  }
+}
