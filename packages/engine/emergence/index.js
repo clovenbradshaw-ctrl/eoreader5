@@ -8,6 +8,7 @@ export {
   descriptionLength,
   canonicalKey,
   enumeratePrograms,
+  mutatePrograms,
   isSeriesNode,
 } from "./expressions/index.js";
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";

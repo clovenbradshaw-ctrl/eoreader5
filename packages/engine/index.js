@@ -132,10 +132,10 @@ export {
 } from "./emergence/lens-assertion/index.js";
 
 // Omnimodal binary perception: format-sniffing dispatch (WAV/text/binary),
-// plus the audio DSP perceiver (PCM -> field vectors). Structure-neutral —
-// no segmentation, no onset detection. Emergence finds structure from the
-// field vectors the same way for every modality.
-// Ported from eoreader4.2: src/organs/in/reading-dispatch.js, src/perceiver/audio/*.
+// plus perceivers for each modality. Structure-neutral — no segmentation,
+// no onset/cut detection. Emergence finds structure from the field vectors
+// the same way for every modality.
+// Ported from eoreader4.2: src/organs/in/reading-dispatch.js, src/perceiver/*.
 export {
   buildReadingFromBytes,
   buildBinaryReading,
@@ -151,3 +151,10 @@ export {
   HOP_SIZE,
 } from "./perceiver/audio/reading.js";
 export { decodeWav, sniffWav } from "./perceiver/audio/wav.js";
+export {
+  buildVideoReading,
+  VIDEO_FIELD_SPEC,
+  FRAME_WIDTH,
+  FRAME_HEIGHT,
+  TARGET_FPS,
+} from "./perceiver/video/reading.js";
