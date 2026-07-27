@@ -30,6 +30,7 @@ import {
   discoverEntities,
   matchTargetEntity,
   findEntityMentions,
+  extractEvents,
   segmentSentences,
 } from "./text-organ.js";
 import {
@@ -71,39 +72,13 @@ export function entityFold(text, entityName, options = {}) {
     return f ?? { text: c.text, dist: new Map(), order: c.idx, offset: 0 };
   });
 
-  // 5. Detect boundaries (topic shifts) among entity-relevant frames
-  const boundaries = detectBoundaries(relevant);
+  // 5. Detect boundaries (topic shifts) among FULL frames
+  const boundaries = detectBoundaries(frames);
 
-  // 6. Extract events from boundaries near the entity's frames
-  const events = [];
-  if (entityName) {
-    const en = entityName.toLowerCase();
-    for (const b of boundaries) {
-      const f = frames.find((f) => f.offset >= b.offset);
-      if (f && f.text.toLowerCase().includes(en)) {
-        events.push({
-          type: "shift",
-          text: f.text,
-          score: b.score,
-          idx: f.order,
-          participants: [entityName],
-        });
-      }
-    }
-  }
-  // Fallback: if no entity-match events, use all top boundaries
-  if (events.length < 3) {
-    for (const b of boundaries.slice(0, sceneCount)) {
-      const f = frames.find((f) => f.offset >= b.offset) || frames[frames.length - 1];
-      events.push({
-        type: "shift",
-        text: f.text,
-        score: b.score,
-        idx: f.order,
-        participants: [entityName],
-      });
-    }
-  }
+  // 6. Extract typed events from boundaries near the entity
+  const events = extractEvents(frames, boundaries, entities, entityName, {
+    maxEvents: sceneCount,
+  });
 
   // 7. Detect figures via co-occurrence
   const figureCounts = detectFigures(

@@ -12,14 +12,13 @@
 // (within a sliding window) are merged — this approximates coreference
 // for pronouns / variant spellings without a full parse.
 
-// Use the proper diacritical normalization from text-organ for consistent
-// name matching. Had we just used /[^a-z0-9\s]+/g here, "Natásha" would
-// become "natsha" (accent stripped without decomposition) instead of
-// "natasha" — and the target-entity filter would silently fail.
-import { stripDiacritics } from "./text-organ.js";
+// No diacritical normalization — the entity-kinds pipeline handles
+// equivalence discovery through co-occurrence. "Natásha" and "Natasha"
+// unify when they co-occur with the same entities, not through
+// character-level normalization.
 
 function norm(name) {
-  return stripDiacritics(name).toLowerCase().trim();
+  return String(name ?? "").toLowerCase().trim();
 }
 
 /**
