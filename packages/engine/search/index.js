@@ -32,6 +32,13 @@ function collectUnitText(unit) {
   return [unit.source_id, unit.field_id, unit.block_id, ...(unit.axes ?? []), ...(unit.surfaces ?? []), ...(unit.values ?? [])].filter(Boolean).join(" ");
 }
 
+// Evidence text is what the source actually says — values and surfaces only.
+// Identifiers (source_id, field_id, block_id, axis names) are addressing, not
+// evidence, and must not satisfy a query on their own.
+function collectEvidenceText(unit) {
+  return [...(unit.surfaces ?? []), ...(unit.values ?? [])].filter(Boolean).join(" ");
+}
+
 function blockStoreValues(state, blockId) {
   return (state.blockStore?.get(blockId)?.values ?? []).filter((value) => typeof value === "string");
 }
@@ -73,11 +80,15 @@ function buildUnits(state) {
 }
 
 /**
- * Keyword-based scoring (original).
+ * Keyword evidence score: how many query terms literally occur in the unit's
+ * evidence text. This is the evidence gate — a unit with zero occurrences of
+ * every term has nothing to say about the query, no matter how similar its
+ * signal texture is. Empty queries carry no evidence requirement to satisfy,
+ * and report as an empty_query gap instead of matching everything.
  */
 function scoreUnitKeyword(unit, terms) {
-  const text = normalizeQuery(collectUnitText(unit));
-  if (terms.length === 0) return 1;
+  if (terms.length === 0) return 0;
+  const text = normalizeQuery(collectEvidenceText(unit));
   return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
 }
 
@@ -176,17 +187,18 @@ export function search(state, request = {}) {
         bornScore = scoreUnitBorn(queryFold, unitFold);
       }
 
-      // Combined: 90% signal, 10% fold. Signal is the primary similarity.
+      // Combined: 90% signal, 10% fold. Signal is the primary similarity —
+      // it RANKS matches. It never GATES them: a unit only qualifies at all
+      // when the query's terms literally occur in its evidence (silence over
+      // fabrication — an absent term returns nothing, not a nearest guess).
       const combinedScore = signalScore * 0.9 + bornScore * 0.1;
-
-      // Fallback: keyword scoring only if neither signal nor fold available
-      const keywordScore = (querySig || queryFold) ? 0 : scoreUnitKeyword(unit, terms);
+      const keywordScore = scoreUnitKeyword(unit, terms);
 
       return {
         unit,
-        score: combinedScore || keywordScore || 0,
+        score: keywordScore > 0 ? (combinedScore > 0 ? combinedScore : keywordScore) : 0,
         signalScore,
-        keywordScore: keywordScore || scoreUnitKeyword(unit, terms),
+        keywordScore,
         bornScore,
         fold: unitFold,
       };
@@ -197,21 +209,20 @@ export function search(state, request = {}) {
 
   // Apply interference between top results
   if (useBornRule && matches.length > 1 && queryFold) {
-    const topFolds = matches.slice(0, 5).map(m => m.fold).filter(Boolean);
-    if (topFolds.length > 1) {
-      const interfered = interfere(queryFold, topFolds);
+    const top = matches.slice(0, 5).filter((m) => m.fold);
+    if (top.length > 1) {
+      // interfere() is indexed against the compacted fold list, so adjust
+      // the same compacted list — indexing `matches` here would misalign
+      // whenever a top-5 unit lacks a fold.
+      const interfered = interfere(queryFold, top.map((m) => m.fold));
+      top.forEach((m, i) => {
+        const interferenceBoost = interfered[i] ?? 0;
+        m.score = m.score * 0.7 + interferenceBoost * 0.3;
+        m.interference = interferenceBoost;
+      });
 
-      // Adjust scores based on interference
-      for (let i = 0; i < Math.min(matches.length, 5); i++) {
-        if (matches[i].fold) {
-          const interferenceBoost = interfered[i] ?? 0;
-          matches[i].score = matches[i].score * 0.7 + interferenceBoost * 0.3;
-          matches[i].interference = interferenceBoost;
-        }
-      }
-
-      // Re-sort after interference
-      matches.sort((a, b) => b.score - a.score);
+      // Re-sort after interference, keeping the deterministic tiebreaker
+      matches.sort((a, b) => b.score - a.score || a.unit.unit_id.localeCompare(b.unit.unit_id));
     }
   }
 

@@ -83,14 +83,19 @@ export function searchCompetentPrograms(series, {
   if (!Array.isArray(series) || series.length <= resolvedWarmup + 1) throw new TypeError("programs: series too short for the requested warmup");
   const baselines = defaultNumericBaselines({ window: Math.max(3, Math.floor(Math.sqrt(n))), seasonalPeriod });
   let programs;
+  const seeds = enumeratePrograms(enumeration);
+  const seedLib = seeds.map((s) => ({ program: s }));
   if (library.length > 0) {
-    // Round 1+: mutate already-promoted operators
-    programs = mutatePrograms(library);
+    // Round 1+: mutate the promoted operators AND the fresh seeds, composing
+    // both against the promoted library (as opref nodes). The seeds must
+    // re-enter the pool: the productive helix composition is a promoted
+    // structure joined with a reducer it has not absorbed yet — e.g.
+    // add(mean(diff(hist)), opref(promoted)) — and that program is
+    // unreachable from library-only mutation.
+    programs = mutatePrograms([...library, ...seedLib], { composeWith: library });
   } else {
     // Round 0: seed programs plus mutations of seeds (bootstrapping).
     // Seeds have no id so mutateProgram uses inline references (not opref).
-    const seeds = enumeratePrograms(enumeration);
-    const seedLib = seeds.map((s) => ({ program: s }));
     const mutants = mutatePrograms(seedLib);
     // Dedup: include all unique seeds and mutants
     const seen = new Set();
@@ -100,6 +105,13 @@ export function searchCompetentPrograms(series, {
       if (!seen.has(key)) { seen.add(key); all.push(p); }
     }
     programs = all;
+  }
+  // The pool is capped at the enumeration's maxPrograms, simplest first —
+  // mutatePrograms returns description-length order already, and round 0's
+  // seeds are simpler than every mutant derived from them.
+  const maxPrograms = enumeration.maxPrograms;
+  if (Number.isFinite(maxPrograms) && maxPrograms > 0 && programs.length > maxPrograms) {
+    programs = programs.slice(0, maxPrograms);
   }
   const sourceVersion = canonicalHashSync(series);
   const taskId = `task:${canonicalHashSync({ population, sourceVersion, warmup: resolvedWarmup, rule: SCORING_RULE })}`;

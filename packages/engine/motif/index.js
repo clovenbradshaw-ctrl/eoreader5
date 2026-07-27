@@ -13,8 +13,7 @@ export function detectMotifs(units, options = {}) {
   const seed = options.seed ?? "eoreader5.motif";
   const candidates = [];
 
-  const minSupport = deriveMinSupport(units);
-  if (n < minSupport) return Object.freeze([]);
+  if (n < 2) return Object.freeze([]);
 
   const typeCosts = deriveTypeCosts(units);
   const fieldWeight = deriveFieldWeight(units);
@@ -38,6 +37,7 @@ export function detectMotifs(units, options = {}) {
   const alignThreshold = deriveAlignmentThreshold(units, costFn);
 
   for (let period = 1; period <= maxPeriod; period += 1) {
+    const minSupport = deriveMinSupport(n, period);
     const candidate = bestCandidateForPeriod(
       units, period, minSupport, alignCost, alignThreshold, maxPeriod,
     );
@@ -62,15 +62,12 @@ export function detectMotifs(units, options = {}) {
   return Object.freeze(selectNonRedundant(candidates));
 }
 
-function deriveMinSupport(units) {
-  const typeCounts = new Map();
-  for (const u of units) {
-    const t = String(u.type ?? "");
-    typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
-  }
-  const freqs = [...typeCounts.values()];
-  if (freqs.length === 0) return 2;
-  return Math.max(2, Math.ceil(freqs.reduce((a, b) => a + b, 0) / freqs.length));
+function deriveMinSupport(n, period) {
+  // Support counts repetitions of a period-length window, so its ceiling is
+  // floor(n / period) — derive the floor on the same scale (the sqrt idiom
+  // maxPeriod already uses), never from unit counts, whose dimension is
+  // incommensurable with repetitions.
+  return Math.max(2, Math.ceil(Math.sqrt(Math.floor(n / period))));
 }
 
 function deriveTypeCosts(units) {

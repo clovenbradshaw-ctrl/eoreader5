@@ -4,7 +4,7 @@ import { createSeededRng, seededShuffle, deriveNull } from "../nulls/index.js";
 import { defaultNumericBaselines } from "../../prediction/baselines/index.js";
 import { evaluateProgramCompetency } from "../programs/index.js";
 import { induceOperators } from "../operators/index.js";
-import { canonicalKey, enumeratePrograms } from "../expressions/index.js";
+import { canonicalKey, descriptionLength } from "../expressions/index.js";
 
 function collectOprefIds(node) {
   if (!node || typeof node !== "object") return [];
@@ -43,10 +43,25 @@ function meanOf(xs) {
 }
 
 function induceExtensions({ vocabulary, bestMemberGain, holdoutSeries, holdoutIds, referenceBaseline, holdoutWarmup, shuffles, quantile, minRelativeEffect, extensionMaxPrograms }) {
-  const library = vocabulary.map((v) => ({ id: v.operator_id, program: v.canonical_program }));
-  const candidates = enumeratePrograms({ library, maxPrograms: extensionMaxPrograms });
+  // Cross-vocabulary candidates compose pairs of distinct promoted members
+  // under the add/sub grammar, each member referenced as an opref node so
+  // the dependency graph records real member-on-member edges.
+  const memberRefs = vocabulary.map((v) => ({ op: "opref", id: v.operator_id, program: v.canonical_program }));
   const memberIds = new Set(vocabulary.map((v) => v.operator_id));
-  const crossVocabulary = candidates.filter((program) => {
+  const seenCandidates = new Set();
+  const candidates = [];
+  for (const a of memberRefs) {
+    for (const b of memberRefs) {
+      if (a.id === b.id) continue;
+      for (const op of ["add", "sub"]) {
+        const program = { op, a, b };
+        const key = canonicalKey(program);
+        if (!seenCandidates.has(key)) { seenCandidates.add(key); candidates.push(program); }
+      }
+    }
+  }
+  candidates.sort((x, y) => descriptionLength(x) - descriptionLength(y) || canonicalKey(x).localeCompare(canonicalKey(y)));
+  const crossVocabulary = candidates.slice(0, extensionMaxPrograms).filter((program) => {
     const referenced = new Set(collectOprefIds(program).filter((id) => memberIds.has(id)));
     return referenced.size >= 2;
   });

@@ -14,13 +14,9 @@ export {
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
 export { induceOperators, behavioralFingerprint } from "./operators/index.js";
 export {
-  NATIVE_EQUATIONS,
-  EMERGENT_EQUATIONS,
-  APPLIED_EQUATIONS,
-  MINIMAL_EQUATIONS,
-  FULL_OPERATOR_MATRIX,
-  LAYER_OPERATOR_PROFILES,
-  DERIVATION_CHAINS
+  OPERATOR_SEMANTICS,
+  EQUATIONS,
+  DERIVATION_CHAINS,
 } from "./operators/decomposition.js";
 export { induceKind } from "./kinds/index.js";
 export { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
@@ -65,6 +61,25 @@ export {
   updateConnectionMap,
   connectionStrength,
 } from "./summary/index.js";
+
+// Entity fold pipeline: perceiver surfaces → signal boundaries → typed
+// events → figures → entity-focused EOT packet. The orchestrator wires the
+// text organ to the modality-agnostic kernel.
+export { entityFold } from "./summary/entity-fold.js";
+export {
+  buildKeyMomentsFromEvents,
+  orderChronologically,
+  buildEntityPacket,
+} from "./summary/kernel.js";
+export { significanceSpine, buildSceneMoments } from "./summary/spine.js";
+export { buildGraph, detectFigures } from "./summary/graph.js";
+export {
+  frameText,
+  detectBoundaries,
+  discoverEntities,
+  extractEvents,
+  TURNING_EVENT_TYPES,
+} from "./summary/text-organ.js";
 
 // Fabrication veto (ported from4.2 tiny-LLM contract + row-veto)
 export { veto } from "./veto/index.js";
