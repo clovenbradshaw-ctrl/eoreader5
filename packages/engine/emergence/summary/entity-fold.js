@@ -20,8 +20,11 @@ import {
   detectBoundaries,
   extractEvents,
   extractSurfaces,
+  snapToSentences,
+  TURNING_EVENT_TYPES,
 } from "./text-organ.js";
 import { classify } from "../../cube/index.js";
+import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 
 // Diacritical mapping for engine-level entity name matching.
 // NOT signal-path normalization — this is the engine discovering
@@ -67,10 +70,28 @@ export function entityFold(text, entityName = null, options = {}) {
     focus = null,
     title = null,
     sceneCount = 12,
+    place = null,
   } = options;
 
   // 1. Frame text into signal windows
-  const frames = frameText(text);
+  const allFrames = frameText(text);
+
+  // Optional place scoping: a place, for a linear document, is a position
+  // on the document's own axis. `place.position` is a frame order (>= 1)
+  // or a 0..1 fraction of the document; `place.radius` is the neighborhood
+  // half-width in frames (default sqrt of the frame count — the engine's
+  // usual scale idiom). The fold then reads the entity AT that place.
+  let frames = allFrames;
+  let placeWindow = null;
+  if (place && place.position != null) {
+    const n = allFrames.length;
+    const center = place.position > 0 && place.position < 1
+      ? Math.round(place.position * (n - 1))
+      : Math.round(place.position);
+    const radius = place.radius ?? Math.max(1, Math.round(Math.sqrt(n)));
+    placeWindow = { center, radius, from: Math.max(0, center - radius), to: Math.min(n - 1, center + radius) };
+    frames = allFrames.filter((f) => f.order >= placeWindow.from && f.order <= placeWindow.to);
+  }
 
   // 2. Extract surfaces (capitalized spans) from the perceiver
   const allSurfaces = [...new Set(extractSurfaces(text))];
@@ -87,10 +108,21 @@ export function entityFold(text, entityName = null, options = {}) {
   const perChunk = new Map();
   for (const f of frames) perChunk.set(f.order, extractSurfaces(f.text));
 
-  // Physics-based ratio filter: names appear in both capitalized and lowercase
-  // forms; sentence-start words are almost exclusively capitalized.
-  const lowerCounts = new Map();
-  for (const f of frames) for (const word of f.dist.keys()) lowerCounts.set(word, (lowerCounts.get(word) ?? 0) + 1);
+  // Physics-based capitalization filter: a NAME essentially never appears
+  // with a lowercase initial in the source, while a sentence/dialogue opener
+  // ("Well", "Why") constantly does. The counts must be case-sensitive over
+  // the raw text — frame distributions are already lowercased, so counting
+  // those would count every occurrence and dissolve the signal.
+  const lowerFormCounts = new Map();
+  for (const f of frames) {
+    for (const tok of f.text.split(/\s+/)) {
+      const m = tok.match(/^\p{Ll}[\p{L}'’]*/u);
+      if (m) {
+        const k = m[0].toLowerCase();
+        lowerFormCounts.set(k, (lowerFormCounts.get(k) ?? 0) + 1);
+      }
+    }
+  }
 
   const surfaceMass = new Map();
   for (const [order, surfaces] of perChunk) for (const s of surfaces) surfaceMass.set(s, (surfaceMass.get(s) ?? 0) + 1);
@@ -105,10 +137,11 @@ export function entityFold(text, entityName = null, options = {}) {
       if (s.includes("\n")) continue;
       const words = s.split(/\s+/);
       if (words.length === 1) {
-        const lower = lowerCounts.get(sn) ?? 0;
+        if (s.length < 3) continue; // below 3 chars the cap/lower physics has no resolution ("Oh")
+        const lower = lowerFormCounts.get(sn) ?? 0;
         const upper = surfaceMass.get(s) ?? 0;
-        const ratio = lower > 0 ? upper / lower : 1;
-        if (lower < 50 || ratio < 0.8) continue; // not a name
+        const capRatio = upper / (upper + lower || 1);
+        if (capRatio < 0.9) continue; // seen in lowercase → a word, not a name
       }
       figureStats.set(s, (figureStats.get(s) ?? 0) + 1);
     }
@@ -128,12 +161,35 @@ export function entityFold(text, entityName = null, options = {}) {
     proximityWindow: 10, // wider window to catch more boundaries near entity
   });
 
-  // 7. Order by narrative position
-  const ordered = orderChronologically([], events, new Map());
+  // 7. Optional relation extraction — the PERCEIVER's organ output, wired
+  // in only on request (`withRelations`). The fold itself stays signal-only;
+  // relations are kept when a clause names the target entity, and their
+  // polarity is read from the clause, never asserted.
+  let relations = [];
+  if (options.withRelations) {
+    // Compare in the same normalization space: rn below is diacritic-
+    // stripped, so the name tokens must be stripped too.
+    const targetTokens = [...targetNameTokenSet].map(diaNorm);
+    relations = extractTextRelations(
+      targetFrames.map((f) => ({ text: snapToSentences(f.text), foldScore: 0, order: f.order })),
+      { limit: Infinity },
+    )
+      .filter((r) => {
+        const rn = diaNorm(`${r.subject} ${r.object}`);
+        return targetTokens.some((t) => rn.includes(t));
+      })
+      .slice(0, 24)
+      .map((r, i) => ({ ...r, idx: i }));
+  }
 
-  // 8. Key moments from events
+  // 8. Order by narrative position
+  const ordered = orderChronologically(relations, events, new Map());
+
+  // 8. Key moments from events — the organ declares which of ITS event
+  // types mark turning points; the kernel stays vocabulary-free.
   const eventMoments = buildKeyMomentsFromEvents(events, targetFrames, {
     maxMoments: sceneCount,
+    turningTypes: TURNING_EVENT_TYPES,
   });
 
   let sceneMoments;
@@ -143,10 +199,20 @@ export function entityFold(text, entityName = null, options = {}) {
     }));
   } else {
     const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount });
-    sceneMoments = buildSceneMoments(targetFrames, spine, { contextWindow: 1 });
+    sceneMoments = buildSceneMoments(targetFrames, spine, { contextWindow: 1 })
+      .map((m) => ({ ...m, text: snapToSentences(m.text), context: snapToSentences(m.context ?? m.text) }));
   }
 
-  // 9. Build EOT packet
+  // 9. Build EOT packet. Absence is reported, never papered over: an entity
+  // with no matching frames yields an explicit gap.
+  const gaps = [];
+  if (!targetFrames.length) {
+    gaps.push({
+      reason: placeWindow ? "entity_not_found_at_place" : "entity_not_found",
+      entity: entityName ?? targetSurface,
+      ...(placeWindow ? { place: placeWindow } : {}),
+    });
+  }
   const packet = buildEntityPacket(ordered, targetSurface, {
     tokenBudget,
     maxRelations: 0,
@@ -155,6 +221,10 @@ export function entityFold(text, entityName = null, options = {}) {
     title: title ?? targetSurface,
     sceneMoments,
     graphFigures: figures,
+    turningTypes: TURNING_EVENT_TYPES,
+    gaps,
+    scope: placeWindow ? "entity@place" : "entity",
+    place: placeWindow,
   });
 
   updateConnectionMap(connectionMap, packet);

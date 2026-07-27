@@ -1,7 +1,7 @@
 // Quality assessment: inspect the actual kinds and parameters the pipeline
 // produces for each media type, evaluating semantic correctness.
-import { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
-import { induceEntityKinds, buildKindVocabulary } from "./entity-kinds/index.js";
+import { induceParameters, parameterProfiles, profileJaccard } from "../packages/engine/emergence/parameters/index.js";
+import { induceEntityKinds, buildKindVocabulary } from "../packages/engine/emergence/entity-kinds/index.js";
 
 function ent(id, name, attrs) {
   return { id, name, attributes: attrs.map(([f, v, c]) => ({ field_id: f, value_type: v, count: c ?? 1 })) };

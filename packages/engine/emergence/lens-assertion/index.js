@@ -63,8 +63,14 @@ export const assertLens = (traj, prior, { confidenceFloor = 0.1 } = {}) => {
   const rfd = restFrameDivergence(traj);
   const volatility = phaseVolatility(traj);
 
+  // A red shift of zero means "no measured movement" ONLY when there was
+  // something to measure. With zero relations in every phase there is no
+  // evidence at all, and asserting a confident lens from silence would be
+  // fabrication — the confidence collapses to the prior's boost alone.
+  const evidence = (traj.phases ?? []).reduce((n, p) => n + (p.relations?.length ?? 0), 0);
+
   // The base confidence is INVERSELY proportional to the red shift
-  const baseConfidence = 1 - rs;
+  const baseConfidence = evidence === 0 ? 0 : 1 - rs;
 
   // The prior boosts confidence
   const boost = prior ? priorConfidenceBoost(prior, {}) : 0;

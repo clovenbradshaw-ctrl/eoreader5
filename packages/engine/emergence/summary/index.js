@@ -24,6 +24,11 @@ import {
   scoreCoordinate,
   focusBias,
 } from "../../cube/index.js";
+import {
+  extractProperties as extractTextProperties,
+  extractRelations as extractTextRelations,
+  extractFigures as extractTextFigures,
+} from "../../perceiver/text/extraction.js";
 
 // ── ConnectionMap ──────────────────────────────────────────────────────────────
 // Tracks which relations/properties appeared across packets, and how often.
@@ -47,7 +52,7 @@ export function createConnectionMap() {
  * @param {number} timestamp - current timestamp for lastSeen
  * @returns {Map} the same map, updated
  */
-export function updateConnectionMap(map, packet, timestamp = Date.now()) {
+export function updateConnectionMap(map, packet, timestamp = null) {
   if (!map || !packet) return map;
 
   const upsert = (key) => {
@@ -112,12 +117,20 @@ export function selectContent(fold, projection) {
   let selected = [...units];
 
   // Filter by holonic level
-  if (level.type === "place" && level.position) {
-    // Select units whose coordinate is near the position
-    selected = selected.filter((u) => {
-      const coord = u.coord ?? classify(u.text);
-      // Approximate: same terrain = "near" (no spatial coords in v5)
-      return coord.terrain === classify("").terrain || true; // placeholder — real impl needs spatial coords
+  if (level.type === "place" && level.position != null) {
+    // A place, for a linear document, is a position on the document's own
+    // axis — the only spatial coordinate its units carry. `position` may be
+    // a unit index (>= 1) or a 0..1 fraction of the document; `radius` is
+    // the neighborhood half-width in units (default: sqrt of length, the
+    // same scale idiom the rest of the engine uses).
+    const n = units.length;
+    const center = level.position > 0 && level.position < 1
+      ? Math.round(level.position * (n - 1))
+      : Math.round(level.position);
+    const radius = level.radius ?? Math.max(1, Math.round(Math.sqrt(n)));
+    selected = selected.filter((u, i) => {
+      const pos = u.meta?.index ?? i;
+      return Math.abs(pos - center) <= radius;
     });
   } else if (level.type === "entity" && level.id) {
     // Select units that mention the entity
@@ -173,8 +186,8 @@ export function selectContent(fold, projection) {
 //
 // The surprise component ensures the most novel units rank highest.
 // The connection strength component ensures what the system has learned
-// to expect (strengthened connections) gets优先 — but surprise still wins
-// when something genuinely new appears.
+// to expect (strengthened connections) gets priority — but surprise still
+// wins when something genuinely new appears.
 
 /**
  * Rank content by surprise + relevance + connection strength.
@@ -320,14 +333,13 @@ export function buildPacket(ranked, groups, foldSurprise, options = {}) {
     }))
     .filter((s) => s.text.trim());
 
-  // Extract simple properties from text (placeholder — real impl uses perceiver)
-  const properties = extractProperties(ranked);
-
-  // Extract simple relations from text (placeholder — real impl uses perceiver)
-  const relations = extractRelations(ranked);
-
-  // Extract figures from text (placeholder — real impl uses perceiver)
-  const figures = extractFigures(ranked);
+  // Properties/relations/figures come from the perceiver — the summary
+  // layer is modality-agnostic and never inspects text itself. A caller
+  // whose units are not English text supplies its own organ output via
+  // options.extracted; the text perceiver is only the default organ.
+  const properties = options.extracted?.properties ?? extractTextProperties(ranked);
+  const relations = options.extracted?.relations ?? extractTextRelations(ranked);
+  const figures = options.extracted?.figures ?? extractTextFigures(ranked);
 
   // Build connection entries with accumulated strength
   const connections = [];
@@ -366,104 +378,8 @@ export function buildPacket(ranked, groups, foldSurprise, options = {}) {
     figures,
     surprise,
     connections,
+    gaps: options.gaps ?? [],
   });
-}
-
-// ── Simple extraction helpers ──────────────────────────────────────────────────
-// These are placeholders that provide basic extraction without the v4.2 perceiver.
-// They'll be replaced when the perceiver is ported to v5.
-
-function extractProperties(ranked) {
-  const props = [];
-  const seen = new Set();
-
-  for (const unit of ranked) {
-    const text = unit.text ?? "";
-    // Simple pattern: "X is Y" or "X was Y" or "X has Y"
-    const matches = text.match(/\b(\w+(?:\s+\w+)?)\s+(?:is|was|has|are|were|had)\s+(.+?)(?:\.|,|;|$)/gi);
-    if (matches) {
-      for (const m of matches) {
-        const parts = m.match(/^(.+?)\s+(?:is|was|has|are|were|had)\s+(.+?)$/i);
-        if (parts) {
-          const label = parts[1].trim();
-          const value = parts[2].trim().replace(/[.,;]$/, "");
-          const key = `${label}|${value}`.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            props.push({ label, value, score: unit.foldScore ?? 0 });
-          }
-        }
-      }
-    }
-  }
-
-  return props.slice(0, 6);
-}
-
-function extractRelations(ranked) {
-  const rels = [];
-  const seen = new Set();
-
-  for (const unit of ranked) {
-    const text = unit.text ?? "";
-    // Simple pattern: "X verb Y" (very basic)
-    const matches = text.match(/\b(\w+(?:\s+\w+)?)\s+(married|fought|led|wrote|built|destroyed|founded|ruled|served|worked|lived|died|born|moved|traveled|wrote|said|told|asked|gave|took|made|found|held|stood|sat|ran|walked|spoke|thought|knew|saw|heard|felt|wanted|needed|loved|hated|feared|hoped|believed|claimed|stated|argued|showed|proved|revealed|demonstrated|indicated|suggested|implied|meant|intended|planned|tried|attempted|managed|failed|succeeded|won|lost|beat|defeated|conquered|controlled|dominated|influenced|shaped|changed|transformed|developed|grew|improved|declined|fell|rose|increased|decreased|remained|stayed|became|turned|seemed|appeared|looked|sounded|felt|tasted|smelled)\s+(.+?)(?:\.|,|;|$)/gi);
-    if (matches) {
-      for (const m of matches) {
-        const parts = m.match(/^(.+?)\s+(married|fought|led|wrote|built|destroyed|founded|ruled|served|worked|lived|died|born|moved|traveled|wrote|said|told|asked|gave|took|made|found|held|stood|sat|ran|walked|spoke|thought|knew|saw|heard|felt|wanted|needed|loved|hated|feared|hoped|believed|claimed|stated|argued|showed|proved|revealed|demonstrated|indicated|suggested|implied|meant|intended|planned|tried|attempted|managed|failed|succeeded|won|lost|beat|defeated|conquered|controlled|dominated|influenced|shaped|changed|transformed|developed|grew|improved|declined|fell|rose|increased|decreased|remained|stayed|became|turned|seemed|appeared|looked|sounded|felt|tasted|smelled)\s+(.+?)$/i);
-        if (parts) {
-          const subject = parts[1].trim();
-          const verb = parts[2].trim();
-          const object = parts[3].trim().replace(/[.,;]$/, "");
-          const key = `${subject}|${verb}|${object}`.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            rels.push({ subject, verb, object, polarity: "+", score: unit.foldScore ?? 0 });
-          }
-        }
-      }
-    }
-  }
-
-  return rels.slice(0, 6);
-}
-
-function extractFigures(ranked) {
-  const figures = [];
-  const seen = new Set();
-
-  for (const unit of ranked) {
-    const text = unit.text ?? "";
-    // Simple pattern: capitalized words that aren't at sentence start
-    const matches = text.match(/(?<=[.!?]\s|^)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/g);
-    if (matches) {
-      for (const m of matches) {
-        const name = m.trim();
-        // Skip common false positives
-        if (/^(The|And|But|For|With|This|That|When|Where|While|He|She|It|They|His|Her|Their|Its|In|On|At|To|From|By|As|Or|If|So|No|Not|Yet|Now|Then|Also|Just|Only|Even|Still|Already|Always|Never|Often|Sometimes|Usually|Here|There|Every|Each|Both|Few|Many|Much|Some|Any|All|None|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)$/.test(name)) continue;
-        const key = name.toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          figures.push({ label: name, count: 1 });
-        }
-      }
-    }
-  }
-
-  // Deduplicate and sort by count
-  const figureMap = new Map();
-  for (const f of figures) {
-    const existing = figureMap.get(f.label);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      figureMap.set(f.label, { ...f });
-    }
-  }
-
-  return [...figureMap.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
 }
 
 // ── Surprise profile ───────────────────────────────────────────────────────────
@@ -532,9 +448,12 @@ export function projectSummary(fold, projection = {}) {
   const selected = selectContent(fold, { level, cast });
 
   if (!selected.length) {
+    // Silence with a gap report, never an indistinguishable empty packet:
+    // "we looked and nothing matched" is different from "nothing to say".
     return buildPacket([], { settled: [], heldOpen: [], turns: [] }, { forward: 0, felt: 0, noveltyReserve: 0 }, {
       scope: level.type,
       title: fold?.title ?? null,
+      gaps: [{ reason: "no_units_matched_projection", level: level.type, cast }],
     });
   }
 
