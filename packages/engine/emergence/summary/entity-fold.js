@@ -26,6 +26,7 @@ import {
 import { classify, classifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 import { admitReferent, presenceByFrame } from "../../perceiver/text/presence.js";
+import { buildStore, surface as surfaceMemory } from "../store/index.js";
 
 // Diacritical mapping for engine-level entity name matching.
 // NOT signal-path normalization — this is the engine discovering
@@ -331,6 +332,40 @@ export function entityFold(text, entityName = null, options = {}) {
     scope: placeWindow ? "entity@place" : "entity",
     place: placeWindow,
   });
+
+  // 10. Echoes — associative memory (emergence/store). For each selected span,
+  // surface the prior passages its frame recalls: verbatim/keyword motif
+  // recurrence plus one Hebbian completion hop (engine tier only — synonymy
+  // and thematic resonance are model-tier and correctly stay absent; see
+  // golden/memory-golden.json). An echo is offset-anchored, so "this passage
+  // recalls that one" is a grounded, checkable edge in the packet, not prose.
+  if (options.withEchoes !== false && frames.length > 2) {
+    const memory = buildStore(frames);
+    const byOrder = new Map(frames.map((f) => [f.order, f]));
+    const frameFor = (off) => {
+      let best = null;
+      for (const f of frames) { if (f.offset <= off) best = f; else break; }
+      return best;
+    };
+    const MIN_DISTANCE = 5; // frames — an adjacent "echo" is just continuation
+    for (const s of packet.spans) {
+      if (s.offset == null) continue;
+      const f = frameFor(s.offset);
+      if (!f) continue;
+      const recalled = surfaceMemory(memory, f.text, { selfOrder: f.order, cueOrder: f.order })
+        .filter((r) => r.order < f.order - MIN_DISTANCE && byOrder.has(r.order));
+      if (!recalled.length) continue;
+      const top = recalled[0].activation;
+      const echoes = recalled
+        .filter((r) => r.activation >= 0.5 * top)
+        .slice(0, 2)
+        .map((r) => ({
+          offset: byOrder.get(r.order).offset,
+          activation: +r.activation.toFixed(3),
+        }));
+      if (echoes.length) s.echoes = echoes;
+    }
+  }
 
   updateConnectionMap(connectionMap, packet);
   return packet;

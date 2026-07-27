@@ -1,1 +1,5 @@
 node_modules/
+
+# Local scratch archive (contains a 70MB audio essay; history has the scripts)
+/_archive/
+.DS_Store

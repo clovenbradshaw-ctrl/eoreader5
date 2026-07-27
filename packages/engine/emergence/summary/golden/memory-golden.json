@@ -17,8 +17,8 @@
     {
       "id": "wedding-night-cue-only",
       "text": "pg84",
-      "tier": "engine",
-      "note": "cue frame is Elizabeth's letter, which does NOT contain the threat quote; requires completion through the marriage/rumination thread",
+      "tier": "model",
+      "note": "RECLASSIFIED from engine to model after measurement. The cue (Elizabeth's letter: union/favourite/playfellows) and the source (the threat: beast/mate/ravish/dread) share no motif and NEVER co-fire in any frame — verified. The only bridge is the synonymy union≈marriage≈wedding, which the text never writes down in one place. That is witness knowledge, the same tier boundary as descriptor coref (monster≈creature) and thematic resonance (the oak). The store must gap it, not fake it.",
       "cueAnchor": "our union had been the favourite plan",
       "sourceAnchor": "I go; but remember, I shall be with you on your"
     },
