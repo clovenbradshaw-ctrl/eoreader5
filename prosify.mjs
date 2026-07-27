@@ -4,7 +4,7 @@
 import { readFileSync } from "fs";
 import { entityFold } from "./packages/engine/emergence/summary/entity-fold.js";
 
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
 
 const packet = entityFold(wp, "Natasha Rostova", { title: "Natasha Rostova", sceneCount: 10 });
 

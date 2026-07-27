@@ -4,7 +4,7 @@
 import { readFileSync } from "fs";
 import { segmentSentences, findEntityMentions, extractRelations } from "./packages/engine/emergence/summary/entity-fold.js";
 
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
 
 // 1. Sentence segmentation
 console.log("=== SENTENCE SEGMENTATION ===");

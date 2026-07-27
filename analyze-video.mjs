@@ -16,14 +16,19 @@ import('node:fs').then(async (fs) => {
 
   // 1. Perceive: frames → field vectors (streaming, never loads full file)
   console.time('perceiver');
-  const { buildVideoReading } = await import('./eoreader5/packages/engine/perceiver/video/reading.js');
-  const reading = await buildVideoReading(path, { fps });
+  const { buildVideoReading } = await import('./packages/engine/perceiver/video/reading.js');
+  const { streamVideoFrames } = await import('./packages/host/video.js');
+  const reading = await buildVideoReading(streamVideoFrames(path, { fps }), {
+    fps,
+    onProgress: (n) => process.stderr.write(`\r  decoded ${n} frames @ ${fps}fps`),
+  });
+  process.stderr.write('\n');
   console.timeEnd('perceiver');
   console.log(`  units: ${reading.units.length}, duration: ${reading.axis.extent.toFixed(0)}s\n`);
 
   // 2. Holon separator on motion-energy channel (index 0..299)
   console.time('holons');
-  const { DEF, extremeValueNull } = await import('./eoreader5/packages/engine/emergence/nulls/extreme-value.js');
+  const { DEF, extremeValueNull } = await import('./packages/engine/emergence/nulls/extreme-value.js');
   const motionEnergy = reading.units.map(u => {
     const block = u.field.slice(0, 300);
     return block.reduce((a, v) => a + v, 0) / 300; // mean block motion per frame

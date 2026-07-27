@@ -4,7 +4,7 @@ import { segmentSentences, findEntityMentions } from "./packages/engine/emergenc
 import { detectFigures } from "./packages/engine/emergence/summary/graph.js";
 import { stripDiacritics } from "./packages/engine/emergence/summary/text-organ.js";
 
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
 const sentences = segmentSentences(wp);
 const relevant = findEntityMentions(sentences, "Natasha Rostova");
 

@@ -6,7 +6,7 @@ import { entityFold } from "./packages/engine/emergence/summary/entity-fold.js";
 import natashaGolden from "./packages/engine/emergence/summary/golden/natasha-rostova.js";
 
 // Load Storgy text
-const storgyText = readFileSync("/Users/mlacy/Documents/Default Project/natasha.txt", "utf-8");
+const storgyText = readFileSync(process.env.NATASHA_PATH ?? "data/natasha.txt", "utf-8");
 
 // Run the fold
 const packet = entityFold(storgyText, "Natasha Rostova", {

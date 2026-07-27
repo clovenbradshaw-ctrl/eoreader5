@@ -6,7 +6,7 @@ import { entityFold } from "./packages/engine/emergence/summary/entity-fold.js";
 import golden from "./packages/engine/emergence/summary/golden/natasha-rostova.js";
 
 // Load W&P
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
 console.log(`W&P loaded: ${wp.length} chars, ${wp.split("\n").length} lines\n`);
 
 // Run the fold

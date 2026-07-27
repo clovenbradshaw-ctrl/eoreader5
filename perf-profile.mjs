@@ -2,7 +2,7 @@
 import { readFileSync } from "fs";
 import { frameText, discoverEntities, detectBoundaries } from "./packages/engine/emergence/summary/text-organ.js";
 
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
 console.log(`Text: ${wp.length} chars`);
 
 const t0 = Date.now();

@@ -1,0 +1,181 @@
+# EOT — Natasha Rostova at "first grand ball"
+# source: War and Peace (Project Gutenberg #2600), 3293552 chars, 3228 frames
+# emitted by: eoreader5 summarize-at-place (deterministic, model-free)
+
+# ── assembly 1: the reading room ──────────────────────────────
+reading_natasha_rostova_first_grand_ball : reading
+reading_natasha_rostova_first_grand_ball.source = "War and Peace — Project Gutenberg #2600"
+reading_natasha_rostova_first_grand_ball.entity = "Natásha Rostóva"
+reading_natasha_rostova_first_grand_ball.place.query = "first grand ball"
+reading_natasha_rostova_first_grand_ball.place.center = 1205
+reading_natasha_rostova_first_grand_ball.place.radius = 20
+reading_natasha_rostova_first_grand_ball.place.frames = 1185..1225
+reading_natasha_rostova_first_grand_ball.contract.ops = NUL, SIG, CON, EVA
+reading_natasha_rostova_first_grand_ball.contract.terrains = Entity, Field, Lens
+reading_natasha_rostova_first_grand_ball.contract.stances = Tending, Binding, Dissecting
+!EVA reading_natasha_rostova_first_grand_ball
+
+# ── assembly 2: the figures present at this place ─────────────
+figure_natasha_rostova : figure
+figure_natasha_rostova.label = "Natásha Rostóva"
+figure_natasha_rostova.role = "focus"
+figure_prince_andrew : figure
+figure_prince_andrew.label = "Prince Andrew"
+figure_prince_andrew.co_sightings = 19
+figure_natasha_rostova -> figure_prince_andrew
+figure_emperor : figure
+figure_emperor.label = "Emperor"
+figure_emperor.co_sightings = 16
+figure_natasha_rostova -> figure_emperor
+figure_peronskaya : figure
+figure_peronskaya.label = "Perónskaya"
+figure_peronskaya.co_sightings = 12
+figure_natasha_rostova -> figure_peronskaya
+figure_rostovs : figure
+figure_rostovs.label = "Rostóvs"
+figure_rostovs.co_sightings = 12
+figure_natasha_rostova -> figure_rostovs
+figure_pierre : figure
+figure_pierre.label = "Pierre"
+figure_pierre.co_sightings = 11
+figure_natasha_rostova -> figure_pierre
+figure_petersburg : figure
+figure_petersburg.label = "Petersburg"
+figure_petersburg.co_sightings = 9
+figure_natasha_rostova -> figure_petersburg
+figure_helene : figure
+figure_helene.label = "Hélène"
+figure_helene.co_sightings = 8
+figure_natasha_rostova -> figure_helene
+figure_sonya : figure
+figure_sonya.label = "Sónya"
+figure_sonya.co_sightings = 7
+figure_natasha_rostova -> figure_sonya
+!EVA figure_natasha_rostova, figure_prince_andrew, figure_emperor, figure_peronskaya, figure_rostovs, figure_pierre, figure_petersburg, figure_helene, figure_sonya
+
+# ── assembly 3: the moments (signal boundaries near the entity) ─
+moment_1 : moment
+moment_1.type = ~
+moment_1.order = 1
+moment_1.score = 12.336
+moment_1.text = "Her ugly old body was washed, perfumed, and powdered in just the same way. She had washed behind her ears just as carefully, and when she entered her drawing room in her yellow dress, wearing her badge as maid of honor, her old lady’s maid was as full of rapturous admiration as the Rostóvs’ servants had been. She praised the Rostóvs’ toilets. They praised her taste and toilet, and at eleven o’clo
+!SIG moment_1
+moment_2 : moment
+moment_2.type = ~
+moment_2.order = 2
+moment_2.score = 12.398
+moment_2.text = "She understood all that awaited her only when, after stepping over the red baize at the entrance, she entered the hall, took off her fur cloak, and, beside Sónya and in front of her mother, mounted the brightly illuminated stairs between the flowers. Only then did she remember how she must behave at a ball, and tried to assume the majestic air she considered indispensable for a girl on such an oc
+!SIG moment_2
+moment_3 : moment
+moment_3.type = ~
+moment_3.order = 3
+moment_3.score = 12.522
+moment_3.text = "The mirrors on the landing reflected ladies in white, pale-blue, and pink dresses, with diamonds and pearls on their bare necks and arms. Natásha looked in the mirrors and could not distinguish her reflection from the others. All was blended into one brilliant procession. On entering the ballroom the regular hum of voices, footsteps, and greetings deafened Natásha, and the light and glitter dazzl
+!SIG moment_3
+moment_4 : moment
+moment_4.type = ~
+moment_4.order = 4
+moment_4.score = 12.741
+moment_4.text = "The host also followed Natásha with his eyes and asked the count which was his daughter. “Charming!” said he, kissing the tips of his fingers. In the ballroom guests stood crowding at the entrance doors awaiting the Emperor. The countess took up a position in one of the front rows of that crowd. Natásha heard and felt that several people were asking about her and looking at her. She realized that
+!SIG moment_4
+moment_5 : moment
+moment_5.type = ~
+moment_5.order = 6
+moment_5.score = 12.968
+moment_5.text = "Yes, she is still the most beautiful of them all, our Márya Antónovna! And how simply she is dressed! Lovely! And that stout one in spectacles is the universal Freemason,” she went on, indicating Pierre. “Put him beside his wife and he looks a regular buffoon!” Pierre, swaying his stout body, advanced, making way through the crowd and nodding to right and left as casually and good-naturedly as if
+!SIG moment_5
+moment_6 : moment
+moment_6.type = ~
+moment_6.order = 11
+moment_6.score = 12.204
+moment_6.text = "Véra, who was telling her something about her own green dress. At last the Emperor stopped beside his last partner (he had danced with three) and the music ceased. A worried aide-de-camp ran up to the Rostóvs requesting them to stand farther back, though as it was they were already close to the wall, and from the gallery resounded the distinct, precise, enticingly rhythmical strains of a waltz. T
+!SIG moment_6
+moment_7 : moment
+moment_7.type = ~
+moment_7.order = 21
+moment_7.score = 13.762
+moment_7.text = "When he reached home Prince Andrew began thinking of his life in Petersburg during those last four months as if it were something new. He recalled his exertions and solicitations, and the history of his project of army reform, which had been accepted for consideration and which they were trying to pass over in silence simply because another, a very poor one, had already been prepared and submitte
+!SIG moment_7
+moment_8 : moment
+moment_8.type = ~
+moment_8.order = 26
+moment_8.score = 12.889
+moment_8.text = "After Borís came a lady with the colonel, then the general himself, then the Rostóvs, and the party became unquestionably exactly like all other evening parties. Berg and Véra could not repress their smiles of satisfaction at the sight of all this movement in their drawing room, at the sound of the disconnected talk, the rustling of dresses, and the bowing and scraping. Everything was just as eve
+!SIG moment_8
+!EVA moment_1, moment_2, moment_3, moment_4, moment_5, moment_6, moment_7, moment_8
+
+# ── assembly 4: relations (perceiver-read; polarity read, never asserted) ─
+rel_1 : relation
+rel_1.subject = "Natásha"
+rel_1.verb = "looked"
+rel_1.object = "in the mirrors and could not distinguish her reflection from the others"
+rel_1.polarity = "+"
+rel_1.position = 0
+rel_2 : relation
+rel_2.subject = "Natásha"
+rel_2.verb = "heard"
+rel_2.object = "and felt that several people were asking about her and looking at her"
+rel_2.polarity = "+"
+rel_2.position = 1
+rel_3 : relation
+rel_3.subject = "Natásha"
+rel_3.verb = "looked"
+rel_3.object = "joyfully at the familiar face of Pierre"
+rel_3.polarity = "+"
+rel_3.position = 2
+rel_4 : relation
+rel_4.subject = "Natásha"
+rel_4.verb = "felt"
+rel_4.object = "that she would be left with her mother and Sónya among a minority of women who crowded near the wall"
+rel_4.polarity = "+"
+rel_4.position = 3
+rel_5 : relation
+rel_5.subject = "arm and"
+rel_5.verb = "looked"
+rel_5.object = "at Natásha as one looks at a wall"
+rel_5.polarity = "+"
+rel_5.position = 4
+rel_6 : relation
+rel_6.subject = "family gathering"
+rel_6.verb = "seemed"
+rel_6.object = "humiliating to Natásha—as if there were nowhere else for the family to talk but here at the ball"
+rel_6.polarity = "+"
+rel_6.position = 5
+rel_7 : relation
+rel_7.subject = "Natásha he"
+rel_7.verb = "held"
+rel_7.object = "out his arm to grasp her waist before he had completed his invitation"
+rel_7.polarity = "+"
+rel_7.position = 6
+rel_8 : relation
+rel_8.subject = "her Natásha"
+rel_8.verb = "ran"
+rel_8.object = "across the room to choose two ladies for the figure"
+rel_8.polarity = "+"
+rel_8.position = 7
+rel_9 : relation
+rel_9.subject = "He"
+rel_9.verb = "looked"
+rel_9.object = "at Natásha as she sang"
+rel_9.polarity = "+"
+rel_9.position = 8
+!EVA rel_1, rel_2, rel_3, rel_4, rel_5, rel_6, rel_7, rel_8, rel_9
+
+# ── assembly 5: the lens assertion (reader-relative, red-shift graded) ─
+lens : lens_assertion
+lens.character = "Natasha Rostova"
+lens.red_shift = 0.4545
+lens.confidence = 0.6455
+lens.strength = "suggested"
+lens.reader = "close reader, first reading"
+lens.gained = "heard", "felt", "seemed", "held"
+lens.lost = "managed", "said"
+lens.spoken = "Natasha Rostova has shifted moderately (red shift: 0.4545). The reading suggests a lens for Natasha Rostova, but with reservations. (reader: close reader, first reading, familiarity: 0.5) Available assertions: narrative frame. Gained: heard, felt, seemed, held. Lost: managed, said."
+!EVA lens
+
+# ── assembly 6: the summary (the emergent whole) ───────────────
+!SYN summary = reading_natasha_rostova_first_grand_ball, figure_natasha_rostova, moment_1, moment_2, moment_3, moment_4, moment_5, moment_6, moment_7, moment_8, rel_1, rel_2, rel_3, rel_4, rel_5, rel_6, rel_7, rel_8, rel_9, lens
+summary.scope = "entity@place"
+summary.turns = 0
+summary.gaps = ~
+!EVA summary
