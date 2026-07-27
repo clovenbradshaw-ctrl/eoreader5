@@ -43,7 +43,7 @@ function walk(dir) {
     const stat = statSync(full);
     if (stat.isDirectory()) {
       out.push(...walk(full));
-    } else if (entry.endsWith(".js") && !entry.endsWith(".test.js")) {
+    } else if ((entry.endsWith(".js") || entry.endsWith(".mjs")) && !entry.endsWith(".test.js") && !entry.endsWith(".test.mjs")) {
       out.push(full);
     }
   }

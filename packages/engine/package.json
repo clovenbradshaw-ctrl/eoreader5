@@ -28,7 +28,11 @@
     "./prediction/tasks": "./prediction/tasks/index.js",
     "./competency/ledger": "./competency/ledger/index.js",
     "./motif": "./motif/index.js",
-    "./cube": "./cube/index.js"
+    "./cube": "./cube/index.js",
+    "./emergence/summary": "./emergence/summary/index.js",
+    "./emergence/summary/entity-fold": "./emergence/summary/entity-fold.js",
+    "./quantum": "./quantum/index.js",
+    "./perceiver/text/extraction": "./perceiver/text/extraction.js"
   },
   "scripts": {
     "test": "node --test"

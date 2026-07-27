@@ -26,7 +26,7 @@ import { fold, classicalToFold } from "../../quantum/index.js";
  */
 export function liftOne(text, priors = null) {
   if (!text || text.length === 0) {
-    return { fold: null, text: "", timestamp: Date.now() };
+    return { fold: null, text: "", timestamp: null };
   }
 
   const f = fold(text, priors);
@@ -34,7 +34,7 @@ export function liftOne(text, priors = null) {
   return {
     fold: f,
     text,
-    timestamp: Date.now(),
+    timestamp: null,
   };
 }
 
@@ -238,7 +238,7 @@ function averageFolds(folds) {
     operator: avgOperator,
     terrain: avgTerrain,
     stance: avgStance,
-    timestamp: Date.now(),
+    timestamp: null,
   };
 }
 

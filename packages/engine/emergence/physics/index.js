@@ -134,14 +134,15 @@ export function applyPriorField(amps, priorField) {
 // Rewritten as Boltzmann distribution: P(survive) = e^(−E/kT)
 // where E = age (energy), T = accessCount (temperature).
 
-export function boltzmannSurvival(entry, now = Date.now()) {
+export function boltzmannSurvival(entry, now) {
+  if (!Number.isFinite(now)) throw new TypeError("boltzmannSurvival: `now` must be supplied by the caller — the engine has no ambient clock");
   const age = (now - entry.ts) / 1000;
   const T = Math.max(0.1, (entry.accessCount || 0) * BOLTZMANN_K);
   return Math.max(0, Math.min(1, Math.exp(-age / (BOLTZMANN_K * T + 0.01))));
 }
 
-export function boltzmannConsolidate(entries, threshold = 0.1) {
-  const now = Date.now();
+export function boltzmannConsolidate(entries, threshold = 0.1, now) {
+  if (!Number.isFinite(now)) throw new TypeError("boltzmannConsolidate: `now` must be supplied by the caller — the engine has no ambient clock");
   const survived = [];
   const pruned = [];
   for (const entry of entries) {
@@ -193,7 +194,7 @@ export function schrodingerEvolve(foldState, hamiltonian, dt, steps = 1) {
     operator: { ...foldState.operator },
     terrain: { ...foldState.terrain },
     stance: { ...foldState.stance },
-    timestamp: Date.now()
+    timestamp: null
   };
   for (let step = 0; step < steps; step++) {
     const E = project(foldState, hamiltonian);
@@ -236,8 +237,8 @@ function normalCDF(x) {
   return 0.5 * (1.0 + sign * y);
 }
 
-export function blackScholesValue(entry, queryThreshold = 0.5, timeHorizon = DECOHERENCE_TAU) {
-  const now = Date.now();
+export function blackScholesValue(entry, queryThreshold = 0.5, timeHorizon = DECOHERENCE_TAU, now) {
+  if (!Number.isFinite(now)) throw new TypeError("blackScholesValue: `now` must be supplied by the caller — the engine has no ambient clock");
   const age = now - entry.ts;
   const tRemaining = Math.max(0, timeHorizon - age);
   const S = Math.min(1, (entry.accessCount || 0) * 0.1 + Math.exp(-age / DECOHERENCE_TAU));

@@ -104,11 +104,3 @@ export function prepareFrame(pixels, { filterSize = 3, lowPct = 0.02, highPct = 
   return processed;
 }
 
-// Encode processed grayscale frames to PNG for CV models
-// Uses ffmpeg to re-encode (since we don't have a JS PNG encoder)
-export function encodeFrameToPNG(pixels, width = FRAME_WIDTH, height = FRAME_HEIGHT) {
-  const { spawn } = require('node:child_process');
-  // Actually let's avoid the dependency — just return raw pixels
-  // The caller can pass them through ffmpeg for PNG encoding
-  return pixels;
-}

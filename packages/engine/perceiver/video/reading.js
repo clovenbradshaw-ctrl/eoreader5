@@ -1,9 +1,8 @@
 // Video perceiver: raw frames in, field vectors out.
 // No structure-finding — just frame-level features.
-// Uses ffmpeg as subprocess to decode frames (the engine itself
-// stays codec-agnostic, same as audio's WAV-only policy).
-
-import { spawn } from 'node:child_process';
+// Decoding is the HOST's job (@eoreader/host/video streams frames via
+// ffmpeg); the engine consumes decoded { frameIndex, pixels } frames and
+// stays codec-agnostic, same as audio's WAV-only policy.
 
 export const TARGET_FPS = 2;
 export const FRAME_WIDTH = 160;
@@ -24,37 +23,6 @@ export const VIDEO_FIELD_SPEC = Object.freeze({
     { name: 'moments', dims: CHANNEL_DIMS.moments, metric: 'euclidean-standardised' },
   ],
 });
-
-// Stream frames via ffmpeg, yield { frameIndex, pixels } objects.
-async function* streamFrames(videoPath, { fps = TARGET_FPS, width = FRAME_WIDTH, height = FRAME_HEIGHT } = {}) {
-  const frameBytes = width * height;
-  const ffmpeg = spawn('ffmpeg', [
-    '-i', videoPath,
-    '-vf', `fps=${fps},scale=${width}:${height}`,
-    '-f', 'rawvideo', '-pix_fmt', 'gray',
-    '-', // stdout
-  ], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-  let buf = Buffer.alloc(0);
-  let frameIndex = 0;
-
-  for await (const chunk of ffmpeg.stdout) {
-    buf = Buffer.concat([buf, chunk]);
-    while (buf.length >= frameBytes) {
-      const frame = buf.subarray(0, frameBytes);
-      buf = buf.subarray(frameBytes);
-      yield { frameIndex: frameIndex++, pixels: new Uint8Array(frame) };
-    }
-  }
-
-  // Flush remaining
-  const stderr = await new Promise((resolve) => {
-    let err = '';
-    ffmpeg.stderr.on('data', (d) => { err += d.toString(); });
-    ffmpeg.on('close', () => resolve(err));
-  });
-  // Don't throw on ffmpeg's normal termination messages
-}
 
 // Per-frame field vector extraction
 function extractFrameFields(frame, prevFrame) {
@@ -127,14 +95,18 @@ function fieldVector(fields) {
   return vec;
 }
 
-// The perceiver: video file path in, Reading@1-like features out.
-// Processes frames in streaming batches to handle large files.
-export async function buildVideoReading(videoPath, { fps = TARGET_FPS, sourceBytes = null, perceiver = {} } = {}) {
+// The perceiver: decoded frames in, Reading@1-like features out.
+// `frames` is any (async) iterable of { frameIndex, pixels } — e.g. the
+// stream produced host-side by @eoreader/host/video streamVideoFrames().
+// Processes frames in streaming batches to handle large files; pass
+// `onProgress` to observe decode progress (the engine itself never writes
+// to stdio).
+export async function buildVideoReading(frames, { fps = TARGET_FPS, sourceBytes = null, perceiver = {}, onProgress = null } = {}) {
   const units = [];
   let prevFrame = null;
   let frameCount = 0;
 
-  for await (const frame of streamFrames(videoPath, { fps })) {
+  for await (const frame of frames) {
     const fields = extractFrameFields(frame, prevFrame);
     const vec = fieldVector(fields);
     units.push({
@@ -146,15 +118,9 @@ export async function buildVideoReading(videoPath, { fps = TARGET_FPS, sourceByt
     prevFrame = frame;
     frameCount++;
 
-    // Progress indicator for large files
-    if (frameCount % 1000 === 0) {
-      process.stderr.write(`\r  decoded ${frameCount} frames @ ${fps}fps`);
-    }
+    if (onProgress && frameCount % 1000 === 0) onProgress(frameCount);
   }
-
-  if (frameCount % 1000 !== 0) {
-    process.stderr.write(`\r  decoded ${frameCount} frames @ ${fps}fps\n`);
-  }
+  if (onProgress) onProgress(frameCount);
 
   const duration = frameCount > 0 ? frameCount / fps : 0;
 

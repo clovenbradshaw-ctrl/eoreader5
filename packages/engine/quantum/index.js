@@ -16,9 +16,16 @@
 
 // ── Constants ──
 
-export const OPERATORS = ["NUL", "SEG", "DEF", "SIG", "CON", "EVA", "INS", "SYN", "REC"];
-export const TERRAINS = ["Void", "Entity", "Kind", "Field", "Link", "Network", "Atmosphere", "Lens", "Paradigm"];
-export const STANCES = ["Clearing", "Dissecting", "Unraveling", "Tending", "Binding", "Tracing", "Cultivating", "Making", "Composing"];
+import { OPERATOR_CODES } from "@eoreader/spec/operators";
+import { TERRAINS as SPEC_TERRAINS, STANCES as SPEC_STANCES } from "@eoreader/spec/cube";
+
+// The three face vocabularies come from the spec — the single source of
+// truth — in helix order (NUL, SIG, INS, SEG, CON, SYN, DEF, EVA, REC).
+// Order is load-bearing: amplitude ties collapse to the earliest key in
+// face order, so "earliest in the helix wins" is the explicit tie rule.
+export const OPERATORS = OPERATOR_CODES;
+export const TERRAINS = SPEC_TERRAINS;
+export const STANCES = SPEC_STANCES;
 
 // Uncertainty constant (I.34.27: ℏ)
 export const UNCERTAINTY_H = 0.1;
@@ -83,7 +90,8 @@ export function gaussianAmplitudeSimilarity(ampA, ampB, sigma = GAUSSIAN_SIGMA) 
  * @returns {object} A fold: { operator: {amp}, terrain: {amp}, stance: {amp} }
  */
 export function fold(text, priors = null, surfaces = null) {
-  const words = (text || "").toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const rawTokens = (text || "").split(/\s+/).filter(w => w.length > 2);
+  const words = rawTokens.map(w => w.toLowerCase());
   const wordSet = new Set(words);
   const wordCount = words.length;
 
@@ -91,31 +99,39 @@ export function fold(text, priors = null, surfaces = null) {
     return emptyFold();
   }
 
+  // Proper nouns must be counted before lowercasing destroys the case
+  // evidence. Unicode-aware so accented names (Natásha, Hélène) count.
+  const properNounCount = rawTokens.filter(w => /^\p{Lu}\p{Ll}/u.test(w)).length;
+
   const operatorAmplitudes = computeOperatorAmplitudes(words, wordSet, wordCount, priors);
-  const terrainAmplitudes = computeTerrainAmplitudes(words, wordSet, wordCount, priors, surfaces);
+  const terrainAmplitudes = computeTerrainAmplitudes(words, wordSet, wordCount, priors, surfaces, properNounCount);
   const stanceAmplitudes = computeStanceAmplitudes(words, wordSet, wordCount, priors);
 
   return {
     operator: operatorAmplitudes,
     terrain: terrainAmplitudes,
     stance: stanceAmplitudes,
-    timestamp: Date.now()
+    timestamp: null
   };
 }
 
+// A uniform face asserts nothing: every basis key equally likely, the
+// maximum-entropy expression of absence. Each face is normalized over its
+// OWN nine keys — mixing the three vocabularies into one object would make
+// grain coherence unverifiable and leave the fold unnormalized (‖ψ‖²=3).
+function uniformFace(keys) {
+  const amps = {};
+  const amp = 1 / Math.sqrt(keys.length);
+  for (const key of keys) amps[key] = amp;
+  return amps;
+}
+
 function emptyFold() {
-  const uniform = {};
-  const uniformAmp = 1 / Math.sqrt(9);
-
-  for (const op of OPERATORS) uniform[op] = uniformAmp;
-  for (const terr of TERRAINS) uniform[terr] = uniformAmp;
-  for (const st of STANCES) uniform[st] = uniformAmp;
-
   return {
-    operator: { ...uniform },
-    terrain: { ...uniform },
-    stance: { ...uniform },
-    timestamp: Date.now()
+    operator: uniformFace(OPERATORS),
+    terrain: uniformFace(TERRAINS),
+    stance: uniformFace(STANCES),
+    timestamp: null
   };
 }
 
@@ -124,13 +140,6 @@ function emptyFold() {
 function computeOperatorAmplitudes(words, wordSet, wordCount, priors) {
   const amps = {};
   for (const op of OPERATORS) amps[op] = 0;
-
-  const wordFactor = Math.min(1, wordCount / 20);
-
-  if (words.length > 0) {
-    amps.DEF += 0.1;
-    amps.SIG += 0.1;
-  }
 
   const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / wordCount;
   if (avgWordLen > 5) {
@@ -181,18 +190,24 @@ function computeOperatorAmplitudes(words, wordSet, wordCount, priors) {
     }
   }
 
+  // No operator evidence at all: assert nothing (uniform), never a
+  // fabricated default toward specific operators.
+  if (Object.values(amps).every((a) => a === 0)) return uniformFace(OPERATORS);
   normalizeAmplitudes(amps);
   return amps;
 }
 
-function computeTerrainAmplitudes(words, wordSet, wordCount, priors) {
+function computeTerrainAmplitudes(words, wordSet, wordCount, priors, surfaces, properNounCount = 0) {
   const amps = {};
   for (const terr of TERRAINS) amps[terr] = 0;
 
   const personIndicators = new Set(['i', 'you', 'he', 'she', 'it', 'we', 'they', 'who', 'whom']);
-  const properNouns = words.filter(w => /^[A-Z]/.test(w) || (priors?.entities?.has(w.toLowerCase())));
-  const personCount = words.filter(w => personIndicators.has(w)).length + properNouns.length;
+  const priorEntityCount = priors?.entities ? words.filter((w) => priors.entities.has(w)).length : 0;
+  const personCount = words.filter(w => personIndicators.has(w)).length + properNounCount + priorEntityCount;
   if (personCount > 0) amps.Entity += personCount * 0.15;
+
+  // Anchored surfaces are declared referents — direct Entity-terrain evidence.
+  if (surfaces?.length) amps.Entity += surfaces.length * 0.15;
 
   const relWords = new Set(['with', 'for', 'from', 'to', 'by', 'about', 'between', 'among']);
   const relCount = words.filter(w => relWords.has(w)).length;
@@ -226,12 +241,9 @@ function computeTerrainAmplitudes(words, wordSet, wordCount, priors) {
   const perspectiveCount = words.filter(w => perspectiveWords.has(w)).length;
   if (perspectiveCount > 0) amps.Lens += perspectiveCount * 0.2;
 
-  const totalSignal = Object.values(amps).reduce((a, b) => a + b, 0);
-  if (totalSignal < 0.5) {
-    amps.Field += 0.3;
-    if (personCount > 0) amps.Entity += 0.2;
-  }
-
+  // No terrain evidence: assert nothing (uniform), never a fabricated
+  // Field/Entity default.
+  if (Object.values(amps).every((a) => a === 0)) return uniformFace(TERRAINS);
   normalizeAmplitudes(amps);
   return amps;
 }
@@ -287,11 +299,9 @@ function computeStanceAmplitudes(words, wordSet, wordCount, priors) {
     amps.Tracing += 0.2;
   }
 
-  const totalSignal = Object.values(amps).reduce((a, b) => a + b, 0);
-  if (totalSignal < 0.3) {
-    amps.Tracing += 0.4;
-  }
-
+  // No stance evidence: assert nothing (uniform), never a fabricated
+  // Tracing default.
+  if (Object.values(amps).every((a) => a === 0)) return uniformFace(STANCES);
   normalizeAmplitudes(amps);
   return amps;
 }
@@ -471,7 +481,7 @@ export function measureFold(fold, basis, strength = 0.3, opts = {}) {
     operator: newOperator,
     terrain: newTerrain,
     stance: newStance,
-    timestamp: Date.now()
+    timestamp: null
   };
 }
 
@@ -537,6 +547,10 @@ function correlation(ampA, ampB) {
  * Update entangled fold when one is measured.
  * Non-local update: measuring one instantly affects the other.
  * Uses relativistic velocity addition (I.16.6) for blending.
+ *
+ * Pure: returns a NEW fold; the input fold is never mutated. Callers hold
+ * folds in replayable state, and in-place mutation would make the same
+ * request produce different readings across replays.
  */
 export function updateEntangledFold(measuredFold, otherFold, measurementBasis, strength = 0.1) {
   const corrFactor = computeCorrelationFactor(measuredFold, otherFold);
@@ -548,26 +562,35 @@ export function updateEntangledFold(measuredFold, otherFold, measurementBasis, s
     return (u + v) / (1 + uv);
   };
 
+  const newOperator = {};
+  const newTerrain = {};
+  const newStance = {};
+
   for (const [op, amp] of Object.entries(otherFold.operator)) {
     const measuredAmp = measurementBasis.operator[op] || 0;
-    otherFold.operator[op] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
+    newOperator[op] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
   }
 
   for (const [terr, amp] of Object.entries(otherFold.terrain)) {
     const measuredAmp = measurementBasis.terrain[terr] || 0;
-    otherFold.terrain[terr] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
+    newTerrain[terr] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
   }
 
   for (const [st, amp] of Object.entries(otherFold.stance)) {
     const measuredAmp = measurementBasis.stance[st] || 0;
-    otherFold.stance[st] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
+    newStance[st] = blend(amp * (1 - corrFactor * strength), measuredAmp * corrFactor * strength);
   }
 
-  normalizeAmplitudes(otherFold.operator);
-  normalizeAmplitudes(otherFold.terrain);
-  normalizeAmplitudes(otherFold.stance);
+  normalizeAmplitudes(newOperator);
+  normalizeAmplitudes(newTerrain);
+  normalizeAmplitudes(newStance);
 
-  return otherFold;
+  return {
+    operator: newOperator,
+    terrain: newTerrain,
+    stance: newStance,
+    timestamp: otherFold.timestamp ?? null,
+  };
 }
 
 function computeCorrelationFactor(foldA, foldB) {
@@ -649,7 +672,7 @@ export function decohereFold(fold, timeMs) {
     operator: newOperator,
     terrain: newTerrain,
     stance: newStance,
-    timestamp: Date.now()
+    timestamp: null
   };
 }
 
@@ -663,7 +686,7 @@ export function collapseFold(fold) {
     operator: collapseToAmplitude(state.operator),
     terrain: collapseToAmplitude(state.terrain),
     stance: collapseToAmplitude(state.stance),
-    timestamp: Date.now()
+    timestamp: null
   };
 }
 
@@ -690,7 +713,7 @@ export function classicalToFold(coord) {
   for (const terr of TERRAINS) terrain[terr] = terr === coord.terrain ? 1.0 : 0.0;
   for (const st of STANCES) stance[st] = st === coord.stance ? 1.0 : 0.0;
 
-  return { operator, terrain, stance, timestamp: Date.now() };
+  return { operator, terrain, stance, timestamp: null };
 }
 
 /**
