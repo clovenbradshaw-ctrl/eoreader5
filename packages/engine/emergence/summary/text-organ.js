@@ -1,35 +1,36 @@
-// text-organ.js — Text as a signal, not as language.
+// text-organ.js — Thin bridge between the perceiver and the engine.
 //
-// Port of the music-extraction approach to text. The music system
-// succeeded by measuring the signal's own statistics and letting
-// structure emerge — no hardcoded thresholds, no pattern templates.
-// This module does the same for text:
+// The perceiver (perceiver/text/) does modality-specific extraction:
+//   text-signal.js — field vectors from raw text (char-3gram, word length)
+//   surfaces.js    — capitalized spans + co-occurrence records
 //
-//   Music           → Text
-//   ─────────────────────────────────
-//   STFT frames     → fixed-char windows ($frameText)
-//   Chroma vectors  → word probability distributions
-//   Chord change    → KL elbow between windows ($detectBoundaries)
-//   Note discovery  → entity co-occurrence ($discoverEntities)
-//   Simultaneous    → PMI-based relation discovery ($discoverRelations)
-//   notes
+// The engine (emergence/summary/) does structure-finding:
+//   entity-kinds.js — entity equivalence through co-occurrence clustering
+//   kernel.js       — universal fold logic
 //
-// The old approach (sentence boundaries, SVO regex, event patterns)
-// is replaced entirely. The kernel interface is preserved so
-// entity-fold.js and kernel.js don't need rewriting.
+// This module is the thin bridge that adapts the perceiver's output
+// to the interface the engine expects. It does NOT duplicate the
+// perceiver's extraction work — it just re-exports and adapts.
+
+import { extractSurfaces, buildSurfaceMap, buildEntityRecords } from "../../perceiver/text/surfaces.js";
+import { cosineSimilarity } from "../../perceiver/text/text-signal.js";
+
+export { cosineSimilarity };
+
+/**
+ * Frame text into chunks for the engine. Delegates to the perceiver's
+ * surface extraction — the perceiver finds capitalized entity-name
+ * surfaces; the engine clusters and ranks them.
+ */
+export { extractSurfaces };
 
 import { wordFrequencies, klDivergence } from "../surprise/index.js";
-
-// No diacritical normalization. The engine discovers entity equivalence
-// through the entity-kinds pipeline (co-occurrence clustering), not
-// through pre-digesting the input. "Natásha" and "Natasha" unify when
-// they co-occur with the same entities, not because I strip accents.
 
 function norm(text) {
   return String(text ?? "").toLowerCase().trim();
 }
 
-// ── 1. Frame text (like STFT) ──────────────────────────────────
+// ── Frame text (currently inline; will move to perceiver when ready) ──
 
 export function frameText(text, options = {}) {
   const windowSize = options.windowSize ?? 2000;
@@ -47,22 +48,14 @@ export function frameText(text, options = {}) {
   return frames;
 }
 
-// ── 2. Boundary detection (KL divergence against sliding prior) ──
-// Like the music extraction's chord-change detection. Uses a SLIDING
-// WINDOW prior (fixed size) so the cost stays O(N) regardless of
-// document length. Each frame's surprise is measured against the
-// immediately preceding WINDOW frames, not the entire history.
+// ── Boundary detection (KL divergence against sliding prior) ──
 
 export function detectBoundaries(frames, options = {}) {
   const { zThreshold = 2.5, window = 20 } = options;
   if (frames.length < window) return [];
-
   const scores = [];
-
-  // Build the initial prior from the first `window` frames, then slide
   for (let i = 0; i < frames.length; i++) {
     if (i < window) {
-      // Prior not ready yet — compute what we can
       const priorStart = Math.max(0, i - window);
       const priorFrames = frames.slice(priorStart, i);
       const score = priorFrames.length > 0
@@ -70,10 +63,7 @@ export function detectBoundaries(frames, options = {}) {
         : 0;
       scores.push({ order: frames[i].order, offset: frames[i].offset, score, text: frames[i].text });
     } else {
-      // Sliding window: prior is the last `window` frames merged
       const priorFrames = frames.slice(i - window, i);
-      // Build prior distribution by merging — this is O(window * frameWords)
-      // window is small (20) and frameWords is small (~50), so it's fast
       const prior = new Map();
       let total = 0;
       for (const pf of priorFrames) {
@@ -89,8 +79,6 @@ export function detectBoundaries(frames, options = {}) {
       scores.push({ order: frames[i].order, offset: frames[i].offset, score, text: frames[i].text });
     }
   }
-
-  // Z-score normalize to find spikes
   const zWindow = Math.min(window, 10);
   const boundaries = [];
   for (let i = zWindow; i < scores.length - zWindow; i++) {
@@ -110,11 +98,10 @@ export function detectBoundaries(frames, options = {}) {
       boundaries.push({ order: scores[i].order, offset: scores[i].offset, score: scores[i].score, z, text: scores[i].text });
     }
   }
-
   return boundaries;
 }
 
-// ── 3. Entity discovery (co-occurrence) ─────────────────────────
+// ── Entity discovery (co-occurrence) ──
 
 export function discoverEntities(frames, options = {}) {
   const { minFrames = 3 } = options;
@@ -143,30 +130,6 @@ export function discoverEntities(frames, options = {}) {
   return candidates.sort((a, b) => b.salience - a.salience).slice(0, 100);
 }
 
-// ── 4. Relation discovery (PMI) ─────────────────────────────────
-
-export function discoverRelations(frames, entities, options = {}) {
-  const { topN = 20, minJoint = 2 } = options;
-  if (entities.length < 2) return [];
-  const ef = new Map(entities.map((e) => [e.word, new Set(e.frames)]));
-  const total = frames.length;
-  const pairs = [];
-  for (let i = 0; i < Math.min(entities.length, 50); i++) {
-    for (let j = i + 1; j < Math.min(entities.length, 50); j++) {
-      const a = entities[i].word, b = entities[j].word;
-      const sa = ef.get(a), sb = ef.get(b);
-      let joint = 0;
-      for (const f of sa) if (sb.has(f)) joint++;
-      if (joint < minJoint) continue;
-      const pAB = joint / total, pA = sa.size / total, pB = sb.size / total;
-      pairs.push({ a, b, pmi: Math.log2(pAB / (pA * pB)), joint });
-    }
-  }
-  return pairs.sort((a, b) => b.pmi - a.pmi).slice(0, topN);
-}
-
-// ── 5. Match entity by name ─────────────────────────────────────
-
 export function matchTargetEntity(entities, name) {
   const n = norm(name);
   const tokens = n.split(/\s+/).filter(Boolean);
@@ -179,11 +142,7 @@ export function matchTargetEntity(entities, name) {
   return best;
 }
 
-// ── 6. Extract events (boundary-derived, entity-typed) ──────────
-// Each boundary is a topic shift. But what MAKES it an event is which
-// ENTITIES are active at that point. A boundary where Natasha meets
-// Andrei is a different KIND of event than one where she falls ill.
-// We type boundaries by the entities that co-occur near them.
+// ── Extract typed events ──
 
 const EVENT_TYPE_KEYWORDS = {
   love: ["love", "dance", "beautiful", "charming", "enchant", "kiss", "embrace", "passion", "adore", "captivate"],
@@ -195,89 +154,65 @@ const EVENT_TYPE_KEYWORDS = {
   nursing: ["nurse", "care", "tend", "wounded", "sick", "fever", "hospital", "medicine"],
 };
 
-/**
- * Type a boundary by the vocabulary that most distinguishes it from
- * the running prior. The type with the most keyword matches wins.
- * This is like the music extraction typing a chord by its pitch class.
- */
 function typeBoundary(boundaryText, priorText) {
   const text = norm(boundaryText);
   let bestType = "shift", bestCount = 0;
-
   for (const [type, keywords] of Object.entries(EVENT_TYPE_KEYWORDS)) {
     const count = keywords.filter((kw) => text.includes(kw)).length;
-    if (count > bestCount) {
-      bestCount = count;
-      bestType = type;
-    }
+    if (count > bestCount) { bestCount = count; bestType = type; }
   }
-
   return bestType;
 }
 
 export function extractEvents(frames, boundaries, entities, entityName, options = {}) {
   const { maxEvents = 12 } = options;
   const en = norm(entityName);
-
-  const frameByPos = new Map(frames.map((f) => [f.order, f]));
-
-  // Build a set of frame positions that mention the entity
   const entityTokens = en.split(/\s+/).filter((t) => t.length > 2);
   const entityPositions = new Set();
   for (const f of frames) {
     const text = norm(f.text);
     if (entityTokens.some((t) => text.includes(t))) entityPositions.add(f.order);
   }
-
-  // Filter boundaries that are near entity-mentioning frames
-  const proximityWindow = 5; // frames
+  const proximityWindow = 5;
   const filtered = boundaries.filter((b) => {
-    // Check if any entity-mentioning frame is within proximityWindow
     for (let d = -proximityWindow; d <= proximityWindow; d++) {
       if (entityPositions.has(b.order + d)) return true;
     }
     return false;
   });
-
+  const frameByPos = new Map(frames.map((f) => [f.order, f]));
   return filtered.slice(0, maxEvents).map((b, i) => {
     const f = frameByPos.get(b.order);
     const prior = frameByPos.get(b.order - 1);
     const type = f ? typeBoundary(f.text, prior?.text ?? "") : "shift";
-
     return {
-      offset: b.offset,
-      order: b.order,
-      type,
-      text: f?.text ?? "",
-      score: b.score,
-      zScore: b.z,
-      idx: i,
+      offset: b.offset, order: b.order, type,
+      text: f?.text ?? "", score: b.score, zScore: b.z, idx: i,
     };
   });
 }
 
-// ── KERNEL INTERFACE ────────────────────────────────────────────
-// These functions produce the interface the kernel expects:
-//   chunks: [{ text, idx }]
-//   relations: [{ subject, verb, object, polarity, idx, text }]
-//   events: [{ type, text, participants, idx }]
-//   temporalMarkers: Map<idx, { type, value, raw }>
+// ── Entity-kinds boosting ──
+// Use the perceiver's surface extraction to boost entity-kinds clustering.
+// Takes the engine's discovered entities and boosts their salience if they
+// appear in the perceiver's surface map (capitalized spans that co-occur).
 
-/**
- * Segment text into chunks the kernel can consume.
- * Returns { text, idx } frames — the same interface as the old
- * segmentSentences, but derived from signal windows, not regex.
- */
-export function segmentSentences(text) {
-  return frameText(text).map((f) => ({ text: f.text, idx: f.order }));
+export function boostFromSurfaces(entities, surfaces, entityName) {
+  const surfaceSet = new Set(surfaces);
+  const en = norm(entityName);
+
+  return entities.map((e) => {
+    const needsBoost = !surfaceSet.has(e.word) && norm(e.word) !== en;
+    return {
+      ...e,
+      surfaceBoost: needsBoost ? 0 : e.salience,
+      isSurface: surfaceSet.has(e.word),
+    };
+  }).sort((a, b) => (b.surfaceBoost || b.salience) - (a.surfaceBoost || a.salience));
 }
 
-/**
- * Find chunks relevant to the entity — direct name matching
- * (the entity discovery path is used for FIGURES, not for
- * initial filtering). The name is a given — we know who we're
- * looking for — so we find frames containing that name directly.
- */
+// ── Bridge: findEntityMentions ──
+
 export function findEntityMentions(chunks, entityName) {
   if (!chunks.length) return [];
   const en = norm(entityName);
@@ -288,6 +223,12 @@ export function findEntityMentions(chunks, entityName) {
   }).map((c) => ({ text: c.text, idx: c.idx }));
 }
 
-export function extractRelations(/* not needed — relations from graph */) { return []; }
+// ── Legacy bridges ──
+
+export function segmentSentences(text) {
+  return frameText(text).map((f) => ({ text: f.text, idx: f.order }));
+}
+
+export function extractRelations() { return []; }
 export function extractTemporalMarker() { return null; }
 export function extractTemporalMarkers() { return new Map(); }

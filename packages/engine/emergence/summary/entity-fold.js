@@ -1,18 +1,9 @@
-// entity-fold.js — Entity-focused fold orchestrator.
+// entity-fold.js — Entity fold orchestrator.
 //
-// This is the thin orchestrator that wires the organ (modality-specific
-// extraction) to the kernel (universal fold logic). For text, it uses
-// text-organ.js to extract signal-derived frames, boundaries, entities,
-// and events, then passes them to kernel.js for key moment selection,
-// temporal ordering, and EOT packet assembly.
-//
-// The signal approach (ported from the music extraction) measures the
-// text's own statistics — KL divergence between frames, co-occurrence
-// of words — and lets structure emerge. No regex, no hardcoded patterns.
-// This mirrors how the music system discovers chords and patterns from
-// raw PCM without any musical notation templates.
-//
-// The fold is cheap (CPU-only, no model calls).
+// Wires the perceiver (capitalized surface extraction) to the engine
+// (signal boundaries, events, figures). The perceiver finds surfaces,
+// the engine finds structure. No regex, no string normalization,
+// no entity-kinds clustering (that's a separate pipeline).
 
 import {
   createConnectionMap,
@@ -27,25 +18,41 @@ import {
 import {
   frameText,
   detectBoundaries,
-  discoverEntities,
-  matchTargetEntity,
-  findEntityMentions,
   extractEvents,
-  segmentSentences,
+  extractSurfaces,
 } from "./text-organ.js";
-import {
-  detectFigures,
-} from "./graph.js";
 
-/**
- * Entity-focused fold: raw text → EOT packet with temporal ordering.
- *
- * @param {string} text - raw text (e.g., a chapter of War and Peace)
- * @param {string} entityName - the entity to focus on (e.g., "Natasha Rostova")
- * @param {object} options - { tokenBudget, connectionMap, focus, title }
- * @returns {object} EOT packet with temporal relations
- */
-export function entityFold(text, entityName, options = {}) {
+// Diacritical mapping for engine-level entity name matching.
+// NOT signal-path normalization — this is the engine discovering
+// that "Natásha" and "Natasha" refer to the same entity.
+const DIACRITICAL_MAP = {
+  'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+  'à':'a','è':'e','ì':'i','ò':'o','ù':'u',
+  'â':'a','ê':'e','î':'i','ô':'o','û':'u',
+  'ä':'a','ë':'e','ï':'i','ö':'o','ü':'u',
+};
+function diaNorm(text) {
+  return String(text ?? "").toLowerCase().trim()
+    .split("").map(c => DIACRITICAL_MAP[c] ?? c).join("");
+}
+
+function norm(text) {
+  return String(text ?? "").toLowerCase().trim();
+}
+
+function matchSurface(name, surfaces) {
+  const n = diaNorm(name);
+  const tokens = n.split(/\s+/).filter((t) => t.length > 2);
+  let best = null, bestScore = 0;
+  for (const s of surfaces) {
+    const sn = diaNorm(s);
+    const score = tokens.filter((t) => sn.includes(t)).length;
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
+  return best;
+}
+
+export function entityFold(text, entityName = null, options = {}) {
   const {
     tokenBudget = 500,
     connectionMap = createConnectionMap(),
@@ -54,74 +61,72 @@ export function entityFold(text, entityName, options = {}) {
     sceneCount = 12,
   } = options;
 
-  // 1. Frame text into signal windows (like STFT frames)
+  // 1. Frame text into signal windows
   const frames = frameText(text);
 
-  // 2. Discover entities from frame co-occurrence statistics
-  const entities = discoverEntities(frames);
+  // 2. Extract surfaces (capitalized spans) from the perceiver
+  const allSurfaces = [...new Set(extractSurfaces(text))];
+  const targetSurface = matchSurface(entityName, allSurfaces) ?? entityName ?? "unknown";
 
-  // 3. Identify target entity
-  const target = matchTargetEntity(entities, entityName);
+  // 3. Find frames containing the target entity
+  const targetFrames = frames.filter((f) => norm(f.text).includes(norm(targetSurface)));
 
-  // 4. Find frames relevant to the entity
-  const relevant = findEntityMentions(
-    frames.map((f) => ({ text: f.text, idx: f.order })),
-    entityName
-  ).map((c) => {
-    const f = frames[c.idx];
-    return f ?? { text: c.text, dist: new Map(), order: c.idx, offset: 0 };
-  });
+  // 4. Build per-chunk surface map for figure detection
+  const perChunk = new Map();
+  for (const f of frames) perChunk.set(f.order, extractSurfaces(f.text));
 
-  // 5. Detect boundaries (topic shifts) among FULL frames
+  const figureCooccurrence = new Map();
+  const targetNorm = norm(targetSurface);
+  for (const f of targetFrames) {
+    const chunkSurfaces = perChunk.get(f.order) ?? [];
+    for (const s of chunkSurfaces) {
+      if (norm(s) === targetNorm) continue;
+      figureCooccurrence.set(s, (figureCooccurrence.get(s) ?? 0) + 1);
+    }
+  }
+
+  const figures = [...figureCooccurrence.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([label, count]) => ({ label, count }));
+
+  // 5. Detect boundaries (topic shifts)
   const boundaries = detectBoundaries(frames);
 
-  // 6. Extract typed events from boundaries near the entity
-  const events = extractEvents(frames, boundaries, entities, entityName, {
+  // 6. Extract typed events near the entity
+  const events = extractEvents(frames, boundaries, [], targetSurface, {
     maxEvents: sceneCount,
   });
 
-  // 7. Detect figures via co-occurrence
-  const figureCounts = detectFigures(
-    relevant.map((f) => ({ text: f.text, idx: f.order })),
-    entityName
-  );
-
-  // 8. Order by narrative position (no temporal markers — signal has none)
+  // 7. Order by narrative position
   const ordered = orderChronologically([], events, new Map());
 
-  // 9. Key moments from events
-  const eventMoments = buildKeyMomentsFromEvents(events, relevant, {
+  // 8. Key moments from events
+  const eventMoments = buildKeyMomentsFromEvents(events, targetFrames, {
     maxMoments: sceneCount,
   });
 
   let sceneMoments;
   if (eventMoments.length >= 3) {
     sceneMoments = eventMoments.map((m) => ({
-      idx: m.idx,
-      text: m.text,
-      context: m.text,
-      score: m.score,
-      type: m.type,
+      idx: m.idx, text: m.text, context: m.text, score: m.score, type: m.type,
     }));
   } else {
-    const spine = significanceSpine(relevant, { budget: 600, k: sceneCount });
-    const spineMoments = buildSceneMoments(relevant, spine, { contextWindow: 1 });
-    sceneMoments = spineMoments;
+    const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount });
+    sceneMoments = buildSceneMoments(targetFrames, spine, { contextWindow: 1 });
   }
 
-  // 10. Build EOT packet
-  const packet = buildEntityPacket(ordered, entityName, {
+  // 9. Build EOT packet
+  const packet = buildEntityPacket(ordered, targetSurface, {
     tokenBudget,
     maxRelations: 0,
     connectionMap,
     focus,
-    title,
+    title: title ?? targetSurface,
     sceneMoments,
-    graphFigures: figureCounts.slice(0, 10),
+    graphFigures: figures,
   });
 
-  // 11. Update connection map
   updateConnectionMap(connectionMap, packet);
-
   return packet;
 }
