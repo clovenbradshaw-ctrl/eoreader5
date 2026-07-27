@@ -3,7 +3,7 @@ import { walkForward } from "../../prediction/tasks/index.js";
 import { defaultNumericBaselines } from "../../prediction/baselines/index.js";
 import { commitPrediction, revealAndScore } from "../../prediction/commitments/index.js";
 import { createLedger, recordStep, finalizeCompetency, competencyGain } from "../../competency/ledger/index.js";
-import { enumeratePrograms, predictWith, descriptionLength, canonicalKey } from "../expressions/index.js";
+import { enumeratePrograms, mutatePrograms, predictWith, descriptionLength, canonicalKey } from "../expressions/index.js";
 
 const SCORING_RULE = "crps";
 
@@ -72,6 +72,7 @@ export function searchCompetentPrograms(series, {
   lambda,
   referenceBaselineId = "baseline:global-mean",
   enumeration = {},
+  library = [],
   seasonalPeriod,
   population = "series:anonymous",
 } = {}) {
@@ -81,7 +82,25 @@ export function searchCompetentPrograms(series, {
 
   if (!Array.isArray(series) || series.length <= resolvedWarmup + 1) throw new TypeError("programs: series too short for the requested warmup");
   const baselines = defaultNumericBaselines({ window: Math.max(3, Math.floor(Math.sqrt(n))), seasonalPeriod });
-  const programs = enumeratePrograms(enumeration);
+  let programs;
+  if (library.length > 0) {
+    // Round 1+: mutate already-promoted operators
+    programs = mutatePrograms(library);
+  } else {
+    // Round 0: seed programs plus mutations of seeds (bootstrapping).
+    // Seeds have no id so mutateProgram uses inline references (not opref).
+    const seeds = enumeratePrograms(enumeration);
+    const seedLib = seeds.map((s) => ({ program: s }));
+    const mutants = mutatePrograms(seedLib);
+    // Dedup: include all unique seeds and mutants
+    const seen = new Set();
+    const all = [];
+    for (const p of [...seeds, ...mutants]) {
+      const key = canonicalKey(p);
+      if (!seen.has(key)) { seen.add(key); all.push(p); }
+    }
+    programs = all;
+  }
   const sourceVersion = canonicalHashSync(series);
   const taskId = `task:${canonicalHashSync({ population, sourceVersion, warmup: resolvedWarmup, rule: SCORING_RULE })}`;
 

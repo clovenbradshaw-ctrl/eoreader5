@@ -69,7 +69,9 @@ export function evalNode(node, history) {
     case "div": {
       const a = evalScalar(node.a, history);
       const b = evalScalar(node.b, history);
-      return b === 0 ? a : a / b;
+      if (b === 0 || !Number.isFinite(b)) return 0;
+      const r = a / b;
+      return Number.isFinite(r) ? r : 0;
     }
     case "opref":
       if (!node.program) throw new TypeError("expressions: opref node missing its inline program");
@@ -92,8 +94,10 @@ export function evalNode(node, history) {
     case "atan2":
       return Math.atan2(evalScalar(node.a, history), evalScalar(node.b, history));
     // Geometry (CON): connect orthogonal components into Euclidean magnitude
-    case "hypot":
-      return Math.hypot(evalScalar(node.a, history), evalScalar(node.b, history));
+    case "hypot": {
+      const r = Math.hypot(evalScalar(node.a, history), evalScalar(node.b, history));
+      return Number.isFinite(r) ? r : 0;
+    }
 
     // Calculus (REC): recursive self-multiplication
     case "exp":
@@ -107,7 +111,9 @@ export function evalNode(node, history) {
     case "pow": {
       const a = evalScalar(node.a, history);
       const b = evalScalar(node.b, history);
-      return Math.pow(a, b);
+      if (a < 0 && !Number.isInteger(b)) return 0;
+      const r = Math.pow(a, b);
+      return Number.isFinite(r) ? r : 0;
     }
 
     // Constants (SIG): signal fixed mathematical anchors
@@ -161,18 +167,18 @@ export function predictWith(program, history, { warmup } = {}) {
     residuals.push(history[i] - f);
   }
   const sd = residuals.length >= 2 ? Math.sqrt(residuals.reduce((acc, r) => acc + (r - mean(residuals)) ** 2, 0) / (residuals.length - 1)) : 0;
-  return sd > 0 ? { kind: "gaussian", mean: centre, sd } : { kind: "point", value: centre };
+  const finalSd = Number.isFinite(sd) && sd > 0 ? sd : 0;
+  return finalSd > 0 ? { kind: "gaussian", mean: centre, sd: finalSd } : { kind: "point", value: centre };
 }
 
 const UNARY_TRANSFORMS = ["sqrt", "sin", "cos", "abs", "exp", "log"];  // DEF, SIG, SIG, DEF, REC, SEG
 const BINARY_TRANSFORMS = ["atan2", "pow", "hypot"];                   // EVA, SYN, CON
 
-export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms, library = [], data } = {}) {
+export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms, data } = {}) {
   const nd = data?.length ?? 0;
   maxSeriesDepth = maxSeriesDepth ?? Math.max(1, Math.floor(Math.log2(Math.max(2, nd || 10)) / 2));
   constants = constants ?? (data ? deriveConstants(data) : [0, 1]);
   lags = lags ?? (data ? deriveLags(data) : [1]);
-  maxPrograms = maxPrograms ?? Math.max(256, Math.round(Math.max(1, nd || 10) * 8));
   const series = [];
   const seen = new Set();
   const pushSeries = (node) => {
@@ -194,55 +200,143 @@ export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms
     frontier = next;
   }
 
-  const scalars = [];
-  const scalarSeen = new Set();
-  const pushScalar = (node) => {
+  const seeds = [];
+  const seedSeen = new Set();
+  const pushSeed = (node) => {
     const key = canonicalKey(node);
-    if (!scalarSeen.has(key)) { scalarSeen.add(key); scalars.push(node); }
+    if (!seedSeen.has(key)) { seedSeen.add(key); seeds.push(node); }
   };
-  // Constants — including mathematical anchors
-  for (const c of constants) pushScalar({ op: "const", value: c });
-  pushScalar({ op: "pi" });
-  pushScalar({ op: "e" });
-  // Reducers over series
+  for (const c of constants) pushSeed({ op: "const", value: c });
+  pushSeed({ op: "pi" });
+  pushSeed({ op: "e" });
   for (const s of series) {
-    pushScalar({ op: "last", of: s });
-    pushScalar({ op: "mean", of: s });
-    pushScalar({ op: "sum", of: s });
-  }
-  // Unary transforms applied to every scalar
-  for (const s of [...scalars]) {
-    for (const t of UNARY_TRANSFORMS) {
-      pushScalar({ op: t, of: s });
+    for (const reducer of ["last", "mean", "sum"]) {
+      pushSeed({ op: reducer, of: s });
     }
   }
-  // Library (previously promoted operators)
-  for (const op of library) pushScalar({ op: "opref", id: op.id, program: op.program });
+  return seeds;
+}
 
-  const composed = [...scalars];
-  const composedSeen = new Set(scalars.map(canonicalKey));
-  const pushComposed = (node) => {
-    const key = canonicalKey(node);
-    if (!composedSeen.has(key)) { composedSeen.add(key); composed.push(node); }
+// ── Evolutionary mutation engine ──
+//
+// Instead of enumerating all O(n²) binary compositions, each program
+// undergoes 9 mutations — one per operator. Mutations change exactly
+// one thing in the expression tree. Complexity builds incrementally
+// over multiple induction rounds, not by enumerating everything at once.
+
+// Operators that combine two sub-expressions
+const CONNECTORS = ["add", "mul", "hypot"];       // CON: commutative connectors
+const EVALUATORS = ["sub", "div", "atan2", "pow"];  // EVA: non-commutative evaluators
+const WRAPPERS = ["sqrt", "abs", "sin", "cos", "exp", "log"];  // DEF, SIG, REC, SEG: unary wraps
+
+function canonicalJsonKey(node) {
+  return JSON.stringify(node);
+}
+
+/**
+ * Mutate a single program, applying one change per mutation.
+ * Each mutation is grounded in one of the 9 operators.
+ *
+ * @param {object} program — the program tree to mutate
+ * @param {Array} library — array of {id, program} promoted operators
+ * @returns {Array} deduplicated set of mutant programs
+ */
+function mutateProgram(program, library) {
+  const mutants = [];
+  const seen = new Set();
+  const push = (node) => {
+    const key = canonicalJsonKey(node);
+    if (!seen.has(key)) { seen.add(key); mutants.push(node); }
   };
-  for (const a of scalars) {
-    for (const b of scalars) {
-      if (canonicalKey(a) === canonicalKey(b)) continue;
-      // Arithmetic binary (SYN)
-      pushComposed({ op: "add", a, b });
-      pushComposed({ op: "sub", a, b });
-      pushComposed({ op: "mul", a, b });
-      pushComposed({ op: "div", a, b });
-      // Geometry + Calculus binary
-      for (const bt of BINARY_TRANSFORMS) {
-        pushComposed({ op: bt, a, b });
-      }
+
+  // NUL: Delete a sub-expression (simplify)
+  // For a binary node, replace with a or b
+  if (program.a) push(program.a);
+  if (program.b) push(program.b);
+  // For a unary node, replace with a seed or the inner expression
+  if (program.of && !["diff", "lag"].includes(program.op)) {
+    push(program.of);
+  }
+
+  // SEG: Split — replace a descendant with a child of that descendant
+  if (program.a?.a) push({ ...program, a: program.a.a });
+  if (program.a?.b) push({ ...program, a: program.a.b });
+  if (program.b?.a) push({ ...program, b: program.b.a });
+  if (program.b?.b) push({ ...program, b: program.b.b });
+  if (program.of?.of) push({ ...program, of: program.of.of });
+
+  // DEF: Wrap with sqrt or abs
+  push({ op: "sqrt", of: program });
+  push({ op: "abs", of: program });
+
+  // SIG: Wrap with sin or cos
+  push({ op: "sin", of: program });
+  push({ op: "cos", of: program });
+
+  // SYN: Wrap with exp or log
+  push({ op: "exp", of: program });
+  push({ op: "log", of: program });
+
+  // EVA: Change the combinator (for binary ops)
+  if (program.a && program.b) {
+    for (const op of [...CONNECTORS, ...EVALUATORS]) {
+      if (op !== program.op) push({ op, a: program.a, b: program.b });
     }
   }
 
-  return composed
-    .sort((x, y) => descriptionLength(x) - descriptionLength(y) || canonicalKey(x).localeCompare(canonicalKey(y)))
-    .slice(0, maxPrograms);
+  // CON + INS: Connect or insert by composing with library members.
+  // Library members are referenced as opref nodes when available, so
+  // promoted operators can trace their dependency graph.
+  for (const lib of library) {
+    const refNode = lib.id ? { op: "opref", id: lib.id, program: lib.program } : lib.program;
+    // CON: forward order (commutative connectors)
+    for (const op of CONNECTORS) {
+      push({ op, a: program, b: JSON.parse(canonicalJsonKey(refNode)) });
+    }
+    // EVA as INS: both orders (non-commutative evaluators)
+    for (const op of EVALUATORS) {
+      push({ op, a: program, b: JSON.parse(canonicalJsonKey(refNode)) });
+      push({ op, a: JSON.parse(canonicalJsonKey(refNode)), b: program });
+    }
+  }
+
+  return mutants;
+}
+
+/**
+ * Generate mutant programs from a library of promoted operators.
+ * Each library member is mutated, and the mutants form the candidate
+ * pool for the next induction round.
+ *
+ * To keep the pool tractable, CON/INS mutations only compose with the
+ * TOP_K simplest library members — prevents O(n²) explosion while still
+ * allowing new compositions to form each round.
+ *
+ * @param {Array} library — array of {id, program} promoted operators
+ * @param {number} topK — number of simplest members to compose with (default 10)
+ * @returns {Array} deduplicated mutant programs, sorted by description length
+ */
+export function mutatePrograms(library, topK = 10) {
+  const candidates = [];
+  const seen = new Set();
+  const push = (node) => {
+    const key = canonicalJsonKey(node);
+    if (!seen.has(key)) { seen.add(key); candidates.push(node); }
+  };
+
+  // Only use the simplest TOP_K library members for CON/INS mutations.
+  // Sorted by description length, then by key for determinism.
+  const sorted = [...library].sort((a, b) => descriptionLength(a.program) - descriptionLength(b.program) || canonicalKey(a.program).localeCompare(canonicalKey(b.program)));
+  const composeLib = sorted.slice(0, topK);
+
+  for (const member of sorted) {
+    const mutants = mutateProgram(member.program, composeLib);
+    for (const m of mutants) push(m);
+  }
+
+  return candidates
+    .filter((p) => !isSeriesNode(p))
+    .sort((x, y) => descriptionLength(x) - descriptionLength(y) || canonicalKey(x).localeCompare(canonicalKey(y)));
 }
 
 function deriveConstants(data) {

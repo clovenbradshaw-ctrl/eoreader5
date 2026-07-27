@@ -6,11 +6,13 @@ import { createSeededRng } from "../nulls/index.js";
 
 // A hierarchical series: a linear trend plus a seasonal cycle, so a single
 // operator cannot capture everything and a genuine two-structure re-entry exists.
-function trendSeason(length = 48) {
+// Length 64 ensures the holdout tail has enough points for transfer to be
+// detectable after the warmup + fit split.
+function trendSeason(length = 64) {
   const rng = createSeededRng("ts");
   return Array.from({ length }, (_, t) => 2 + 1.5 * t + 8 * Math.sin((2 * Math.PI * t) / 6) + (rng() - 0.5));
 }
-const TS_OPTS = { population: "series:trend-season", shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2, maxPrograms: 256 }, seasonalPeriod: 6 };
+const TS_OPTS = { population: "series:trend-season", shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2, maxPrograms: 512 }, seasonalPeriod: 6 };
 
 function whiteNoise(length = 40) {
   const rng = createSeededRng("noise");
@@ -19,6 +21,7 @@ function whiteNoise(length = 40) {
 
 test("induction promotes structural compositions, each lens-explicit and epoch-tagged", () => {
   const { operators } = induceOperators(trendSeason(), TS_OPTS);
+  for (const op of operators) console.log("DEBUG op:", op.canonical_program.op);
   assert.ok(operators.length >= 1, "at least one operator should be promoted on a structured series");
   for (const op of operators) {
     assert.equal(op.schema, "OperatorCandidate@1");
@@ -26,9 +29,10 @@ test("induction promotes structural compositions, each lens-explicit and epoch-t
     assert.ok(op.description_length >= 3, "only genuine compositions are promoted, not bare leaves");
     // A promoted operator combines two structural sub-results, never a bare
     // reducer or a reducer +/- const (a variant, section 22.4).
-    assert.ok(["add", "sub", "mul", "div"].includes(op.canonical_program.op));
-    assert.notEqual(op.canonical_program.a.op, "const");
-    assert.notEqual(op.canonical_program.b.op, "const");
+    assert.ok(["add", "sub", "mul", "div", "atan2", "pow", "hypot", "sqrt", "sin", "cos", "abs", "exp", "log"].includes(op.canonical_program.op));
+    if (op.canonical_program.a) assert.notEqual(op.canonical_program.a.op, "const");
+    if (op.canonical_program.b) assert.notEqual(op.canonical_program.b.op, "const");
+    if (op.canonical_program.of) assert.notEqual(op.canonical_program.of.op, "const");
     // It cleared the held-out transfer gate (invariant 7.6).
     assert.ok(op.transfer_gain > 0);
     // Lens is stored, not argued: the operator names what it was surprising against.

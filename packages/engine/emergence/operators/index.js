@@ -5,12 +5,23 @@ import { defaultNumericBaselines } from "../../prediction/baselines/index.js";
 import { searchCompetentPrograms, evaluateProgramCompetency } from "../programs/index.js";
 import { evaluateProgram } from "../expressions/index.js";
 
-const BINARY_COMBINATORS = new Set(["add", "sub", "mul", "div"]);
+const BINARY_COMBINATORS = new Set(["add", "sub", "mul", "div", "atan2", "pow", "hypot"]);
 
 function isPromotableComposition(node) {
-  if (!node || !BINARY_COMBINATORS.has(node.op)) return false;
-  if (node.a?.op === "const" || node.b?.op === "const") return false;
-  return true;
+  if (!node || typeof node.op !== "string") return false;
+  // A genuine composition is a binary combinator (add, sub, mul, div, atan2, pow, hypot)
+  // where neither operand is a bare constant.
+  if (BINARY_COMBINATORS.has(node.op)) {
+    if (node.a?.op === "const" || node.b?.op === "const") return false;
+    return true;
+  }
+  // A unary transform (sqrt, sin, cos, abs, exp, log) of a non-const scalar
+  // is also a genuine composition — e.g., sqrt(last(hist)) or sin(mean(hist)).
+  if (["sqrt", "sin", "cos", "abs", "exp", "log"].includes(node.op)) {
+    if (node.of?.op === "const") return false;
+    return true;
+  }
+  return false;
 }
 
 function behavioralFingerprint(program, series, warmup) {
@@ -96,7 +107,8 @@ export function induceOperators(series, {
       referenceBaselineId,
       seasonalPeriod,
       population,
-      enumeration: { ...enumeration, library },
+      enumeration,
+      library,
     });
     finalFrontier = ranked;
 

@@ -7,7 +7,7 @@ import { validateIndividuationResult } from "@eoreader/spec";
 
 // Same fixture as emergence/operators/index.test.js: a trend + seasonal cycle
 // so at least one operator is promoted.
-function trendSeason(length = 48) {
+function trendSeason(length = 64) {
   const rng = createSeededRng("ts");
   return Array.from({ length }, (_, t) => 2 + 1.5 * t + 8 * Math.sin((2 * Math.PI * t) / 6) + (rng() - 0.5));
 }

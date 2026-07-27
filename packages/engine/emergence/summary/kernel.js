@@ -26,10 +26,10 @@ import {
 // entity's relational/emotional state, as opposed to routine action.
 
 export const TURNING_EVENT_TYPES = [
-  "shift", // signal-based boundary (replaces all typed event patterns)
+  "shift", // signal-based boundary
   "love", "engagement", "breakup", "elopement", "thwarting", "death",
   "marriage", "nursing", "evacuation", "rescue", "dance", "folk-dance",
-  "ball", "command", "wound",
+  "ball", "command", "wound", "war",
 ];
 
 // ── Key moment selection ───────────────────────────────────────────────────────
@@ -69,27 +69,27 @@ export function buildKeyMomentsFromEvents(events, relevantChunks, options = {}) 
     return { ...e, pos, score };
   });
 
-  // If all events are the same type (e.g. signal-based "shift"), keep
-  // the top N by score (spread across the narrative). If multiple types
-  // exist, keep one per type.
+  // If fewer than 4 distinct event types, keep the top N by score
+  // (one per type when plentiful, all top-scorers when sparse).
+  // This prevents a text with only "war" and "death" events from
+  // producing only 2 key moments.
   const types = new Set(scored.map((e) => e.type));
-  if (types.size <= 1) {
-    // Single type — keep top N by score, ordered by narrative position
-    return scored
-      .sort((a, b) => b.score - a.score)
-      .slice(0, maxMoments)
-      .sort((a, b) => a.idx - b.idx)
-      .map((e) => ({ idx: e.idx, type: e.type, text: e.text, score: e.score }));
+
+  let selected;
+  if (types.size >= 4) {
+    // Plentiful types — one per type
+    const bestByType = new Map();
+    for (const e of scored) {
+      const existing = bestByType.get(e.type);
+      if (!existing || e.score > existing.score) bestByType.set(e.type, e);
+    }
+    selected = [...bestByType.values()];
+  } else {
+    // Sparse types — keep all, sorted by score
+    selected = scored.slice();
   }
 
-  // Multiple types — one representative per type
-  const bestByType = new Map();
-  for (const e of scored) {
-    const existing = bestByType.get(e.type);
-    if (!existing || e.score > existing.score) bestByType.set(e.type, e);
-  }
-
-  return [...bestByType.values()]
+  return selected
     .sort((a, b) => b.score - a.score)
     .slice(0, maxMoments)
     .sort((a, b) => a.idx - b.idx)

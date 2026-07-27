@@ -165,7 +165,7 @@ function typeBoundary(boundaryText, priorText) {
 }
 
 export function extractEvents(frames, boundaries, entities, entityName, options = {}) {
-  const { maxEvents = 12 } = options;
+  const { maxEvents = 12, proximityWindow: optProximity } = options;
   const en = norm(entityName);
   const entityTokens = en.split(/\s+/).filter((t) => t.length > 2);
   const entityPositions = new Set();
@@ -173,7 +173,7 @@ export function extractEvents(frames, boundaries, entities, entityName, options 
     const text = norm(f.text);
     if (entityTokens.some((t) => text.includes(t))) entityPositions.add(f.order);
   }
-  const proximityWindow = 5;
+  const proximityWindow = optProximity ?? 5;
   const filtered = boundaries.filter((b) => {
     for (let d = -proximityWindow; d <= proximityWindow; d++) {
       if (entityPositions.has(b.order + d)) return true;
