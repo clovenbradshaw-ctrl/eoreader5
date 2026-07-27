@@ -70,7 +70,7 @@ export function validateEffectResult(value, name = "EffectResult") {
 
 export function validateCommand(value, name = "Command") {
   const v = object(value, name); string(v.type, name, "type");
-  const allowed = new Set(["observation.admit", "effect.result.admit", "hypothesis.accept", "hypothesis.compete", "hypothesis.hold", "hypothesis.supersede", "referent.merge", "referent.split", "referent.same_as", "discovery.advance", "discovery.resume"]);
+  const allowed = new Set(["observation.admit", "effect.result.admit", "hypothesis.accept", "hypothesis.compete", "hypothesis.hold", "hypothesis.supersede", "referent.merge", "referent.split", "referent.same_as", "discovery.advance", "discovery.resume", "task.pencil", "task.ink", "task.hold"]);
   if (!allowed.has(v.type)) fail(name, `unknown command type ${v.type}`);
   if (v.inputs !== undefined) array(v.inputs, name, "inputs");
   if (v.type === "observation.admit") validateObservationEnvelope(v.payload?.envelope ?? v.payload);
