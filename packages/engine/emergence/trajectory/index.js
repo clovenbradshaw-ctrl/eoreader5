@@ -36,7 +36,12 @@ const round = (x) => Math.round(x * 1e4) / 1e4;
 // normalised histogram over the relation types — a point on the simplex that captures
 // the structural fingerprint without surface labels.
 
-const relationSignature = (relations) => {
+// Exported so trajectory/field-shift.js can densify these signatures
+// against a shared basis and demonstrate that the Map-based distance
+// here and the array-based cosine distance in perceiver/field-spec.js
+// are the same computation — the unification the physics review asked
+// for. Nothing else about this module's interface changes.
+export const relationSignature = (relations) => {
   const viaCounts = new Map();
   let total = 0;
   for (const r of relations) {

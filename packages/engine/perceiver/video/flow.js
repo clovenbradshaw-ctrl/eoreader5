@@ -11,10 +11,37 @@ const ROWS = Math.floor(FRAME_HEIGHT / BLOCK_SIZE);
 // For each 8×8 block in the current frame, find the best match in
 // the previous frame within a search radius. Returns motion vectors
 // (dx, dy) per block, plus summary statistics.
+//
+// ── Sign convention ─────────────────────────────────────────────
+// The search asks "where did this block COME FROM", so the winning
+// offset (sx, sy) points from the current position back to the
+// previous one. The MOTION is the negation of that. The returned
+// (dx, dy) are motion vectors — content that moved down the frame has
+// dy > 0 — because every consumer reads them that way: physics.js
+// treats them as a motion field F when computing ∇×F and ∇·F, and the
+// directionality summary below labels dy > 0 as downward.
+//
+// This matters beyond tidiness. Before the negation, `downMotion`
+// counted blocks whose match lay BELOW them in the previous frame,
+// i.e. content that had moved UP — so the Odessa Steps reading, whose
+// whole claim is that the massacre turns milling motion into sustained
+// DOWNWARD flow, was measuring the opposite of what it reported.
+//
+// ── Edge blocks ─────────────────────────────────────────────────
+// The search window is truncated at the frame border: at bx = 0 only
+// sx ≥ 0 is reachable, so the recovered motion there can only be ≤ 0
+// after negation. The border therefore carries a systematic inward
+// bias that is an artefact of the window, not of any motion — and a
+// ring of inward-pointing vectors is exactly a spurious negative
+// divergence. Border blocks are marked in `valid` so the physics layer
+// can exclude them rather than average the artefact in.
 export function blockFlow(current, previous, { searchRadius = 4 } = {}) {
   const dx = new Int8Array(ROWS * COLS);
   const dy = new Int8Array(ROWS * COLS);
   const confidence = new Float64Array(ROWS * COLS);
+  // 1 = the search window was complete in every direction.
+  const valid = new Uint8Array(ROWS * COLS);
+  const bestCosts = new Float64Array(ROWS * COLS);
 
   for (let by = 0; by < ROWS; by++) {
     for (let bx = 0; bx < COLS; bx++) {
@@ -55,41 +82,81 @@ export function blockFlow(current, previous, { searchRadius = 4 } = {}) {
         }
       }
 
-      dx[by * COLS + bx] = bestDx;
-      dy[by * COLS + bx] = bestDy;
+      const i = by * COLS + bx;
+      // Negate: the search returns where the block came FROM, the
+      // caller wants where it WENT.
+      dx[i] = -bestDx;
+      dy[i] = -bestDy;
       // Confidence: lower cost = higher confidence
       const maxCost = BLOCK_SIZE * BLOCK_SIZE * 255;
-      confidence[by * COLS + bx] = 1 - (bestCost / maxCost);
+      bestCosts[i] = bestCost;
+      confidence[i] = 1 - (bestCost / maxCost);
+      // Complete search window? Border blocks lose candidates on the
+      // outward side and are biased inward.
+      valid[i] = by >= searchRadius && by < ROWS - searchRadius
+        && bx >= searchRadius && bx < COLS - searchRadius ? 1 : 0;
     }
   }
 
+  // ── The confidence gate ──
+  // The old gate was `confidence > 0.2`, i.e. SAD < 0.8 · 64 · 255 ≈
+  // 13056 — a cost only reachable by a block matched against near-
+  // inverted content. Real matches on 8-bit video land two orders of
+  // magnitude below that, so the gate passed every block on every
+  // frame and `activityFraction` was reporting mean confidence, not a
+  // fraction of moving blocks.
+  //
+  // The threshold now comes from this frame's own cost distribution:
+  // a block is confidently matched when its cost sits in the lower
+  // half of the frame's costs. That is scale-free — it adapts to grain,
+  // exposure and contrast instead of assuming an absolute SAD budget.
+  const sortedCosts = Array.from(bestCosts).sort((a, b) => a - b);
+  const medianCost = sortedCosts.length
+    ? sortedCosts.length % 2
+      ? sortedCosts[sortedCosts.length >> 1]
+      : (sortedCosts[(sortedCosts.length >> 1) - 1] + sortedCosts[sortedCosts.length >> 1]) / 2
+    : 0;
+
   // Summary statistics
-  let meanDx = 0, meanDy = 0, count = 0;
+  let meanDx = 0, meanDy = 0, weight = 0;
   let upMotion = 0, downMotion = 0, leftMotion = 0, rightMotion = 0;
   const motionMagnitudes = [];
+  // Blocks that actually moved, as a genuine count.
+  let movingBlocks = 0;
+  let consideredBlocks = 0;
 
   for (let i = 0; i < dx.length; i++) {
-    if (confidence[i] > 0.2) {
-      meanDx += dx[i] * confidence[i];
-      meanDy += dy[i] * confidence[i];
-      count += confidence[i];
-      const mag = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]);
-      motionMagnitudes.push(mag);
+    // Only blocks with a complete search window and a cost no worse
+    // than typical contribute to the direction summary.
+    if (!valid[i] || bestCosts[i] > medianCost) continue;
+    consideredBlocks++;
+    const c = confidence[i];
+    meanDx += dx[i] * c;
+    meanDy += dy[i] * c;
+    weight += c;
+    const mag = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]);
+    motionMagnitudes.push(mag);
+    if (mag >= 1) movingBlocks++;
 
-      if (dy[i] < -1) upMotion += confidence[i];     // Moving up
-      if (dy[i] > 1) downMotion += confidence[i];    // Moving down
-      if (dx[i] < -1) leftMotion += confidence[i];   // Moving left
-      if (dx[i] > 1) rightMotion += confidence[i];   // Moving right
-    }
+    if (dy[i] < -1) upMotion += c;      // content moved up the frame
+    if (dy[i] > 1) downMotion += c;     // content moved down the frame
+    if (dx[i] < -1) leftMotion += c;    // content moved left
+    if (dx[i] > 1) rightMotion += c;    // content moved right
   }
 
   const totalDir = upMotion + downMotion + leftMotion + rightMotion || 1;
 
   return {
-    vectors: { dx, dy, confidence },
-    meanDx: count > 0 ? meanDx / count : 0,
-    meanDy: count > 0 ? meanDy / count : 0,
-    motionMagnitude: count > 0 ? motionMagnitudes.reduce((a, v) => a + v, 0) / motionMagnitudes.length : 0,
+    vectors: { dx, dy, confidence, valid, cost: bestCosts },
+    cols: COLS,
+    rows: ROWS,
+    searchRadius,
+    costThreshold: medianCost,
+    meanDx: weight > 0 ? meanDx / weight : 0,
+    meanDy: weight > 0 ? meanDy / weight : 0,
+    motionMagnitude: motionMagnitudes.length
+      ? motionMagnitudes.reduce((a, v) => a + v, 0) / motionMagnitudes.length
+      : 0,
     directionality: {
       up: upMotion / totalDir,
       down: downMotion / totalDir,
@@ -100,8 +167,12 @@ export function blockFlow(current, previous, { searchRadius = 4 } = {}) {
       // Rightward dominance: > 0.5 means motion is predominantly rightward
       rightwardDominance: (rightMotion - leftMotion) / totalDir,
     },
-    // Fraction of blocks with meaningful motion
-    activityFraction: count / (ROWS * COLS),
+    // Fraction of CONSIDERED blocks that actually moved — a real count
+    // over a real denominator, not a confidence average wearing the
+    // name of a fraction.
+    activityFraction: consideredBlocks > 0 ? movingBlocks / consideredBlocks : 0,
+    movingBlocks,
+    consideredBlocks,
   };
 }
 

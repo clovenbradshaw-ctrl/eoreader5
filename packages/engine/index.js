@@ -157,4 +157,132 @@ export {
   FRAME_WIDTH,
   FRAME_HEIGHT,
   TARGET_FPS,
+  BLOCK_SIZE,
 } from "./perceiver/video/reading.js";
+
+// Video motion primitives: block-matching optical flow, scene
+// classification, intertitle detection. Deterministic, no training data.
+// blockFlow's (dx, dy) are MOTION vectors (+y is down the frame) and it
+// marks border blocks in `vectors.valid`, whose search window is
+// truncated and therefore biased inward.
+export {
+  blockFlow,
+  motionSignature,
+  classifyScene,
+  detectIntertitle,
+} from "./perceiver/video/flow.js";
+
+// Physics analogs over the optical-flow field: curl, divergence,
+// current density, Laplacian, gradient. Every reduction is NaN-safe,
+// interior-only, and reports the sample count behind it.
+export {
+  curlField,
+  divergenceField,
+  currentDensity,
+  laplacianField,
+  gradientMagnitude,
+  vorticity,
+  potentialEnergy,
+  findDipoles,
+  analyzeFlowPhysics,
+  physicsSeries,
+  PHYSICS_OBSERVABLES,
+} from "./perceiver/video/physics.js";
+
+// Holon self-teaching: patterns found at one level become templates
+// lower levels use to recognise the same shape elsewhere — and the
+// cross-modal bridge, since the same centroid-trajectory matching runs
+// over film cut intervals, musical inter-onset intervals and text
+// section lengths.
+export {
+  AccelTemplate,
+  StructuralVocabulary,
+  findAccelerationPattern,
+  detectNarrativeArc,
+} from "./perceiver/video/holontutor.js";
+
+// The modality-blind field-spec interface. Audio, video and text each
+// declare channels and widths; this makes the declaration executable,
+// so cross-modal formulas slice by name instead of hardcoded offsets.
+export {
+  defineFieldSpec,
+  normalizeFieldSpec,
+  fieldSpecDims,
+  channelNames,
+  getChannel,
+  validateFieldVector,
+  sliceChannel,
+  splitChannels,
+  cosineDistance,
+  angularDistance,
+  euclideanDistance,
+  channelDistance,
+  fieldDistance,
+  isTrueMetric,
+  specIsMetric,
+  eotFieldSpec,
+  eotFieldVectors,
+  EOT_OPERATORS,
+} from "./perceiver/field-spec.js";
+export { TEXT_FIELD_SPEC, buildTextFieldText } from "./perceiver/text/text-signal.js";
+
+// Trajectory red shift and physics current density, unified: both are a
+// cosine comparison against a reference accumulated along an axis, so
+// they are one implementation over any field-spec sequence. The
+// Map-based redShift in emergence/trajectory keeps its interface;
+// field-shift.test.js pins the two to agree exactly.
+export {
+  fieldRedShift,
+  fieldRestFrameDivergence,
+  fieldPhaseVolatility,
+  fieldCurrentDensity,
+  fieldTrajectory,
+  trajectoryToVectors,
+  signatureToVector,
+  signatureBasis,
+} from "./emergence/trajectory/field-shift.js";
+export { relationSignature } from "./emergence/trajectory/index.js";
+
+// Chapter detection: DEF over any physics time series. The Potemkin
+// boundary pipeline as a reusable, testable module — modality-blind,
+// abstaining when the series holds no structure.
+export {
+  changeSeries,
+  detectBoundaries,
+  detectChapters,
+  segmentChapters,
+  consensusBoundaries,
+} from "./emergence/chapters/index.js";
+
+// ── The invariant layer ──
+// The four constraints that define the system's legal state space.
+// These CHECK rather than clamp: quantum/project() and interfere()
+// both end in Math.max(0, Math.min(1, x)), which satisfies the bound at
+// the output while destroying the evidence it was ever violated.
+export {
+  checkProbability,
+  checkProbabilities,
+  checkContinuity,
+  checkFoldContinuity,
+  checkEntropyMonotone,
+  checkPhaseBound,
+  scatteringKernelBound,
+  amplitudeEntropy,
+  foldEntropy,
+  checkInvariants,
+  guard,
+  INVARIANT_IDS,
+  DEFAULT_TOLERANCE,
+} from "./invariants/index.js";
+
+// ── The cycle layer ──
+// The three closed loops in which violating one invariant triggers
+// another to correct it: the oscillator, the heat engine, and Byzantine
+// cross-modal fault tolerance.
+export {
+  bornContinuityCycle,
+  entropyPhaseCycle,
+  crossModalConsensus,
+  crossModalRepair,
+  runCycles,
+} from "./invariants/cycles.js";
