@@ -1,21 +1,22 @@
 /**
- * EO Reader Engine Runner
- *
- * The assembled ribosome.
+ * EO Reader Engine Runner — assembles the full read pipeline.
  *
  * Pipeline:
  *   1. Admit observations (replay)
- *   2. Lift into fold space (quantum mechanics)
+ *   2. Lift into fold (feature-vector) space
  *   3. Advance discovery (emergence engine)
- *   4. Born salience routing (decision layer)
+ *   4. Salience routing (decision layer)
  *   5. Take snapshot (reading state)
  *   6. Project (cube coordinates)
- *   7. Apply interference (quantum mechanics)
- *   8. Search with Born rule projection (search)
+ *   7. Apply correlation re-rank (interfere)
+ *   8. Search with fold relevance scoring
  *   9. Fold compression (context management)
  *   10. Veto (fabrication safety)
  *   11. Character lens assertion (the higher tier)
  *   12. Complete
+ *
+ * fold/project/interfere are vector-scoring operations; see quantum/index.js
+ * for the honest description of each.
  */
 
 import { CURRENT_OPERATOR_EPOCH } from "@eoreader/spec/operators";
@@ -157,7 +158,7 @@ export function createEOReaderEngine(defaults = {}) {
       for (const query of request.queries ?? []) {
         let searchResult = searchState(state, query);
 
-        // Apply Born rule projection if we have folds
+        // Apply fold relevance scoring if we have folds
         if (liftedSnapshot._liftedPassages?.length > 0) {
           const queryFold = fold(query.query ?? "", priors);
           const passages = searchResult.passages ?? [];
