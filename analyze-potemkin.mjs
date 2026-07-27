@@ -13,15 +13,20 @@ import('node:fs').then(async (fs) => {
 
   // ── 1. Perceive: frames → field vectors ──
   console.time('\n  perceiver');
-  const { buildVideoReading, FRAME_WIDTH, FRAME_HEIGHT, TARGET_FPS, BLOCK_SIZE } = await import('./eoreader5/packages/engine/perceiver/video/reading.js');
-  const { analyzeFrame, selectKeyFrames } = await import('./eoreader5/packages/engine/perceiver/video/vision.js');
-  const reading = await buildVideoReading(path, { fps: TARGET_FPS });
+  const { buildVideoReading, FRAME_WIDTH, FRAME_HEIGHT, TARGET_FPS, BLOCK_SIZE } = await import('./packages/engine/perceiver/video/reading.js');
+  const { analyzeFrame, selectKeyFrames } = await import('./packages/engine/perceiver/video/vision.js');
+  const { streamVideoFrames } = await import('./packages/host/video.js');
+  const reading = await buildVideoReading(streamVideoFrames(path, { fps: TARGET_FPS }), {
+    fps: TARGET_FPS,
+    onProgress: (n) => process.stderr.write(`\r  decoded ${n} frames @ ${TARGET_FPS}fps`),
+  });
+  process.stderr.write('\n');
   console.timeEnd('  perceiver');
   console.log(`  units: ${reading.units.length}, duration: ${(reading.axis.extent/60).toFixed(0)}min`);
 
   // ── 2. Holon separator on motion energy ──
   console.time('\n  holons');
-  const { DEF, extremeValueNull } = await import('./eoreader5/packages/engine/emergence/nulls/extreme-value.js');
+  const { DEF, extremeValueNull } = await import('./packages/engine/emergence/nulls/extreme-value.js');
   const motionEnergy = reading.units.map(u => {
     const block = u.field.slice(0, 300);
     return block.reduce((a, v) => a + v, 0) / 300;

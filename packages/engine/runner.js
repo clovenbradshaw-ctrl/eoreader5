@@ -37,15 +37,15 @@ export function createEOReaderEngine(defaults = {}) {
   // Shared state: priors for quantum mechanics
   const priors = defaults.priors ?? null;
 
-  // Routing history (for relax settling)
-  const routingHistory = [];
-
-  // Entanglement graph: maps entry IDs to folds
-  const entanglementGraph = new Map();
-
   return {
     async *read(request) {
       if (!request || request.schema !== "RunRequest@1") throw new TypeError("RunRequest@1 required");
+
+      // Per-read state. These live inside read(), never on the engine
+      // instance: the same RunRequest@1 replayed against one engine must
+      // produce the same reading, so no state may leak between reads.
+      const routingHistory = [];
+      const entanglementGraph = new Map();
 
       const context = request.context;
       const priorSnapshot = request.prior?.snapshot ?? request.priorSnapshot ?? request.prior_snapshot;
@@ -191,47 +191,50 @@ export function createEOReaderEngine(defaults = {}) {
           history: routingHistory,
         });
 
-        queryResults.push({
-          query: searchResult,
-          folded: foldedReading,
-        });
-
-        yield {
-          schema: "EngineEvent@1",
-          type: "query",
-          reading: searchResult,
-          folded: foldedReading,
-          semantic_head: state.semanticHead,
-        };
-      }
-
-      // ── Phase 10: Veto ──
-      // Apply veto to folded summaries
-      const vetoResults = [];
-      for (const qr of queryResults) {
-        if (qr.folded?.summary) {
-          const source = qr.query?.passages?.map(p =>
+        // ── Phase 10: Veto ──
+        // The veto gates emission: a folded summary is checked against its
+        // source BEFORE the reading leaves the engine. A failing veto blocks
+        // the folded payload (veto over degradation) — the consumer receives
+        // the veto event and a gap, never the unvetted summary.
+        let vetoResult = null;
+        if (foldedReading?.summary) {
+          const source = (searchResult.passages ?? []).map(p =>
             (p.anchors?.exact_text ?? []).join(" ")
-          ).join(" ") ?? "";
-
-          const vetoResult = veto(qr.folded.summary, {
+          ).join(" ");
+          vetoResult = veto(foldedReading.summary, {
             source,
             strict: context?.strict_veto ?? true,
           });
+        }
 
-          vetoResults.push({
-            query: qr.query?.request?.query,
+        if (vetoResult && !vetoResult.passed) {
+          queryResults.push({ query: searchResult, folded: null, veto: vetoResult });
+          yield {
+            schema: "EngineEvent@1",
+            type: "veto",
+            result: vetoResult,
+            semantic_head: state.semanticHead,
+          };
+          yield {
+            schema: "EngineEvent@1",
+            type: "query",
+            reading: {
+              ...searchResult,
+              gaps: [...(searchResult.gaps ?? []), { reason: "veto_failed", query: query.query ?? "" }],
+            },
+            folded: null,
             veto: vetoResult,
-          });
-
-          if (!vetoResult.passed) {
-            yield {
-              schema: "EngineEvent@1",
-              type: "veto",
-              result: vetoResult,
-              semantic_head: state.semanticHead,
-            };
-          }
+            semantic_head: state.semanticHead,
+          };
+        } else {
+          queryResults.push({ query: searchResult, folded: foldedReading, veto: vetoResult });
+          yield {
+            schema: "EngineEvent@1",
+            type: "query",
+            reading: searchResult,
+            folded: foldedReading,
+            semantic_head: state.semanticHead,
+          };
         }
       }
 

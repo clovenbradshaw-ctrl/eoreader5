@@ -22,10 +22,9 @@ function norm(name) {
 }
 
 /**
- * Build a union-find entity graph from relations and entity-mention sentences.
+ * Build a union-find entity graph from relations.
  *
  * @param {Array<{ subject: string, verb: string, object: string, idx: number }>} relations
- * @param {Array<{ text: string, idx: number }>} entitySentences
  * @param {string} targetEntity - the entity the fold focuses on (excluded from figure registry)
  * @returns {{ entities: Map<string, { id: string, label: string, sightings: number }>,
  *             edges: Array<{ from: string, to: string, via: string, weight: number }>,
@@ -98,25 +97,37 @@ export function buildGraph(relations, targetEntity = "") {
     }
   }
 
-  // Merge entities that share a name token (simple coref). Use capitalized
-  // multi-word phrases only — this prevents "Sonya" and "Sonya Rostova"
-  // from splitting, while avoiding the bug where a relation object like
-  // "perfectly happy" gets merged in.
+  // Merge entities by coreference. A shared token alone is NOT identity —
+  // "Prince Andrew" and "Prince Vasili" share an honorific, not a referent.
+  // Two names corefer only when one is contained in the other ("Natasha" ⊂
+  // "Natasha Rostova", "Prince Andrew" ⊂ "Prince Andrew Bolkonski") or when
+  // both END in the same token (surname match: "Andrew Bolkonski" /
+  // "Prince Bolkonski"). Leading shared tokens never merge.
+  const tokensOf = (id) => id.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+  const corefers = (a, b) => {
+    const ta = tokensOf(a);
+    const tb = tokensOf(b);
+    if (!ta.length || !tb.length) return false;
+    const setA = new Set(ta);
+    const setB = new Set(tb);
+    const subset = ta.every((t) => setB.has(t)) || tb.every((t) => setA.has(t));
+    const surnameMatch = ta[ta.length - 1] === tb[tb.length - 1];
+    return subset || surnameMatch;
+  };
   const byToken = new Map();
   for (const [n, e] of registry) {
-    const tokens = e.id.toLowerCase().split(/\s+/);
-    for (const t of tokens) {
-      if (t.length > 2 && /^[A-Z]/.test(e.id)) {
-        const group = byToken.get(t) ?? [];
-        if (!group.includes(e.id)) group.push(e.id);
-        byToken.set(t, group);
-      }
+    if (!/^[A-Z]/.test(e.id)) continue;
+    for (const t of tokensOf(e.id)) {
+      const group = byToken.get(t) ?? [];
+      if (!group.includes(e.id)) group.push(e.id);
+      byToken.set(t, group);
     }
   }
   for (const [token, ids] of byToken) {
-    if (ids.length > 1) {
-      const first = ids[0];
-      for (let i = 1; i < ids.length; i++) union(first, ids[i]);
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        if (corefers(ids[i], ids[j])) union(ids[i], ids[j]);
+      }
     }
   }
 

@@ -1,30 +1,36 @@
 #!/usr/bin/env node
+// Debug: dump the entity graph the fold pipeline builds around a target
+// entity. Reads the corpus from WP_PATH (default data/pg2600.txt —
+// run scripts/fetch-warandpeace.mjs first).
 import { readFileSync } from "fs";
 import {
-  segmentSentences,
-  findEntityMentions,
-  extractRelations,
-  extractEvents,
+  frameText,
+  extractSurfaces,
 } from "./packages/engine/emergence/summary/text-organ.js";
+import { extractRelations } from "./packages/engine/perceiver/text/extraction.js";
 import {
   buildGraph,
   couplingByNode,
   rankBySalience,
-  filterCast,
 } from "./packages/engine/emergence/summary/graph.js";
 
-const wp = readFileSync("/Users/mlacy/Downloads/pg2600.txt", "utf-8");
-const sentences = segmentSentences(wp);
-const relevant = findEntityMentions(sentences, "Natasha Rostova");
-const relations = extractRelations(relevant, "Natasha Rostova");
-const events = extractEvents(relevant, "Natasha Rostova");
+const target = process.argv[2] ?? "Natasha Rostova";
+const wp = readFileSync(process.env.WP_PATH ?? "data/pg2600.txt", "utf-8");
+const frames = frameText(wp);
+const tokens = target.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+const relevant = frames
+  .filter((f) => tokens.some((t) => f.text.toLowerCase().includes(t)))
+  .map((f) => ({ text: f.text, idx: f.order }));
+const relations = extractRelations(relevant.map((r) => ({ text: r.text, foldScore: 0 })));
 
-const graph = buildGraph(relations, relevant);
+const graph = buildGraph(relations, target);
 const coupling = couplingByNode(graph);
 
 console.log("=== GRAPH DUMP ===\n");
+console.log(`Frames mentioning "${target}": ${relevant.length}`);
+console.log(`Surfaces (sample): ${extractSurfaces(wp).slice(0, 10).join(" | ")}`);
 
-console.log(`Entities: ${graph.entities.size}`);
+console.log(`\nEntities: ${graph.entities.size}`);
 for (const [id, e] of graph.entities) {
   const c = coupling.get(id);
   console.log(`  ${e.label} (sightings: ${e.sightings}, rho: ${c?.rho ?? 0}, aliases: ${(e.aliases ?? []).join(", ") || "none"})`);

@@ -16,21 +16,19 @@
 
 import { classify } from "../../cube/index.js";
 import { forwardScore } from "../surprise/index.js";
-import {
-  createConnectionMap,
-  updateConnectionMap,
-} from "./index.js";
 
 // ── Event type classification ──────────────────────────────────────────────────
-// The event types that mark a narrative turning point — a change in the
-// entity's relational/emotional state, as opposed to routine action.
+// The kernel is modality-agnostic, so it owns NO event-type vocabulary —
+// the organ that extracted the events declares which of its types mark
+// narrative turning points (text-organ exports TURNING_EVENT_TYPES).
+// When no vocabulary is supplied, every typed event counts as turning:
+// organs only emit events at detected signal boundaries, so each one is
+// a boundary by construction.
 
-export const TURNING_EVENT_TYPES = [
-  "shift", // signal-based boundary
-  "love", "engagement", "breakup", "elopement", "thwarting", "death",
-  "marriage", "nursing", "evacuation", "rescue", "dance", "folk-dance",
-  "ball", "command", "wound", "war",
-];
+function turningFilter(events, turningTypes) {
+  if (!turningTypes) return events.slice();
+  return events.filter((e) => turningTypes.includes(e.type));
+}
 
 // ── Key moment selection ───────────────────────────────────────────────────────
 // Build key moments from turning events (structural signal) rather than
@@ -52,9 +50,9 @@ export const TURNING_EVENT_TYPES = [
  * @returns {Array<{ idx, type, text, score }>}
  */
 export function buildKeyMomentsFromEvents(events, relevantChunks, options = {}) {
-  const { maxMoments = 8, window = 60 } = options;
+  const { maxMoments = 8, window = 60, turningTypes = null } = options;
 
-  const turning = events.filter((e) => TURNING_EVENT_TYPES.includes(e.type));
+  const turning = turningFilter(events, turningTypes);
   if (!turning.length) return [];
 
   // Position each event within the relevant-chunk stream (by idx match)
@@ -142,25 +140,31 @@ export function orderChronologically(relations, events, temporalMarkers) {
     ...events.map((e) => ({ ...e, itemType: "event" })),
   ];
 
-  // Assign temporal position to each item
+  // Assign temporal position to each item. Scales must never mix: an
+  // absolute year (~1805), a sequential rank (0-7), and a chunk index
+  // (0-thousands) are incommensurable, and summing or interleaving them
+  // produces arbitrary chronology. Absolute years reorder items ONLY when
+  // every item carries one; otherwise narrative position (idx) is primary
+  // and markers refine order within the same idx.
+  const allAbsolute = items.length > 0 && items.every((item) => temporalMarkers.get(item.idx)?.type === "absolute");
+
   const positioned = items.map((item) => {
     const marker = temporalMarkers.get(item.idx);
     let position = item.idx; // default: preserve original order
+    let refinement = 0;
 
-    if (marker) {
-      if (marker.type === "absolute") {
-        // Absolute date: use the year as position
-        position = parseInt(marker.value, 10) || item.idx;
-      } else if (marker.type === "sequential") {
-        // Sequential: use the predefined order
-        position = (SEQUENTIAL_ORDER[marker.value] ?? 2) * 1000 + item.idx;
+    if (allAbsolute) {
+      position = parseInt(marker.value, 10) || item.idx;
+    } else if (marker) {
+      if (marker.type === "sequential") {
+        // Sequential markers refine order among items at the same idx
+        refinement = (SEQUENTIAL_ORDER[marker.value] ?? 2) / 100;
       } else if (marker.type === "relative") {
-        // Relative: use narrative position (offset by a small amount)
-        position = item.idx + 0.5;
+        refinement = 0.005;
       }
     }
 
-    return { ...item, position };
+    return { ...item, position: position + refinement };
   });
 
   // Sort by position
@@ -205,6 +209,10 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
     title = null,
     sceneMoments = [],
     graphFigures = [],
+    turningTypes = null,
+    gaps = [],
+    scope = "entity",
+    place = null,
   } = options;
 
   const { relations, events, order } = ordered;
@@ -241,7 +249,7 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
 
   // Build groups: settled = relations, heldOpen = none (biography is all settled),
   // turns = events that change the narrative state
-  const turningEvents = events.filter((e) => TURNING_EVENT_TYPES.includes(e.type));
+  const turningEvents = turningFilter(events, turningTypes);
 
   const groups = {
     settled: relations.map((r) => `${r.subject} ${r.verb} ${r.object}`),
@@ -336,17 +344,21 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
   }
 
   return Object.freeze({
-    scope: "entity",
+    scope,
     title,
     entity: entityName,
+    place,
     spans,
     groups,
     properties,
     relations: temporalRelations,
     keyMoments,
     figures,
-    surprise: { forward: 0, felt: 0, noveltyReserve: 0 },
+    // null, not 0: the kernel does not compute a surprise profile here, and
+    // an asserted zero would read as a measurement of "nothing surprising".
+    surprise: { forward: null, felt: null, noveltyReserve: null },
     connections,
     order,
+    gaps,
   });
 }

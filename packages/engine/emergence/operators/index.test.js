@@ -21,7 +21,6 @@ function whiteNoise(length = 40) {
 
 test("induction promotes structural compositions, each lens-explicit and epoch-tagged", () => {
   const { operators } = induceOperators(trendSeason(), TS_OPTS);
-  for (const op of operators) console.log("DEBUG op:", op.canonical_program.op);
   assert.ok(operators.length >= 1, "at least one operator should be promoted on a structured series");
   for (const op of operators) {
     assert.equal(op.schema, "OperatorCandidate@1");

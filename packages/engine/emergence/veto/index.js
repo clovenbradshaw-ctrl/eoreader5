@@ -29,9 +29,16 @@ import { TERRAINS, STANCES } from "@eoreader/spec/cube";
 import { classifyTerrain, classifyStance } from "../../cube/index.js";
 
 // ── Tiny-model constraint contract ──
-// From4.2:docs/tiny-model-form-surface.md
-// The model is allowed ops=DEF, terrains=Lens, stances=Making.
-// Anything else is a violation.
+// Inherited from4.2:docs/tiny-model-form-surface.md as
+// ops=DEF, terrains=Lens, stances=Making.
+//
+// !REC (eo-2026-07): widened for the v5 read path — a folded summary is a
+// reading over source material, so its sentences legitimately land at
+// SIG (signaling what the source says), Field/Kind (the material and its
+// categories), and Tracing/Unraveling (following and unpacking it). The
+// widened region is still a narrow corner of the cube; callers with the
+// original 4.2 surface pass the narrower sets via context.allowedOps /
+// allowedTerrains / allowedStances.
 
 const TINY_MODEL_ALLOWED_OPS = new Set(["DEF", "SIG"]);
 const TINY_MODEL_ALLOWED_TERRAINS = new Set(["Lens", "Field", "Kind"]);

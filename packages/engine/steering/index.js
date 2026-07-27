@@ -17,7 +17,6 @@
  */
 
 import * as transitions from "../emergence/transitions/index.js";
-import { fold } from "../quantum/index.js";
 
 // ── Layer definitions (from steering.js in proxy) ──
 
@@ -75,7 +74,7 @@ export function createState() {
 /**
  * Enter a layer.
  */
-export function enterLayer(state, layerName, reason = "transition") {
+export function enterLayer(state, layerName, reason = "transition", ts = null) {
   if (!LAYERS[layerName]) return state;
 
   const layer = LAYERS[layerName];
@@ -92,7 +91,7 @@ export function enterLayer(state, layerName, reason = "transition") {
         layer: layerName,
         sequence,
         stepIndex: 0,
-        ts: Date.now(),
+        ts,
         reason,
       },
     ],
@@ -102,7 +101,7 @@ export function enterLayer(state, layerName, reason = "transition") {
 /**
  * Advance within the current sequence.
  */
-export function advance(state, reason = "step") {
+export function advance(state, reason = "step", ts = null) {
   if (!state.layer) return state;
 
   const layer = LAYERS[state.layer];
@@ -122,7 +121,7 @@ export function advance(state, reason = "step") {
       capacities[capacityName] = {
         built: true,
         layer: state.layer,
-        ts: Date.now(),
+        ts,
       };
     }
 
@@ -142,7 +141,7 @@ export function advance(state, reason = "step") {
 /**
  * Build a capacity (mark as complete).
  */
-export function buildCapacity(state, capacityName) {
+export function buildCapacity(state, capacityName, ts = null) {
   if (!CAPACITIES[capacityName]) return state;
 
   return {
@@ -152,7 +151,7 @@ export function buildCapacity(state, capacityName) {
       [capacityName]: {
         built: true,
         layer: state.layer,
-        ts: Date.now(),
+        ts,
       },
     },
   };
@@ -170,7 +169,7 @@ export function recordTurn(state, query, response, context = {}) {
       ...state.groundCovered,
       {
         summary,
-        ts: Date.now(),
+        ts: context.ts ?? null,
         layer: context.layer ?? state.layer,
       },
     ],

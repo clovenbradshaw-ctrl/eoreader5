@@ -154,7 +154,13 @@ const EVENT_TYPE_KEYWORDS = {
   nursing: ["nurse", "care", "tend", "wounded", "sick", "fever", "hospital", "medicine"],
 };
 
-function typeBoundary(boundaryText, priorText) {
+// The organ owns the event-type ontology — it is text-specific (and openly
+// narrative-biased) vocabulary, which is exactly why it cannot live in the
+// modality-agnostic kernel. Every organ type marks a turning point; "shift"
+// is the untyped signal boundary.
+export const TURNING_EVENT_TYPES = ["shift", ...Object.keys(EVENT_TYPE_KEYWORDS)];
+
+function typeBoundary(boundaryText) {
   const text = norm(boundaryText);
   let bestType = "shift", bestCount = 0;
   for (const [type, keywords] of Object.entries(EVENT_TYPE_KEYWORDS)) {
@@ -180,16 +186,51 @@ export function extractEvents(frames, boundaries, entities, entityName, options 
     }
     return false;
   });
+  // Keep the STRONGEST boundaries across the whole document, then restore
+  // narrative order. Truncating by position instead (first N in order)
+  // would silently confine every event to the opening chapters.
+  const strongest = filtered
+    .slice()
+    .sort((a, b) => b.z - a.z || a.order - b.order)
+    .slice(0, maxEvents)
+    .sort((a, b) => a.order - b.order);
   const frameByPos = new Map(frames.map((f) => [f.order, f]));
-  return filtered.slice(0, maxEvents).map((b, i) => {
+  return strongest.map((b, i) => {
     const f = frameByPos.get(b.order);
-    const prior = frameByPos.get(b.order - 1);
-    const type = f ? typeBoundary(f.text, prior?.text ?? "") : "shift";
+    const type = f ? typeBoundary(f.text) : "shift";
     return {
       offset: b.offset, order: b.order, type,
-      text: f?.text ?? "", score: b.score, zScore: b.z, idx: i,
+      text: f ? snapToSentences(f.text) : "", score: b.score, zScore: b.z, idx: i,
     };
   });
+}
+
+// ── Sentence snapping ──
+// Frames are fixed-width signal windows and routinely cut mid-word. For
+// packet/EOT output the organ trims each window to whole sentences: start
+// at the first sentence opening inside the window, end at the last
+// terminator. Falls back to the trimmed window when snapping would drop
+// most of it (dialogue-heavy windows with sparse terminators).
+
+export function snapToSentences(text) {
+  const s = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!s) return s;
+  const startMatch = s.match(/(?:^|[.!?…]["'”’]?\s+)(["'“‘]?\p{Lu})/u);
+  let start = 0;
+  if (startMatch && startMatch.index != null) {
+    start = startMatch.index === 0 ? 0 : startMatch.index + startMatch[0].length - startMatch[1].length;
+  }
+  let end = s.length;
+  for (let i = s.length - 1; i > start; i -= 1) {
+    if (".!?…".includes(s[i])) {
+      let j = i + 1;
+      while (j < s.length && '"\'”’'.includes(s[j])) j += 1;
+      end = j;
+      break;
+    }
+  }
+  const snapped = s.slice(start, end).trim();
+  return snapped.length >= s.length * 0.4 ? snapped : s;
 }
 
 // ── Entity-kinds boosting ──
@@ -202,13 +243,14 @@ export function boostFromSurfaces(entities, surfaces, entityName) {
   const en = norm(entityName);
 
   return entities.map((e) => {
-    const needsBoost = !surfaceSet.has(e.word) && norm(e.word) !== en;
+    const isSurface = surfaceSet.has(e.word);
+    const boosted = isSurface || norm(e.word) === en;
     return {
       ...e,
-      surfaceBoost: needsBoost ? 0 : e.salience,
-      isSurface: surfaceSet.has(e.word),
+      surfaceBoost: boosted ? e.salience * 2 : e.salience,
+      isSurface,
     };
-  }).sort((a, b) => (b.surfaceBoost || b.salience) - (a.surfaceBoost || a.salience));
+  }).sort((a, b) => b.surfaceBoost - a.surfaceBoost);
 }
 
 // ── Bridge: findEntityMentions ──

@@ -1,0 +1,13 @@
+{
+  "name": "@eoreader/host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Host-side adapters for the pure engine: media decode/encode via external tools (ffmpeg). The engine never spawns processes, reads clocks, or touches the network — everything ambient lives here, at the host boundary.",
+  "exports": {
+    "./video": "./video.js"
+  },
+  "dependencies": {
+    "@eoreader/engine": "*"
+  }
+}

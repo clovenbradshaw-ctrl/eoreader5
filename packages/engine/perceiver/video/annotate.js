@@ -1,8 +1,8 @@
 // Stick-figure output organ: draw detected people, motion, and structure
 // directly onto frames. Pure pixel operations, no dependencies.
-// Pipe through ffmpeg to produce annotated video.
+// Encoding the annotated frames to a video file is the host's job
+// (@eoreader/host/video produceAnnotatedVideo).
 
-import { spawn } from 'node:child_process';
 import { FRAME_WIDTH, FRAME_HEIGHT } from './reading.js';
 
 // ── Pixel drawing primitives ────────────────────────────────────
@@ -154,25 +154,5 @@ export function annotateFrame(pixels, { time, shotBoundary, people, motionFlow }
   return out;
 }
 
-// ── Produce annotated video ─────────────────────────────────────
-// Pipes annotated frames through ffmpeg to create output video.
-
-export function produceAnnotatedVideo(annotatedFrames, outputPath, { fps = 2, width = FRAME_WIDTH, height = FRAME_HEIGHT } = {}) {
-  const ffmpeg = spawn('ffmpeg', [
-    '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', `${width}x${height}`,
-    '-r', String(fps), '-i', '-',
-    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
-    '-pix_fmt', 'yuv420p',
-    outputPath,
-  ], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-  for (const frame of annotatedFrames) {
-    ffmpeg.stdin.write(Buffer.from(frame));
-  }
-  ffmpeg.stdin.end();
-
-  return new Promise((resolve) => {
-    ffmpeg.stderr.on('data', () => {});
-    ffmpeg.on('close', resolve);
-  });
-}
+// Producing the annotated video file lives host-side:
+// @eoreader/host/video produceAnnotatedVideo(annotatedFrames, outputPath).

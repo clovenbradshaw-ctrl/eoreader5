@@ -69,7 +69,8 @@ export function evalNode(node, history) {
     case "div": {
       const a = evalScalar(node.a, history);
       const b = evalScalar(node.b, history);
-      if (b === 0 || !Number.isFinite(b)) return 0;
+      if (b === 0) return a; // protected division: the numerator survives a zero denominator
+      if (!Number.isFinite(b)) return 0;
       const r = a / b;
       return Number.isFinite(r) ? r : 0;
     }
@@ -171,9 +172,6 @@ export function predictWith(program, history, { warmup } = {}) {
   return finalSd > 0 ? { kind: "gaussian", mean: centre, sd: finalSd } : { kind: "point", value: centre };
 }
 
-const UNARY_TRANSFORMS = ["sqrt", "sin", "cos", "abs", "exp", "log"];  // DEF, SIG, SIG, DEF, REC, SEG
-const BINARY_TRANSFORMS = ["atan2", "pow", "hypot"];                   // EVA, SYN, CON
-
 export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms, data } = {}) {
   const nd = data?.length ?? 0;
   maxSeriesDepth = maxSeriesDepth ?? Math.max(1, Math.floor(Math.log2(Math.max(2, nd || 10)) / 2));
@@ -227,7 +225,6 @@ export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms
 // Operators that combine two sub-expressions
 const CONNECTORS = ["add", "mul", "hypot"];       // CON: commutative connectors
 const EVALUATORS = ["sub", "div", "atan2", "pow"];  // EVA: non-commutative evaluators
-const WRAPPERS = ["sqrt", "abs", "sin", "cos", "exp", "log"];  // DEF, SIG, REC, SEG: unary wraps
 
 function canonicalJsonKey(node) {
   return JSON.stringify(node);
@@ -273,7 +270,7 @@ function mutateProgram(program, library) {
   push({ op: "sin", of: program });
   push({ op: "cos", of: program });
 
-  // SYN: Wrap with exp or log
+  // REC / SEG: Wrap with exp (recursive self-multiplication) or log (scale segmentation)
   push({ op: "exp", of: program });
   push({ op: "log", of: program });
 
@@ -304,19 +301,26 @@ function mutateProgram(program, library) {
 }
 
 /**
- * Generate mutant programs from a library of promoted operators.
- * Each library member is mutated, and the mutants form the candidate
- * pool for the next induction round.
+ * Generate mutant programs from a pool of members.
+ * Each member is mutated, and the mutants form the candidate pool for the
+ * next induction round.
  *
  * To keep the pool tractable, CON/INS mutations only compose with the
- * TOP_K simplest library members — prevents O(n²) explosion while still
- * allowing new compositions to form each round.
+ * TOP_K simplest members of `composeWith` — prevents O(n²) explosion while
+ * still allowing new compositions to form each round.
  *
- * @param {Array} library — array of {id, program} promoted operators
- * @param {number} topK — number of simplest members to compose with (default 10)
+ * `composeWith` defaults to the members themselves, but the caller can pass
+ * a distinct composition library (e.g. mutate fresh seeds while composing
+ * them against already-promoted operators as opref nodes, so the helix can
+ * re-enter: REC promotes, INS re-enters).
+ *
+ * @param {Array} members — array of {id?, program} to mutate
+ * @param {object} [opts]
+ * @param {Array} [opts.composeWith] — {id?, program} members to compose against (default: members)
+ * @param {number} [opts.topK] — number of simplest composeWith members used (default 10)
  * @returns {Array} deduplicated mutant programs, sorted by description length
  */
-export function mutatePrograms(library, topK = 10) {
+export function mutatePrograms(members, { composeWith = members, topK = 10 } = {}) {
   const candidates = [];
   const seen = new Set();
   const push = (node) => {
@@ -324,10 +328,11 @@ export function mutatePrograms(library, topK = 10) {
     if (!seen.has(key)) { seen.add(key); candidates.push(node); }
   };
 
-  // Only use the simplest TOP_K library members for CON/INS mutations.
-  // Sorted by description length, then by key for determinism.
-  const sorted = [...library].sort((a, b) => descriptionLength(a.program) - descriptionLength(b.program) || canonicalKey(a.program).localeCompare(canonicalKey(b.program)));
-  const composeLib = sorted.slice(0, topK);
+  const byLength = (a, b) => descriptionLength(a.program) - descriptionLength(b.program) || canonicalKey(a.program).localeCompare(canonicalKey(b.program));
+  const sorted = [...members].sort(byLength);
+  // Only the simplest TOP_K composition members participate in CON/INS
+  // mutations. Sorted by description length, then by key for determinism.
+  const composeLib = [...composeWith].sort(byLength).slice(0, topK);
 
   for (const member of sorted) {
     const mutants = mutateProgram(member.program, composeLib);

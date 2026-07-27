@@ -105,13 +105,13 @@ export function transitionEnergy(from, to) {
  * @returns {object} { success, state, energy, reason }
  */
 export function transition(state, toLayer, opts = {}) {
-  const { confidence = 0, reason = "none" } = opts;
+  const { confidence = 0, reason = "none", ts = null } = opts;
 
   const fromLayer = state.currentLayer;
 
   // First transition: any layer is valid
   if (fromLayer === null) {
-    const newState = enterLayer(state, toLayer, reason);
+    const newState = enterLayer(state, toLayer, reason, ts);
     return { success: true, state: newState, energy: 0, reason: "initial" };
   }
 
@@ -137,14 +137,14 @@ export function transition(state, toLayer, opts = {}) {
   }
 
   // Transition succeeds
-  const newState = enterLayer(state, toLayer, reason);
+  const newState = enterLayer(state, toLayer, reason, ts);
   return { success: true, state: newState, energy: required, reason };
 }
 
 /**
  * Enter a layer (internal helper).
  */
-function enterLayer(state, layerName, reason) {
+function enterLayer(state, layerName, reason, ts = null) {
   const layer = LAYER_MAP.get(layerName);
   if (!layer) return state;
 
@@ -164,7 +164,7 @@ function enterLayer(state, layerName, reason) {
       {
         from: state.currentLayer,
         to: layerName,
-        ts: Date.now(),
+        ts,
         reason,
       },
     ],
