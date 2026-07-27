@@ -128,11 +128,11 @@ function reduceEvents(state) {
       const envelope = event.payload.envelope ?? event.payload;
       observations.push(envelope);
       for (const block of event.payload.blocks ?? []) blockStore.set(block.block_id, block);
-      for (const surface of envelope?.anchors?.surfaces ?? []) referentEvents.push({ type: "admit", referent_id: surface.referent_id, surface: surface.text, provenance: { event_id: event.event_id } });
+      for (const surface of envelope?.anchors?.surfaces ?? []) referentEvents.push({ type: "DEF.admit", referent_id: surface.referent_id, surface: surface.text, provenance: { event_id: event.event_id } });
     }
-    if (event.event_type === "referent.merged") referentEvents.push({ type: "merge", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
-    if (event.event_type === "referent.split") referentEvents.push({ type: "split", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
-    if (event.event_type === "referent.same_as") referentEvents.push({ type: "same_as", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (event.event_type === "referent.merged") referentEvents.push({ type: "SYN.merge", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (event.event_type === "referent.split") referentEvents.push({ type: "SEG.split", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
+    if (event.event_type === "referent.same_as") referentEvents.push({ type: "CON.identity", ...event.payload, provenance: { event_id: event.event_id, ...(event.payload?.provenance ?? {}) } });
     if (["hypothesis.accepted", "hypothesis.competing", "hypothesis.held"].includes(event.event_type)) byId.set(event.payload.hypothesis_id ?? event.event_id, { ...event.payload, event_id: event.event_id });
     if (event.event_type === "hypothesis.superseded") {
       const ids = [event.payload.hypothesis_id, event.payload.supersedes, ...(event.payload.superseded_ids ?? [])].filter(Boolean);

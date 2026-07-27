@@ -1,7 +1,23 @@
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 
 const SERIES_OPS = new Set(["hist", "diff", "lag"]);
-const SCALAR_OPS = new Set(["const", "last", "sum", "mean", "count", "add", "sub", "mul", "div", "opref"]);
+
+// Arithmetic (SYN):        add, sub, mul, div, pow
+// Segmentation (SEG):      diff, log
+// Definition (DEF):        mean, sqrt, abs
+// Signaling (SIG):         const, sin, cos, pi, e
+// Connection (CON):        sum, hypot
+// Evaluation (EVA):        count, atan2
+// Insertion (INS):         last
+// Synthesis (SYN):         add, sub, mul, div, pow
+// Recursion (REC):         hist, lag, opref, exp
+const SCALAR_OPS = new Set([
+  "const", "last", "sum", "mean", "count",
+  "add", "sub", "mul", "div", "opref",
+  "sqrt", "sin", "cos", "abs", "exp", "log",
+  "atan2", "pow", "hypot",
+  "pi", "e",
+]);
 
 export function isSeriesNode(node) {
   if (!node || typeof node !== "object" || typeof node.op !== "string") throw new TypeError("expressions: node must be an object with an op");
@@ -58,6 +74,48 @@ export function evalNode(node, history) {
     case "opref":
       if (!node.program) throw new TypeError("expressions: opref node missing its inline program");
       return evalNode(node.program, history);
+
+    // Geometry (DEF): define magnitude by extracting root
+    case "sqrt": {
+      const v = evalScalar(node.of, history);
+      return v < 0 ? 0 : Math.sqrt(v);
+    }
+    // Geometry (SIG): signal periodic behavior
+    case "sin":
+      return Math.sin(evalScalar(node.of, history));
+    case "cos":
+      return Math.cos(evalScalar(node.of, history));
+    // Geometry (DEF): define magnitude, strip sign
+    case "abs":
+      return Math.abs(evalScalar(node.of, history));
+    // Geometry (EVA): evaluate angular relationship between two components
+    case "atan2":
+      return Math.atan2(evalScalar(node.a, history), evalScalar(node.b, history));
+    // Geometry (CON): connect orthogonal components into Euclidean magnitude
+    case "hypot":
+      return Math.hypot(evalScalar(node.a, history), evalScalar(node.b, history));
+
+    // Calculus (REC): recursive self-multiplication
+    case "exp":
+      return Math.exp(evalScalar(node.of, history));
+    // Calculus (SEG): segment scale into orders of magnitude
+    case "log": {
+      const v = evalScalar(node.of, history);
+      return v <= 0 ? 0 : Math.log(v);
+    }
+    // Calculus (SYN): synthesize exponential relationship
+    case "pow": {
+      const a = evalScalar(node.a, history);
+      const b = evalScalar(node.b, history);
+      return Math.pow(a, b);
+    }
+
+    // Constants (SIG): signal fixed mathematical anchors
+    case "pi":
+      return Math.PI;
+    case "e":
+      return Math.E;
+
     default:
       throw new TypeError(`expressions: unknown op ${node.op}`);
   }
@@ -106,12 +164,15 @@ export function predictWith(program, history, { warmup } = {}) {
   return sd > 0 ? { kind: "gaussian", mean: centre, sd } : { kind: "point", value: centre };
 }
 
+const UNARY_TRANSFORMS = ["sqrt", "sin", "cos", "abs", "exp", "log"];  // DEF, SIG, SIG, DEF, REC, SEG
+const BINARY_TRANSFORMS = ["atan2", "pow", "hypot"];                   // EVA, SYN, CON
+
 export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms, library = [], data } = {}) {
   const nd = data?.length ?? 0;
   maxSeriesDepth = maxSeriesDepth ?? Math.max(1, Math.floor(Math.log2(Math.max(2, nd || 10)) / 2));
   constants = constants ?? (data ? deriveConstants(data) : [0, 1]);
   lags = lags ?? (data ? deriveLags(data) : [1]);
-  maxPrograms = maxPrograms ?? Math.max(32, Math.round(Math.max(1, nd || 10) * 3));
+  maxPrograms = maxPrograms ?? Math.max(256, Math.round(Math.max(1, nd || 10) * 8));
   const series = [];
   const seen = new Set();
   const pushSeries = (node) => {
@@ -139,12 +200,23 @@ export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms
     const key = canonicalKey(node);
     if (!scalarSeen.has(key)) { scalarSeen.add(key); scalars.push(node); }
   };
+  // Constants — including mathematical anchors
   for (const c of constants) pushScalar({ op: "const", value: c });
+  pushScalar({ op: "pi" });
+  pushScalar({ op: "e" });
+  // Reducers over series
   for (const s of series) {
     pushScalar({ op: "last", of: s });
     pushScalar({ op: "mean", of: s });
     pushScalar({ op: "sum", of: s });
   }
+  // Unary transforms applied to every scalar
+  for (const s of [...scalars]) {
+    for (const t of UNARY_TRANSFORMS) {
+      pushScalar({ op: t, of: s });
+    }
+  }
+  // Library (previously promoted operators)
   for (const op of library) pushScalar({ op: "opref", id: op.id, program: op.program });
 
   const composed = [...scalars];
@@ -156,8 +228,15 @@ export function enumeratePrograms({ maxSeriesDepth, constants, lags, maxPrograms
   for (const a of scalars) {
     for (const b of scalars) {
       if (canonicalKey(a) === canonicalKey(b)) continue;
+      // Arithmetic binary (SYN)
       pushComposed({ op: "add", a, b });
       pushComposed({ op: "sub", a, b });
+      pushComposed({ op: "mul", a, b });
+      pushComposed({ op: "div", a, b });
+      // Geometry + Calculus binary
+      for (const bt of BINARY_TRANSFORMS) {
+        pushComposed({ op: bt, a, b });
+      }
     }
   }
 

@@ -8,7 +8,7 @@ const HIST = { op: "hist" };
 const SELECTOR = { op: "mean", of: { op: "diff", of: HIST } }; // windowed tendency (see induceKind's selectorWindow)
 const PREDICTOR = { op: "last", of: HIST }; // persistence
 const REFERENCE = "baseline:moving-mean-3"; // lags a slope, so it loses in trend legs and wins in flat legs
-const OPTS = { selector: SELECTOR, predictor: PREDICTOR, referenceBaselineId: REFERENCE, permutations: 300 };
+const OPTS = { selector: SELECTOR, predictor: PREDICTOR, referenceBaselineId: REFERENCE, permutations: 300, fitFraction: 0.75 };
 
 // Alternating trend legs (steep, low noise -> persistence wins big over a
 // lagging moving average) and flat legs (no slope, larger noise -> the moving

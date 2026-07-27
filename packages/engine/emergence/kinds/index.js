@@ -52,6 +52,7 @@ export function induceKind(series, {
   referenceBaselineId = "baseline:global-mean",
   warmup,
   selectorWindow,
+  baselineWindow = 3,
   fitFraction,
   thresholdQuantiles,
   permutations,
@@ -71,7 +72,6 @@ export function induceKind(series, {
   ];
   const resolvedPermutations = permutations ?? Math.max(40, Math.round(n * 5));
   const resolvedMinRelativeEffect = minRelativeEffect ?? 1 / Math.sqrt(n);
-  const baselineWindow = Math.max(3, Math.floor(Math.sqrt(n) / 2));
 
   if (!Array.isArray(series) || series.length <= resolvedWarmup + 4) throw new TypeError("kinds: series too short");
   const baselines = defaultNumericBaselines({ window: baselineWindow });

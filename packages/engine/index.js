@@ -102,3 +102,52 @@ export {
 export {
   veto,
 } from "./emergence/veto/index.js";
+
+// Trajectory red shift: the cosmological metaphor for character transformation.
+// Measures how far a character has moved from their rest frame, determining the
+// reader's confidence in their lens assertion.
+export {
+  redShift,
+  restFrameDivergence,
+  phaseVolatility,
+} from "./emergence/trajectory/index.js";
+
+// Reader priors: the reader's background knowledge that shapes what they can
+// assert about a character's lens. Injected by the app/eoPriors layer, never
+// computed by the engine.
+export {
+  createReaderPrior,
+  availableAssertions,
+  priorConfidenceBoost,
+  speakPrior,
+} from "./emergence/reader-priors/index.js";
+
+// Character lens assertion: the higher tier where the reader ASSERTS what a
+// character's lens is, shaped by their priors and measured by the red shift.
+// This is the relativistic construct — different readers assert different lenses,
+// and all can be valid.
+export {
+  assertLens,
+  speakLensAssertion,
+} from "./emergence/lens-assertion/index.js";
+
+// Omnimodal binary perception: format-sniffing dispatch (WAV/text/binary),
+// plus the audio DSP perceiver (PCM -> field vectors). Structure-neutral —
+// no segmentation, no onset detection. Emergence finds structure from the
+// field vectors the same way for every modality.
+// Ported from eoreader4.2: src/organs/in/reading-dispatch.js, src/perceiver/audio/*.
+export {
+  buildReadingFromBytes,
+  buildBinaryReading,
+  buildTextReading,
+} from "./perceiver/dispatch.js";
+export {
+  buildAudioReading,
+  extractFrameFields,
+  frameSignal,
+  AUDIO_FIELD_SPEC,
+  TARGET_SAMPLE_RATE,
+  FRAME_SIZE,
+  HOP_SIZE,
+} from "./perceiver/audio/reading.js";
+export { decodeWav, sniffWav } from "./perceiver/audio/wav.js";

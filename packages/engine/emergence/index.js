@@ -43,5 +43,18 @@ export {
   routeDecision,
 } from "./salience/index.js";
 
+// Summary engine (portable fold → summary packet with connection strengthening)
+export {
+  projectSummary,
+  selectContent,
+  rankContent,
+  groupContent,
+  buildPacket,
+  computeSurpriseProfile,
+  createConnectionMap,
+  updateConnectionMap,
+  connectionStrength,
+} from "./summary/index.js";
+
 // Fabrication veto (ported from4.2 tiny-LLM contract + row-veto)
 export { veto } from "./veto/index.js";

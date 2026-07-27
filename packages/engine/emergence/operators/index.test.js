@@ -10,7 +10,7 @@ function trendSeason(length = 48) {
   const rng = createSeededRng("ts");
   return Array.from({ length }, (_, t) => 2 + 1.5 * t + 8 * Math.sin((2 * Math.PI * t) / 6) + (rng() - 0.5));
 }
-const TS_OPTS = { population: "series:trend-season", shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2 }, seasonalPeriod: 6 };
+const TS_OPTS = { population: "series:trend-season", shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2, maxPrograms: 256 }, seasonalPeriod: 6 };
 
 function whiteNoise(length = 40) {
   const rng = createSeededRng("noise");

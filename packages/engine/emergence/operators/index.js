@@ -114,8 +114,8 @@ export function induceOperators(series, {
       const fingerprint = behavioralFingerprint(r.program, fitSeries, resolvedWarmup);
       if (known.has(fingerprint)) continue;
 
-      const transfer_gain = referenceGain(series, r.program, referenceBaseline, fitLen, `transfer:${r.key}`);
-      if (transfer_gain <= 0) continue;
+      const transferGain = referenceGain(series, r.program, referenceBaseline, fitLen, `transfer:${r.key}`);
+      if (transferGain <= 0) continue;
 
       const nullResult = bornNullGate(fitSeries, r.program, referenceBaseline, { warmup: resolvedWarmup, shuffles: resolvedShuffles, quantile });
       if (!nullResult.passed) continue;
@@ -123,7 +123,7 @@ export function induceOperators(series, {
       const operator = mintOperator(r, {
         round,
         nullResult,
-        transfer_gain,
+        transfer_gain: transferGain,
         referenceBaselineId,
         baselineIds: baselines.map((b) => b.id),
         population,

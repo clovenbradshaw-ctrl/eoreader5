@@ -11,7 +11,7 @@ import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 // budget) — the empirical battery run during development confirmed these
 // still correctly discriminate positive from negative families; the realistic
 // module defaults are more thorough and are exercised by the demo script.
-const FAST_OPTS = { shuffles: 15, maxRounds: 2, maxOperators: 2, enumeration: { lags: [1, 6], maxSeriesDepth: 2 } };
+const FAST_OPTS = { shuffles: 15, maxRounds: 2, maxOperators: 2, enumeration: { lags: [1, 6], maxSeriesDepth: 2, maxPrograms: 256 } };
 const CALC_OPTS = { operatorOptions: FAST_OPTS, shuffles: 20 };
 
 function trendSeason(seed, length = 36) {
@@ -138,7 +138,7 @@ test("dependency_graph is computed from real opref references, not a placeholder
   // which shows a round-1 operator built atop a round-0 one) produces genuine
   // internal (member-on-member) and external (imported, non-qualifying)
   // opref edges — this is not always empty by construction.
-  const deep = { shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2 }, maxRounds: 3, maxOperators: 4 };
+  const deep = { shuffles: 30, enumeration: { lags: [1, 6], maxSeriesDepth: 2, maxPrograms: 256 }, maxRounds: 3, maxOperators: 4 };
   const family = ["a", "b", "c"].map((s) => ({ id: `series:${s}`, series: trendSeason(`fam-${s}`, 48) }));
   const c = induceCalculus(family, {
     operatorOptions: deep,
