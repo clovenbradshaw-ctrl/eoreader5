@@ -18,12 +18,17 @@
     "./emergence/operators": "./emergence/operators/index.js",
     "./emergence/kinds": "./emergence/kinds/index.js",
     "./emergence/calculus": "./emergence/calculus/index.js",
+    "./emergence/surprise": "./emergence/surprise/index.js",
+    "./emergence/fold": "./emergence/fold/index.js",
+    "./emergence/salience": "./emergence/salience/index.js",
+    "./emergence/veto": "./emergence/veto/index.js",
     "./prediction/scoring": "./prediction/scoring/index.js",
     "./prediction/baselines": "./prediction/baselines/index.js",
     "./prediction/commitments": "./prediction/commitments/index.js",
     "./prediction/tasks": "./prediction/tasks/index.js",
     "./competency/ledger": "./competency/ledger/index.js",
-    "./motif": "./motif/index.js"
+    "./motif": "./motif/index.js",
+    "./cube": "./cube/index.js"
   },
   "scripts": {
     "test": "node --test"

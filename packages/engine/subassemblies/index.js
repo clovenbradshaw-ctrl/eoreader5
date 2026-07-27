@@ -68,6 +68,31 @@ export const CORE_SUBASSEMBLIES = assembleWatchmaker([
   defineSubassembly({ id: "semantic-ledger", kind: "semantic-ledger", version: "0.1.0", inputs: ["semantic-events"], outputs: ["semantic-head"], depends_on: ["canonical-json", "operator-epoch", "referent-laws"], owns: ["append-only semantic event fold"] }),
   defineSubassembly({ id: "reading-snapshot", kind: "reading-snapshot", version: "0.1.0", inputs: ["semantic-head", "frame", "lens", "prior-snapshot"], outputs: ["reading-snapshot"], depends_on: ["semantic-ledger", "prior-boundary"], owns: ["external app citation artifact"] }),
   defineSubassembly({ id: "enactment-boundary", kind: "enactment-boundary", version: "0.1.0", inputs: ["candidate-surface", "reading-snapshot"], outputs: ["enactment-decision", "effect-request"], depends_on: ["reading-snapshot"], owns: ["admit/hold/veto decision seam"] }),
+
+  // Cube coordinate: terrain/stance classification + focus bias scoring.
+  // Ported from4.2:src/wiki/terrains.js, src/turn/meta-route.js.
+  // No dependencies — pure regex classifier over text.
+  defineSubassembly({ id: "cube-coordinate", kind: "cube-coordinate", version: "0.1.0", inputs: ["semantic-event"], outputs: ["cube-cell"], owns: ["terrain/stance/operator classification"] }),
+
+  // Surprise measure: KL divergence, felt surprise, forward score,
+  // novelty reserve. Ported from4.2:src/core/surprise.js.
+  // Depends on operator-epoch (for coordinate system).
+  defineSubassembly({ id: "surprise-measure", kind: "surprise-measure", version: "0.1.0", inputs: ["semantic-event", "observation-history"], outputs: ["surprise-score", "novelty-reserve"], depends_on: ["operator-epoch"], owns: ["KL surprise / novelty scoring"] }),
+
+  // Fold compression: token-budget fold, chunk scoring, selection.
+  // Ported from4.2 fold/foldReading stages + proxy fold_summary.
+  // Depends on surprise-measure (for forward scoring) and cube-coordinate (for classification).
+  defineSubassembly({ id: "fold-compression", kind: "fold-compression", version: "0.1.0", inputs: ["reading-snapshot", "token-budget"], outputs: ["folded-reading"], depends_on: ["reading-snapshot", "cube-coordinate", "surprise-measure"], owns: ["context compression for tiny models"] }),
+
+  // Born salience: exemplar scoring, relax settling, route decision.
+  // Ported from4.2:src/weave/chorus/born.js, src/weave/longgen/relax.js.
+  // Depends on canonical-json (for hashing null protocols).
+  defineSubassembly({ id: "born-salience", kind: "born-salience", version: "0.1.0", inputs: ["content-score", "exemplar-basis"], outputs: ["salience-score", "route-decision"], depends_on: ["canonical-json"], owns: ["routing layer for tiny models"] }),
+
+  // Fabrication veto: model-output constraint checks.
+  // Ported from4.2 tiny-LLM contract + row-veto battery.
+  // Depends on reading-snapshot (for grounding propositions).
+  defineSubassembly({ id: "fabrication-veto", kind: "fabrication-veto", version: "0.1.0", inputs: ["candidate-output", "grounding-propositions"], outputs: ["veto-decision"], depends_on: ["reading-snapshot"], owns: ["safety net for small model outputs"] }),
 ]);
 
 function topoSort(items, byId) {

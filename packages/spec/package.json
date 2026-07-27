@@ -12,7 +12,8 @@
     "./schemas/*": "./schemas/*",
     "./holons": "./holons/index.js",
     "./fixed-point": "./fixed-point.js",
-    "./row-shapes": "./row-shapes/index.js"
+    "./row-shapes": "./row-shapes/index.js",
+    "./cube": "./cube/index.js"
   },
   "scripts": {
     "test": "node --test"

@@ -11,6 +11,11 @@ export const SUBASSEMBLY_KINDS = Object.freeze([
   "reading-snapshot",
   "enactment-boundary",
   "compatibility-import",
+  "cube-coordinate",
+  "surprise-measure",
+  "fold-compression",
+  "born-salience",
+  "fabrication-veto",
 ]);
 
 export const REQUIRED_PORTS = Object.freeze({
@@ -24,6 +29,11 @@ export const REQUIRED_PORTS = Object.freeze({
   "reading-snapshot": Object.freeze({ inputs: ["semantic-head", "frame", "lens", "prior-snapshot"], outputs: ["reading-snapshot"] }),
   "enactment-boundary": Object.freeze({ inputs: ["candidate-surface", "reading-snapshot"], outputs: ["enactment-decision", "effect-request"] }),
   "compatibility-import": Object.freeze({ inputs: ["legacy42-envelope"], outputs: ["observation-envelope", "held-review"] }),
+  "cube-coordinate": Object.freeze({ inputs: ["semantic-event"], outputs: ["cube-cell"] }),
+  "surprise-measure": Object.freeze({ inputs: ["semantic-event", "observation-history"], outputs: ["surprise-score", "novelty-reserve"] }),
+  "fold-compression": Object.freeze({ inputs: ["reading-snapshot", "token-budget"], outputs: ["folded-reading"] }),
+  "born-salience": Object.freeze({ inputs: ["content-score", "exemplar-basis"], outputs: ["salience-score", "route-decision"] }),
+  "fabrication-veto": Object.freeze({ inputs: ["candidate-output", "grounding-propositions"], outputs: ["veto-decision"] }),
 });
 
 export function isSubassemblyKind(kind) {
