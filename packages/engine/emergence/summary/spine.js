@@ -103,10 +103,10 @@ export function significanceSpine(sentences, options = {}) {
  * context (a few sentences before/after by array position), scored by its
  * forward surprise.
  *
- * @param {Array<{ text: string, idx: number }>} sentences - in reading order
+ * @param {Array<{ text: string, idx: number, offset?: number }>} sentences - in reading order
  * @param {{ peaks: number[], scoreByPos: Map<number, number> }} spine - from significanceSpine
  * @param {object} options - { contextWindow }
- * @returns {Array<{ idx: number, pos: number, text: string, context: string, score: number }>}
+ * @returns {Array<{ idx: number, offset: number|null, pos: number, text: string, context: string, score: number }>}
  */
 export function buildSceneMoments(sentences, spine, options = {}) {
   const { contextWindow = 2 } = options;
@@ -119,6 +119,7 @@ export function buildSceneMoments(sentences, spine, options = {}) {
 
     return {
       idx: center?.idx ?? pos, // original document sentence index (provenance)
+      offset: center?.offset ?? null, // character offset into the source text
       pos, // array position within the input sentences
       text: center?.text ?? "",
       context: contextSentences.join(" "),

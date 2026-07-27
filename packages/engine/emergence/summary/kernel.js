@@ -91,7 +91,13 @@ export function buildKeyMomentsFromEvents(events, relevantChunks, options = {}) 
     .sort((a, b) => b.score - a.score)
     .slice(0, maxMoments)
     .sort((a, b) => a.idx - b.idx)
-    .map((e) => ({ idx: e.idx, type: e.type, text: e.text, score: e.score }));
+    .map((e) => ({
+      idx: e.idx,
+      offset: e.offset ?? null, // character offset into the source text
+      type: e.type,
+      text: e.text,
+      score: e.score,
+    }));
 }
 
 // ── Chronological ordering ─────────────────────────────────────────────────────
@@ -223,12 +229,16 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
   const spans = sceneMoments.length
     ? sceneMoments.map((m, i) => ({
         idx: i,
+        offset: m.offset ?? null,
+        length: m.text?.length ?? 0,
         text: m.text,
         coord: classify(m.text),
         score: m.score,
       }))
     : events.slice(0, 8).map((e, i) => ({
         idx: i,
+        offset: e.offset ?? null,
+        length: e.text?.length ?? 0,
         text: e.text,
         coord: classify(e.text),
         score: 0,
@@ -241,6 +251,8 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
     .sort((a, b) => a.idx - b.idx)
     .map((m) => ({
       idx: m.idx,
+      offset: m.offset ?? null,
+      length: m.text?.length ?? 0,
       type: m.type ?? null,
       text: m.text,
       context: m.context,

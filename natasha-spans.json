@@ -1,0 +1,117 @@
+{
+  "source": "/Users/mlacy/Downloads/pg2600.txt",
+  "sourceLength": 3293655,
+  "entity": "Natásha Rostóva",
+  "spans": [
+    {
+      "id": "first-appearance",
+      "section": "Who they are",
+      "anchor": "This black-eyed, wide-mouthed girl, not pretty but full of life",
+      "len": 300,
+      "claim": "Natasha enters the novel not as a conventional heroine but as unmediated vitality — explicitly not pretty, explicitly full of life.",
+      "offset": 100305,
+      "length": 300,
+      "position": 3,
+      "text": "This black-eyed, wide-mouthed girl, not pretty but full of life—with\r\nchildish bare shoulders which after her run heaved and shook her\r\nbodice, with black curls tossed backward, thin bare arms, little legs\r\nin lace-frilled drawers, and feet in low slippers—was just at that\r\ncharming age when a girl "
+    },
+    {
+      "id": "name-day-laugh",
+      "section": "Who they are",
+      "anchor": "“Do you see?... My doll... Mimi... You see...”",
+      "len": 280,
+      "claim": "Tolstoy measures her by feeling rather than accomplishment: her first sustained act in the book is laughter that disarms even the prim visitor.",
+      "offset": 100965,
+      "length": 280,
+      "position": 3.1,
+      "text": "“Do you see?... My doll... Mimi... You see...” was all Natásha\r\nmanaged to utter (to her everything seemed funny). She leaned against\r\nher mother and burst into such a loud, ringing fit of laughter that even\r\nthe prim visitor could not help joining in.\r\n\r\n“Now then, go away and t"
+    },
+    {
+      "id": "first-ball",
+      "section": "Key moments",
+      "anchor": "He asked her to waltz.",
+      "len": 400,
+      "claim": "The first ball. Her unselfconscious joy — not her beauty — is what disarms the war-weary prince.",
+      "offset": 1224664,
+      "length": 400,
+      "position": 37.2,
+      "text": "He asked her to waltz. That tremulous expression on\r\nNatásha’s face, prepared either for despair or rapture, suddenly\r\nbrightened into a happy, grateful, childlike smile.\r\n\r\n“I have long been waiting for you,” that frightened happy little\r\ngirl seemed to say by the smile that replaced the threatened tears, as\r\nshe raised her hand to Prince Andrew’s shoulder. They were the second\r\ncouple to enter t"
+    },
+    {
+      "id": "ball-contrast-helene",
+      "section": "Key moments",
+      "anchor": "bare arms and neck were not beautiful",
+      "len": 380,
+      "claim": "The Hélène contrast is made explicit in the ball scene itself: Hélène is 'hardened by a varnish' of being looked at; Natasha is exposed for the first time.",
+      "offset": 1225337,
+      "length": 380,
+      "position": 37.2,
+      "text": "bare arms and neck were not beautiful—compared to Hélène’s her\r\nshoulders looked thin and her bosom undeveloped. But Hélène seemed, as\r\nit were, hardened by a varnish left by the thousands of looks that had\r\nscanned her person, while Natásha was like a girl exposed for the first\r\ntime, who would have felt very much ashamed had she not been assured\r\nthat this was absolutely nece"
+    },
+    {
+      "id": "uncle-folk-dance",
+      "section": "Key moments",
+      "anchor": "Where, how, and when had this young countess",
+      "len": 460,
+      "claim": "At Uncle's estate Tolstoy makes his most explicit claim about her: a French-educated countess carries something 'inimitable and unteachable' Russian.",
+      "offset": 1371140,
+      "length": 460,
+      "position": 41.6,
+      "text": "Where, how, and when had this young countess, educated by an émigrée\r\nFrench governess, imbibed from the Russian air she breathed that spirit\r\nand obtained that manner which the pas de châle * would, one would have\r\nsupposed, long ago have effaced? But the spirit and the movements were\r\nthose inimitable and unteachable Russian ones that “Uncle” had\r\nexpected of her. As soon as she had struck her pose, and smiled\r\ntriumphantly, proudly, and with sly merrime"
+    },
+    {
+      "id": "anatole-letter",
+      "section": "Key moments",
+      "anchor": "With trembling hands Natásha held that passionate love letter",
+      "len": 330,
+      "claim": "The seduction works because the letter is a forgery she fills with her own feeling — Dólokhov composed it, and she 'found in it an echo of all that she herself imagined she was feeling.'",
+      "offset": 1546826,
+      "length": 330,
+      "position": 47,
+      "text": "With trembling hands Natásha held that passionate love letter which\r\nDólokhov had composed for Anatole, and as she read it she found in it\r\nan echo of all that she herself imagined she was feeling.\r\n\r\n“Since yesterday evening my fate has been sealed; to be loved by you\r\nor to die. There is no other way for me,” the letter began."
+    },
+    {
+      "id": "crisis-hunted-animal",
+      "section": "Key moments",
+      "anchor": "Natásha looked from one to the other as a hunted and wounded animal",
+      "len": 300,
+      "claim": "Her lowest point. The novel's cruelest image of her is not moral condemnation but an animal at bay.",
+      "offset": 1589630,
+      "length": 300,
+      "position": 48.3,
+      "text": "Natásha looked from one to the other as a hunted and wounded animal\r\nlooks at the approaching dogs and sportsmen.\r\n\r\n“Natálya Ilyníchna,” Pierre began, dropping his eyes with a feeling of\r\npity for her and loathing for the thing he had to do, “whether it is\r\ntrue or not should make no difference to "
+    },
+    {
+      "id": "carts-anger",
+      "section": "Key moments",
+      "anchor": "“I consider,” Natásha suddenly almost shouted",
+      "len": 330,
+      "claim": "The Moscow evacuation. Her moral authority arrives first as rage, not composure — 'Are we despicable Germans?'",
+      "offset": 2322541,
+      "length": 330,
+      "position": 70.5,
+      "text": "“I consider,” Natásha suddenly almost shouted, turning her angry face to\r\nPétya, “I consider it so horrid, so abominable, so... I don’t know what.\r\nAre we despicable Germans?”\r\n\r\nHer throat quivered with convulsive sobs and, afraid of weakening and\r\nletting the force of her anger run to waste, she turned and rushed\r\nheadlong up "
+    },
+    {
+      "id": "carts-action",
+      "section": "Key moments",
+      "anchor": "“Papa! Mamma! May I see to it? May I?...”",
+      "len": 380,
+      "claim": "Transformation with real consequences in the world: she converts the anger into a household order that gives the carts to the wounded.",
+      "offset": 2324606,
+      "length": 380,
+      "position": 70.6,
+      "text": "“Papa! Mamma! May I see to it? May I?...” asked Natásha. “We will still\r\ntake all the most necessary things.”\r\n\r\nThe count nodded affirmatively, and Natásha, at the rapid pace at which\r\nshe used to run when playing at tag, ran through the ballroom to the\r\nanteroom and downstairs into the yard.\r\n\r\nThe servants gathered round Natásha, but could not believe the strange\r\norder she "
+    },
+    {
+      "id": "deathbed-forgive",
+      "section": "Key moments",
+      "anchor": "“Forgive me!” she whispered",
+      "len": 420,
+      "claim": "The reconciliation. Forgiveness arrives too late for anything but grace — and Tolstoy insists on her plainness at the exact moment of her greatest beauty.",
+      "offset": 2484289,
+      "length": 420,
+      "position": 75.4,
+      "text": "“Forgive me!” she whispered, raising her head and glancing at him.\r\n“Forgive me!”\r\n\r\n“I love you,” said Prince Andrew.\r\n\r\n“Forgive...!”\r\n\r\n“Forgive what?” he asked.\r\n\r\n“Forgive me for what I ha-ve do-ne!” faltered Natásha in a scarcely\r\naudible, broken whisper, and began kissing his hand more rapidly, just\r\ntouching it with her lips.\r\n\r\n“I love you more, better than before,” said Prince Andrew, lifting her\r\nface with"
+    }
+  ]
+}

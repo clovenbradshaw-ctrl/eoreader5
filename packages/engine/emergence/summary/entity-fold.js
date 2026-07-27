@@ -23,7 +23,7 @@ import {
   snapToSentences,
   TURNING_EVENT_TYPES,
 } from "./text-organ.js";
-import { classify } from "../../cube/index.js";
+import { classify, classifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 
 // Diacritical mapping for engine-level entity name matching.
@@ -135,13 +135,22 @@ export function entityFold(text, entityName = null, options = {}) {
       const sn = norm(s);
       if (targetNameTokenSet.has(sn)) continue;
       if (s.includes("\n")) continue;
+      // Stage 1: surface-level Entity terrain = pronoun → filter
+      if (classifyTerrain(s) === "Entity") continue;
       const words = s.split(/\s+/);
+      // Stage 2: cap/lower ratio for single-word surfaces.
+      // - lower=0, upper>0: proper name (always capitalized) → keep
+      // - lower>0, upper>0: has both forms → apply ratio filter
+      // Names: ratio ~1.0-1.5. Common words: < 0.8. Dialogue-only: > 2.0.
       if (words.length === 1) {
-        if (s.length < 3) continue; // below 3 chars the cap/lower physics has no resolution ("Oh")
         const lower = lowerFormCounts.get(sn) ?? 0;
         const upper = surfaceMass.get(s) ?? 0;
-        const capRatio = upper / (upper + lower || 1);
-        if (capRatio < 0.9) continue; // seen in lowercase → a word, not a name
+        if (upper > 0 && lower > 0) {
+          const ratio = upper / lower;
+          if (ratio < 0.8 || ratio > 2.0) continue;
+        }
+        // lower=0 means the word is never lowercased → it's a proper name
+        if (upper === 0) continue; // not a perceiver surface (shouldnt happen)
       }
       figureStats.set(s, (figureStats.get(s) ?? 0) + 1);
     }
@@ -195,7 +204,8 @@ export function entityFold(text, entityName = null, options = {}) {
   let sceneMoments;
   if (eventMoments.length >= 3) {
     sceneMoments = eventMoments.map((m) => ({
-      idx: m.idx, text: m.text, context: m.text, score: m.score, type: m.type,
+      idx: m.idx, offset: m.offset ?? null,
+      text: m.text, context: m.text, score: m.score, type: m.type,
     }));
   } else {
     const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount });

@@ -15,20 +15,21 @@ export function setPixel(pixels, x, y, value = 255) {
 }
 
 export function drawLine(pixels, x1, y1, x2, y2, value = 255) {
-  // Guard against NaN — NaN === NaN is always false, causing infinite loop
   if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) return;
-  const dx = Math.abs(x2 - x1), dy = -Math.abs(y2 - y1);
+  const rdx = Math.abs(x2 - x1), rdy = -Math.abs(y2 - y1);
   const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
-  let err = dx + dy, e2;
+  let err = rdx + rdy, e2;
   let x = Math.round(x1), y = Math.round(y1);
   const ex = Math.round(x2) || 0, ey = Math.round(y2) || 0;
+  let guard = 0;
 
   while (true) {
+    if (guard++ > 2000) break;  // safety: never more than 2000 pixels
     setPixel(pixels, x, y, value);
     if (x === ex && y === ey) break;
     e2 = 2 * err;
-    if (e2 >= dy) { err += dy; x += sx; }
-    if (e2 <= dx) { err += dx; y += sy; }
+    if (e2 >= rdy) { err += rdy; x += sx; }
+    if (e2 <= rdx) { err += rdx; y += sy; }
   }
 }
 
