@@ -252,16 +252,35 @@ export function entityFold(text, entityName = null, options = {}) {
   // the first 27.5% of W&P). One winner per stratum spends the budget across
   // the whole arc instead.
   if (sceneMoments.length < sceneCount && targetFrames.length) {
-    const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount * 3 });
+    // Every presence frame is a candidate, scored by motif-self-surprise x
+    // presence: targetFrames are the entity's statements in order, so
+    // forwardScore reads "how unlike this entity's previous appearances is
+    // this one". This is the best MEASURED selector on the span golden
+    // (5/21); see golden/span-golden.json notes. Variants measured and
+    // rejected — do not silently retry them:
+    //   presence-only ............................ 4/21
+    //   cold-start mask (minHistory) ............. 4/21 (kills exposition
+    //     scenes — a theme's first statement is canonical, not noise)
+    //   sentence-stream reduction ................ 3/21 (per-sentence bags
+    //     are too small to carry a KL; the "instrument line" idea is right,
+    //     the lexical field vector is too weak an extractor for it)
+    // The residual gap to the golden is a MISSING OBSERVABLE (what the
+    // entity does/feels — relations, dialogue, affect channels), not a
+    // rearrangement of this one.
+    const spine = significanceSpine(targetFrames, { budget: targetFrames.length, k: sceneCount * 3 });
     const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
-    // Weight each candidate by the referent's presence in its frame. Forward
-    // surprise alone anti-correlates with canonical moments (measured: the
-    // deathbed ranks 9th percentile under surprise, 98th under presence) —
-    // a scene is significant for THIS entity where the entity is dense in it.
-    const presenceAt = new Map(targetFrames.map((f) => [f.offset, presence.get(f.order) ?? 0]));
-    const candidates = buildSceneMoments(targetFrames, spine, { contextWindow: 1 })
-      .filter((m) => m.offset != null && !sceneMoments.some((s) => near(s.offset, m.offset)))
-      .map((m) => ({ ...m, score: (m.score || 1e-6) * Math.log1p(presenceAt.get(m.offset) ?? 0) }));
+    const candidates = [...spine.scoreByPos.entries()]
+      .map(([pos, score]) => {
+        const f = targetFrames[pos];
+        return {
+          idx: f.order,
+          offset: f.offset,
+          text: f.text,
+          context: f.text,
+          score: (score || 1e-6) * Math.log1p(presence.get(f.order) ?? 0),
+        };
+      })
+      .filter((m) => m.offset != null && !sceneMoments.some((s) => near(s.offset, m.offset)));
 
     const lo = targetFrames[0].offset;
     const hi = targetFrames[targetFrames.length - 1].offset + 1;

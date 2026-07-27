@@ -60,6 +60,14 @@ export function significanceSpine(sentences, options = {}) {
     k = DEFAULT_K,
     window = DEFAULT_WINDOW,
     minWords = DEFAULT_MIN_WORDS,
+    // Cold-start mask. Forward surprise against an empty/thin history is
+    // inflated by construction — the first statements of a motif score high
+    // because there is nothing to compare them to, not because they are
+    // turning points (measured: unmasked, 12/12 selected spans fell in the
+    // first 27.5% of War and Peace). With minHistory = h, a unit is scored
+    // only once h prior units have accumulated. Default 0 preserves the
+    // legacy behavior for existing consumers.
+    minHistory = 0,
   } = options;
   const S = sentences.length;
   if (S === 0) return { peaks: [], stride: 1, sampled: 0, units: 0 };
@@ -80,7 +88,7 @@ export function significanceSpine(sentences, options = {}) {
     const blank = !text.trim();
     const wordCount = text.split(/\s+/).filter(Boolean).length;
 
-    if (!blank && wordCount >= minWords && pos % stride === 0) {
+    if (!blank && wordCount >= minWords && pos % stride === 0 && history.length >= minHistory) {
       const score = forwardScore(s, history);
       sample.push({ pos, score });
     }
@@ -92,7 +100,10 @@ export function significanceSpine(sentences, options = {}) {
   }
 
   const topSorted = [...sample].sort((a, b) => b.score - a.score).slice(0, k);
-  const scoreByPos = new Map(topSorted.map((s) => [s.pos, s.score]));
+  // Expose EVERY sampled score, not only the top-k: a downstream selector
+  // that re-weights (e.g. by referent presence) needs the whole field —
+  // truncating here would silently pre-decide significance by surprise alone.
+  const scoreByPos = new Map(sample.map((s) => [s.pos, s.score]));
   const peaks = topSorted.map((s) => s.pos).sort((a, b) => a - b);
 
   return { peaks, stride, sampled: sample.length, units: S, scoreByPos };

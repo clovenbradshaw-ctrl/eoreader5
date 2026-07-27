@@ -13,11 +13,11 @@ export {
 } from "./expressions/index.js";
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
 export { induceOperators, behavioralFingerprint } from "./operators/index.js";
-export {
-  OPERATOR_SEMANTICS,
-  EQUATIONS,
-  DERIVATION_CHAINS,
-} from "./operators/decomposition.js";
+// The operator→physics-equation catalog (OPERATOR_SEMANTICS, EQUATIONS,
+// DERIVATION_CHAINS) asserted the system "IS" the Born rule, interference, etc.
+// That's a claim about shared functional form, not derived physics, so it was
+// moved to archive/physics-derivation/operator-equation-catalog.js and dropped
+// from the build.
 export { induceKind } from "./kinds/index.js";
 export { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
 export { induceEntityKinds, buildKindVocabulary, pluralize } from "./entity-kinds/index.js";
