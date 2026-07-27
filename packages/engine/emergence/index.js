@@ -12,6 +12,15 @@ export {
 } from "./expressions/index.js";
 export { searchCompetentPrograms, evaluateProgramCompetency } from "./programs/index.js";
 export { induceOperators, behavioralFingerprint } from "./operators/index.js";
+export {
+  NATIVE_EQUATIONS,
+  EMERGENT_EQUATIONS,
+  APPLIED_EQUATIONS,
+  MINIMAL_EQUATIONS,
+  FULL_OPERATOR_MATRIX,
+  LAYER_OPERATOR_PROFILES,
+  DERIVATION_CHAINS
+} from "./operators/decomposition.js";
 export { induceKind } from "./kinds/index.js";
 export { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
 export { induceEntityKinds, buildKindVocabulary, pluralize } from "./entity-kinds/index.js";
@@ -58,3 +67,28 @@ export {
 
 // Fabrication veto (ported from4.2 tiny-LLM contract + row-veto)
 export { veto } from "./veto/index.js";
+
+// Physics equations derived from quantum primitives
+// (Fokker-Planck, Michaelis-Menten, Navier-Stokes, Poisson, Boltzmann,
+//  Lotka-Volterra, Schrödinger, Black-Scholes, Euler-Lagrange)
+export {
+  fokkerPlanckEvolve,
+  michaelisMentenSaturation,
+  michaelisMentenMeasure,
+  verifyBlendIsMichaelisMenten,
+  navierStokesFlow,
+  poissonPriorField,
+  applyPriorField,
+  boltzmannSurvival,
+  boltzmannConsolidate,
+  lotkaVolterraTerrain,
+  schrodingerEvolve,
+  blackScholesValue,
+  eulerLagrangeAction,
+  eulerLagrangeOptimalK,
+  verifyContinuity,
+  computeProbabilityCurrent,
+  HBAR,
+  DECOHERENCE_TAU,
+  BOLTZMANN_K,
+} from "./physics/index.js";
