@@ -14,8 +14,7 @@
 // relevance, selects the best ones within the budget, and returns
 // a structured summary. No model calls, no ambient state.
 
-import { forwardScore, wordFrequencies, klDivergence } from "../surprise/index.js";
-import { classify, scoreCoordinate, focusBias } from "../../cube/index.js";
+import { classify } from "../../cube/index.js";
 
 /**
  * Approximate token count (words + punctuation).
@@ -39,7 +38,7 @@ function estimateTokens(text) {
  * @returns {number} composite score
  */
 export function scoreChunk(chunk, context) {
-  const { query, focus, history, queryCoord } = context;
+  const { query } = context;
   let score = 0;
 
   const STOPWORDS = new Set([
@@ -60,38 +59,20 @@ export function scoreChunk(chunk, context) {
   const chunkText = (chunk.text ?? "").toLowerCase();
   const wordCount = chunkText.split(/\s+/).filter(Boolean).length;
 
-  // Text relevance (keyword density — normalizes by chunk size so
-  // a dense 200-word passage beats a diffuse 2000-word one)
+  // Keyword density — normalizes by chunk size so
+  // a dense 200-word passage beats a diffuse 2000-word one
   let keywordMatches = 0;
-  for (const w of queryWords) {
+  const uniqueQueryWords = new Set(queryWords);
+  for (const w of uniqueQueryWords) {
     if (chunkText.includes(w)) keywordMatches++;
   }
   if (keywordMatches > 0 && wordCount > 0) {
-    score += (keywordMatches / wordCount) * 300;
+    score += (keywordMatches / wordCount) * 1000;
   }
 
   // Exact phrase match
-  const queryPhrase = queryWords.join(" ");
-  if (queryPhrase && chunkText.includes(queryPhrase)) score += 100;
-
-  // Coordinate match (terrain/stance/operator alignment)
-  const chunkCoord = chunk.coord ?? classify(chunk.text);
-  if (queryCoord) {
-    if (chunkCoord.terrain === queryCoord.terrain) score += 5;
-    if (chunkCoord.stance === queryCoord.stance) score += 2;
-    if (chunkCoord.operator === queryCoord.operator) score += 1;
-  }
-
-  // Focus bias
-  if (focus) {
-    score += focusBias({ coord: chunkCoord }, focus);
-  }
-
-  // Surprise (forward score against history)
-  if (history && history.length > 0) {
-    const novelty = forwardScore(chunk, history);
-    score += Math.min(10, novelty);
-  }
+  const queryPhrase = [...uniqueQueryWords].join(" ");
+  if (queryPhrase && chunkText.includes(queryPhrase)) score += 200;
 
   return score;
 }
@@ -111,8 +92,6 @@ export function fold(reading, options = {}) {
   const history = options.history ?? [];
   const focus = options.focus ?? null;
   const query = reading.query ?? "";
-  const queryCoord = options.queryCoord ?? (query ? classify(query) : null);
-
   const units = reading.units ?? [];
   if (units.length === 0) {
     return {
@@ -127,11 +106,10 @@ export function fold(reading, options = {}) {
   }
 
   // Score each chunk
-  const context = { query, focus, history, queryCoord };
+  const context = { query, focus, history };
   const scored = units.map((unit) => ({
     ...unit,
     foldScore: scoreChunk(unit, context),
-    coord: unit.coord ?? classify(unit.text),
   }));
 
   // Sort by score descending

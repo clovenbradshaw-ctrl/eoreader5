@@ -245,13 +245,41 @@ export function entityFold(text, entityName = null, options = {}) {
 
   // Top up: one-per-type event dedup can leave far fewer moments than asked
   // for (4 types → 4 moments regardless of sceneCount). Fill the remainder
-  // from the significance spine, skipping anything already covered.
+  // from the significance spine — STRATIFIED across the entity's presence
+  // extent. Forward surprise is measured against an accumulating history, so
+  // early text scores high by construction; taking globally-ranked peaks
+  // confines every moment to the opening chapters (measured: 12/12 spans in
+  // the first 27.5% of W&P). One winner per stratum spends the budget across
+  // the whole arc instead.
   if (sceneMoments.length < sceneCount && targetFrames.length) {
-    const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount });
+    const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount * 3 });
     const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
-    for (const m of buildSceneMoments(targetFrames, spine, { contextWindow: 1 })) {
-      if (sceneMoments.length >= sceneCount) break;
-      if (sceneMoments.some((s) => near(s.offset, m.offset))) continue;
+    // Weight each candidate by the referent's presence in its frame. Forward
+    // surprise alone anti-correlates with canonical moments (measured: the
+    // deathbed ranks 9th percentile under surprise, 98th under presence) —
+    // a scene is significant for THIS entity where the entity is dense in it.
+    const presenceAt = new Map(targetFrames.map((f) => [f.offset, presence.get(f.order) ?? 0]));
+    const candidates = buildSceneMoments(targetFrames, spine, { contextWindow: 1 })
+      .filter((m) => m.offset != null && !sceneMoments.some((s) => near(s.offset, m.offset)))
+      .map((m) => ({ ...m, score: (m.score || 1e-6) * Math.log1p(presenceAt.get(m.offset) ?? 0) }));
+
+    const lo = targetFrames[0].offset;
+    const hi = targetFrames[targetFrames.length - 1].offset + 1;
+    const slots = sceneCount - sceneMoments.length;
+    const strata = Array.from({ length: slots }, () => []);
+    for (const m of candidates) {
+      const s = Math.min(slots - 1, Math.floor(((m.offset - lo) / (hi - lo)) * slots));
+      strata[s].push(m);
+    }
+    const picked = strata
+      .map((bucket) => bucket.sort((a, b) => b.score - a.score)[0])
+      .filter(Boolean);
+    // Strata the entity never peaks in stay empty; backfill by global score.
+    for (const m of candidates.sort((a, b) => b.score - a.score)) {
+      if (picked.length >= slots) break;
+      if (!picked.includes(m) && !picked.some((p) => near(p.offset, m.offset))) picked.push(m);
+    }
+    for (const m of picked.slice(0, slots)) {
       sceneMoments.push({
         ...m,
         text: snapToSentences(m.text),

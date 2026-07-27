@@ -84,27 +84,9 @@ export {
 // Fabrication veto (ported from4.2 tiny-LLM contract + row-veto)
 export { veto } from "./veto/index.js";
 
-// Physics equations derived from quantum primitives
-// (Fokker-Planck, Michaelis-Menten, Navier-Stokes, Poisson, Boltzmann,
-//  Lotka-Volterra, Schrödinger, Black-Scholes, Euler-Lagrange)
-export {
-  fokkerPlanckEvolve,
-  michaelisMentenSaturation,
-  michaelisMentenMeasure,
-  verifyBlendIsMichaelisMenten,
-  navierStokesFlow,
-  poissonPriorField,
-  applyPriorField,
-  boltzmannSurvival,
-  boltzmannConsolidate,
-  lotkaVolterraTerrain,
-  schrodingerEvolve,
-  blackScholesValue,
-  eulerLagrangeAction,
-  eulerLagrangeOptimalK,
-  verifyContinuity,
-  computeProbabilityCurrent,
-  HBAR,
-  DECOHERENCE_TAU,
-  BOLTZMANN_K,
-} from "./physics/index.js";
+// The former physics-derivation re-exports (fokkerPlanckEvolve, navierStokesFlow,
+// michaelisMentenSaturation, schrodingerEvolve, …) were removed here. That module
+// recovered the functional *forms* of physics equations from the retrieval
+// primitives, which is not the same as deriving the physics, so it was moved to
+// archive/physics-derivation/ and is no longer part of the build. The working
+// scoring primitives it composed still live in ../quantum/index.js.

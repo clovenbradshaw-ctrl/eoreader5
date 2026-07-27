@@ -1,0 +1,54 @@
+{
+  "span_golden_version": "span-golden@1.0.0",
+  "notes": [
+    "Machine-scorable golden: canonical scenes as anchor quotes into the source text, resolved to offsets at score time. A fold 'hits' a scene when it emits a span within `tolerance` chars of the anchor.",
+    "Three entities, three arc kinds, two narrative modes (third-person holon, first-person emanon) — frozen BEFORE fitting any significance scorer. A scorer tuned on one entity here must not regress the others; that requirement exists because Cult*Atmo*density fit Natasha at 5.5x chance and transferred at 0.7x (worse than chance) to Pierre.",
+    "kind labels are inputs, not metadata: Pierre falsified the single-scalar significance model, so a measure probably needs to know which arc kind it is reading."
+  ],
+  "tolerance": 2000,
+  "entities": [
+    {
+      "text": "pg2600",
+      "entity": "Natasha Rostova",
+      "arc": "emotional",
+      "scenes": [
+        { "id": "first-appearance", "kind": "emotional-turn", "anchor": "This black-eyed, wide-mouthed girl" },
+        { "id": "first-ball", "kind": "emotional-turn", "anchor": "He asked her to waltz." },
+        { "id": "uncle-folk-dance", "kind": "identity-revelation", "anchor": "Where, how, and when had this young countess" },
+        { "id": "anatole-letter", "kind": "emotional-turn", "anchor": "With trembling hands Natásha held that passionate love letter" },
+        { "id": "crisis", "kind": "emotional-turn", "anchor": "Natásha looked from one to the other as a hunted and wounded animal" },
+        { "id": "carts-anger", "kind": "moral-commitment", "anchor": "“I consider,” Natásha suddenly almost shouted" },
+        { "id": "carts-action", "kind": "moral-commitment", "anchor": "“Papa! Mamma! May I see to it? May I?...”" },
+        { "id": "deathbed", "kind": "moral-commitment", "anchor": "“Forgive me!” she whispered" }
+      ]
+    },
+    {
+      "text": "pg2600",
+      "entity": "Pierre",
+      "arc": "intellectual",
+      "scenes": [
+        { "id": "duel-reflection", "kind": "moral-commitment", "anchor": "bully,” thought Pierre" },
+        { "id": "freemasonry", "kind": "intellectual-reversal", "anchor": "Brotherhood of Freemasons under my sponsorship" },
+        { "id": "borodino", "kind": "intellectual-reversal", "anchor": "Raévski Redoubt" },
+        { "id": "assassination-plan", "kind": "moral-commitment", "anchor": "essential for the execution of his design" },
+        { "id": "karataev", "kind": "intellectual-reversal", "anchor": "Karatáev,” he added, evidently wishing" },
+        { "id": "revelation", "kind": "intellectual-reversal", "anchor": "Life is everything" }
+      ]
+    },
+    {
+      "text": "pg84",
+      "entity": "creature",
+      "arc": "mixed",
+      "referentPrior": "eoPriors/priors/coref/pg84-frankenstein.json#creature",
+      "scenes": [
+        { "id": "creation", "kind": "identity-revelation", "anchor": "It was on a dreary night of November" },
+        { "id": "first-rejection", "kind": "emotional-turn", "anchor": "I beheld the wretch" },
+        { "id": "thy-creature", "kind": "moral-commitment", "anchor": "Remember that I am thy creature" },
+        { "id": "cursed-creator", "kind": "emotional-turn", "anchor": "Cursed, cursed creator" },
+        { "id": "demand-mate", "kind": "moral-commitment", "anchor": "You must create a female" },
+        { "id": "belong-to-enemy", "kind": "moral-commitment", "anchor": "Frankenstein! you belong then to my enemy" },
+        { "id": "final", "kind": "identity-revelation", "anchor": "lost in darkness and distance" }
+      ]
+    }
+  ]
+}

@@ -1,17 +1,23 @@
 /**
- * Search — query-based discovery with Born rule projection
+ * Search — query-based discovery over folded text vectors.
  *
- * The search module now supports two scoring modes:
- *   1. Keyword scoring (original) — simple term overlap
- *   2. Born rule projection (new) — quantum mechanical scoring
+ * Two scoring modes:
+ *   1. Keyword scoring — simple term overlap.
+ *   2. Fold scoring — squared, normalized overlap between a query's feature
+ *      vector and an entry's: score = |cos(entryFold, queryFold)|². Squaring
+ *      sharpens the ranking (it down-weights weak partial matches); it is a
+ *      relevance heuristic, not the quantum-mechanical Born rule despite the
+ *      shared |⟨·|·⟩|² form. See ../quantum/index.js for what fold/project
+ *      actually compute.
  *
- * The Born rule: P(relevance) = |⟨entryFold|queryFold⟩|²
- * This measures how well an entry's fold aligns with the query's fold.
- *
- * The two modes can be combined:
+ * The two modes combine as:
  *   finalScore = keywordScore * 0.3 + foldScore * 0.7
- *
  * The fold score dominates when available; keyword scoring is the fallback.
+ *
+ * Top results are then re-ranked by interfere(): a correlation term that boosts
+ * entries pointing the same direction as other strong hits. Same |A₁+A₂|²
+ * cross-term shape as optical interference — used here purely as a co-relevance
+ * signal, with no wave physics implied.
  */
 
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
@@ -93,13 +99,15 @@ function scoreUnitKeyword(unit, terms) {
 }
 
 /**
- * Born rule scoring: project query fold onto unit fold.
+ * Fold relevance score: squared, normalized overlap of query and unit folds.
  *
- * P(relevance) = |⟨queryFold|unitFold⟩|²
+ * score = |cos(queryFold, unitFold)|²  in [0, 1]
+ * (Squaring is a ranking sharpener, not the physical Born rule. Symbol name
+ * kept for compatibility with existing callers/fields.)
  *
  * @param {object} queryFold - The query's fold
  * @param {object} unitFold - The unit's fold (if available)
- * @returns {number} Born rule probability [0, 1]
+ * @returns {number} relevance score [0, 1]
  */
 function scoreUnitBorn(queryFold, unitFold) {
   if (!queryFold || !unitFold) return 0;
@@ -127,7 +135,7 @@ function getUnitFold(unit, foldCache) {
 }
 
 /**
- * Search with Born rule projection.
+ * Search with fold relevance scoring (+ optional correlation re-rank).
  *
  * @param {object} state - Engine state
  * @param {object} request - { query, limit?, frame?, lens?, useBornRule? }
@@ -179,7 +187,9 @@ export function search(state, request = {}) {
       // still scores high regardless of surrounding noise.
       const signalScore = getUnitSignalScore(unit);
 
-      // Secondary: Born rule fold similarity
+      // Secondary: fold relevance (squared normalized overlap). Field kept as
+      // `bornScore` for caller compatibility; it is a similarity score, not a
+      // physical probability.
       let bornScore = 0;
       let unitFold = null;
       if (useBornRule && queryFold) {
@@ -207,7 +217,9 @@ export function search(state, request = {}) {
     .sort((a, b) => b.score - a.score || a.unit.unit_id.localeCompare(b.unit.unit_id))
     .slice(0, limit);
 
-  // Apply interference between top results
+  // Correlation re-rank of the top results: boost entries that point the same
+  // direction as other strong hits (the interfere() cross-term). Named
+  // "interference" after the |A₁+A₂|² shape; it is a co-relevance signal only.
   if (useBornRule && matches.length > 1 && queryFold) {
     const top = matches.slice(0, 5).filter((m) => m.fold);
     if (top.length > 1) {

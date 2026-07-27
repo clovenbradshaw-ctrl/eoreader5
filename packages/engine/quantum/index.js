@@ -1,17 +1,27 @@
 /**
- * Quantum Mechanics Core for EO Reader Engine
+ * Fold scoring core for the EO Reader engine.
  *
- * The fundamental operation: fold → project → measure → decohere
+ * Pipeline: fold → project → measure → decohere. The names borrow quantum
+ * vocabulary, but the operations are ordinary vector scoring — documented
+ * honestly here so the code isn't mistaken for physics:
  *
- * This is the small subunit of the ribosome.
- * It reads the mRNA (raw observations) and translates it into
- * the language of the cube (amplitude vectors).
+ * - fold(text)        → a bounded, normalized feature vector over the cube's
+ *                       faces (Σ of squared components = 1). A representation
+ *                       choice, not a wavefunction.
+ * - project(a, b)     → |cos(a, b)|²: squared normalized overlap in [0,1], used
+ *                       as a relevance score. Shares the Born rule's |⟨·|·⟩|²
+ *                       form; squaring is a ranking sharpener, nothing more.
+ * - interfere(q, fs)  → a correlation cross-term that boosts mutually-aligned
+ *                       results. Same |A₁+A₂|² shape as optical interference,
+ *                       used as a co-relevance signal.
+ * - measure/decohere  → drift a vector toward a query / relax it toward uniform
+ *                       over time. A weighting + exponential-decay heuristic.
  *
- * Core insight: "state is always a projection of the fold"
- * - The FOLD compresses reality into bounded amplitude vectors
- * - The BORN RULE projects folds into definite outcomes
- * - STATE exists only after measurement
- * - Before measurement, there's only the fold
+ * Design guardrail worth keeping: scores stay in [0,1] and folds stay
+ * normalized. That's an engineering constraint, not a conservation law.
+ *
+ * The physics-equation "derivations" that used to compose these primitives
+ * live in archive/physics-derivation/ and are no longer part of the build.
  */
 
 // ── Constants ──
@@ -27,20 +37,22 @@ export const OPERATORS = OPERATOR_CODES;
 export const TERRAINS = SPEC_TERRAINS;
 export const STANCES = SPEC_STANCES;
 
-// Uncertainty constant (I.34.27: ℏ)
+// Spread of the per-face entropy term used by the uncertainty read (tunable).
 export const UNCERTAINTY_H = 0.1;
 
-// Decoherence time constant (ms) — exponential decay I.6.2a
+// How long (ms) before a fold has fully relaxed toward uniform. This is a
+// chosen staleness horizon (1 hour), i.e. a product decision — not a measured
+// or derived time constant.
 const DECOHERENCE_TAU = 3600000;
 
-// Gaussian kernel bandwidth (I.6.2: σ) — controls amplitude smoothing
+// Gaussian similarity bandwidth: how quickly score falls off with distance.
 const GAUSSIAN_SIGMA = 0.4;
 
-// Anisotropic scattering parameters (III.17.37: β(1 + α·cosθ))
+// Angular-reweighting parameters for the cosine boost term (tunable).
 const SCATTER_BETA = 1.0;
 const SCATTER_ALPHA = 0.3;
 
-// ── Gaussian Kernel (I.6.2: e^(−(θ/σ)²/2) / (√(2π)·σ)) ──
+// ── Gaussian similarity kernel: exp(−(Δ/σ)²/2) ──
 
 /**
  * Gaussian kernel score between two values.
@@ -306,14 +318,15 @@ function computeStanceAmplitudes(words, wordSet, wordCount, priors) {
   return amps;
 }
 
-// ── Projection (Born Rule) ──
+// ── Projection (squared normalized overlap) ──
 
 /**
- * Project foldA onto foldB using the Born rule: |⟨ψ|φ⟩|²
+ * Relevance of foldA to foldB: squared normalized overlap, |cos(a,b)|².
+ * Shares the |⟨ψ|φ⟩|² form; squaring sharpens ranking, not physics.
  *
  * @param {object} foldA - The system fold
- * @param {object} foldB - The measurement basis fold
- * @returns {number} Probability of this projection [0, 1]
+ * @param {object} foldB - The reference/query fold
+ * @returns {number} relevance score [0, 1]
  */
 export function project(foldA, foldB) {
   const opIP = innerProductAmplitudes(foldA.operator, foldB.operator);
@@ -358,15 +371,15 @@ function amplitudeToProbability(amplitudes) {
 // ── Interference ──
 
 /**
- * Compute interference between folds.
- * Reinforcing folds boost each other; contradictory folds cancel.
+ * Correlation re-rank across folds: aligned folds boost each other, opposed
+ * folds cancel. Each fold's base intensity |amp|² gets a cross-term
+ * 2√(I_i·I_j)·cos(δ) summed over the others, then a cosine-weighted kernel.
+ * Borrows the I₁+I₂+2√(I₁I₂)cosδ form of two-source interference; used here as
+ * a co-relevance signal, clamped to [0,1]. No wave physics implied.
  *
- * Uses two-source interference (I.37.4): I₁+I₂+2√(I₁I₂)·cosδ
- * with anisotropic scattering kernel (III.17.37): β(1+α·cosθ)
- *
- * @param {object} queryFold - The measurement basis
- * @param {Array} folds - Folds to interfere
- * @returns {Array} Interfered probabilities
+ * @param {object} queryFold - The reference/query fold
+ * @param {Array} folds - Folds to score against each other
+ * @returns {Array} re-ranked scores in [0,1]
  */
 export function interfere(queryFold, folds) {
   const amplitudes = folds.map(fold => {
@@ -387,8 +400,8 @@ export function interfere(queryFold, folds) {
       const phase = computePhase(folds[i], folds[j]);
       const intensityJ = ampJ * ampJ;
 
-      // Anisotropic scattering: β(1 + α·cosδ) — forward-peaked for
-      // correlated folds, suppresses backscattering
+      // Angular reweight: β(1 + α·cosδ) — up-weights aligned (small-angle)
+      // folds, down-weights opposed ones.
       const kernel = SCATTER_BETA * (1 + SCATTER_ALPHA * Math.cos(phase));
       intensity += 2 * Math.sqrt(ampI * ampI * intensityJ) * kernel * Math.cos(phase);
     }
@@ -398,10 +411,9 @@ export function interfere(queryFold, folds) {
 }
 
 /**
- * Compute phase difference between folds.
- * Uses law of cosines (I.29.16): √(x₁² + x₂² − 2x₁x₂·cos(Δθ))
- * instead of simple linear sum, giving proper angular distance on the
- * amplitude sphere.
+ * Angular distance between two folds. Combines the terrain and stance
+ * distance components with the law of cosines, √(x₁²+x₂²−2x₁x₂cos Δθ),
+ * rather than a linear sum — a proper distance on the vector sphere.
  */
 function computePhase(foldA, foldB) {
   const terrDist = 1 - innerProductAmplitudes(foldA.terrain, foldB.terrain);
@@ -419,14 +431,11 @@ function computePhase(foldA, foldB) {
 // ── Measurement Backaction ──
 
 /**
- * Measure a fold. This changes the fold.
+ * Drift a fold toward a reference basis, returning a new fold (input unchanged).
  *
- * Before measurement: fold exists in superposition
- * After measurement: fold is projected towards measurement basis
- *
- * Uses relativistic velocity addition (I.16.6): (u+v)/(1+uv/c²)
- * for blending amplitudes — naturally caps at 1.0 and gives
- * sublinear combination for large values.
+ * Blends amplitudes with the (u+v)/(1+uv/c²) form, chosen because it caps at
+ * 1.0 and combines sublinearly for large values — a convenient saturating
+ * blend, not relativistic velocity addition.
  *
  * @param {object} fold - The fold to measure
  * @param {object} basis - The measurement basis
@@ -440,10 +449,9 @@ export function measureFold(fold, basis, strength = 0.3, opts = {}) {
   const newTerrain = {};
   const newStance = {};
 
-  // Oscillatory backaction (III.8.54: sin²(Et/ℏ))
-  // Repeated measurements cause the fold to oscillate rather than
-  // monotonically converge. The effective strength cycles through
-  // sin²(n·π/2) peaks.
+  // Optional oscillating strength: with oscillate on, repeated drifts cycle
+  // the effective strength through sin²(n·π/2) peaks instead of converging
+  // monotonically. A damping option, not measurement backaction.
   let effectiveStrength = strength;
   if (oscillate && oscillationCount > 1) {
     effectiveStrength = strength * Math.sin(oscillationCount * Math.PI / 2) ** 2;
@@ -544,9 +552,10 @@ function correlation(ampA, ampB) {
 }
 
 /**
- * Update entangled fold when one is measured.
- * Non-local update: measuring one instantly affects the other.
- * Uses relativistic velocity addition (I.16.6) for blending.
+ * Co-update a correlated ("entangled") fold when its partner is drifted:
+ * updating one nudges the other toward the same basis. Uses the same saturating
+ * (u+v)/(1+uv/c²) blend as measureFold. "Entangled" here means statistically
+ * correlated, not quantum-entangled.
  *
  * Pure: returns a NEW fold; the input fold is never mutated. Callers hold
  * folds in replayable state, and in-place mutation would make the same
