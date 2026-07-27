@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
-import { applyCommand, createState, project, read, replay, readingSnapshot } from "../index.js";
+import { applyCommand, createState, project, read, readTasks, replay, readingSnapshot } from "../index.js";
+import { pencilTask, inkTask } from "../emergence/genesis/index.js";
+import { deriveNull } from "../emergence/nulls/index.js";
 
 const priorSnapshot = { schema_version: "PriorSnapshot@1", prior_id: "prior:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", operator_epoch: "eo-2026-07", ledger_head: "head:empty", basis_id: "basis:test", content_hash: "sha256:11111111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
 const observation = { schema: "ObservationEnvelope@1", source_id: "source:1", source_media_type: "text/plain", decoder: { id: "test", version: "1" }, axes: [{ axis_id: "line", topology: "ordered" }], fields: [{ field_id: "f1", value_type: "text", block_id: "b1", axes: ["line"] }], anchors: { scheme: "test", surfaces: [{ referent_id: "ref:1", text: "alpha" }] }, source_content_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", blocks_hash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" };
@@ -58,6 +60,85 @@ test("read, project, and readingSnapshot return evidence-bearing public contract
   assert.equal(snapshot.schema_version, "ReadingSnapshot@1");
   assert.equal(snapshot.units.length, 1);
   assert.equal(snapshot.units[0].operator_events.length, 1);
+});
+
+function passingValidation() {
+  return deriveNull({
+    nullSamples: [0.1, 0.2, 0.15, 0.12, 0.18],
+    observedStatistic: 0.9,
+    tailDirection: "greater",
+    quantile: 0.9,
+    protocol: { name: "test-validation" },
+  });
+}
+
+test("task.pencil/task.ink commands record genesis's own EVA/REC operator, not a hardcoded one", () => {
+  const pencil = pencilTask({ id: "task-add-search", score: 5, description: "add a search bar" }, { dependents: 0, baseQuantile: 0.9 });
+  let next = applyCommand(state(), { type: "task.pencil", payload: pencil });
+  assert.equal(next.events[0].event_type, "task.penciled");
+  assert.equal(next.events[0].op, "EVA");
+  assert.equal(next.tasks.pencil[0].candidate_id, "task-add-search");
+
+  const inked = inkTask(pencil, passingValidation());
+  assert.ok(inked.promoted);
+  next = applyCommand(next, { type: "task.ink", payload: inked.task, inputs: [next.events[0].event_id] });
+  assert.equal(next.events[1].event_type, "task.inked");
+  assert.equal(next.events[1].op, "EVA", "a first commit with no prior ink behind it is EVA, matching hypothesis.accept");
+  assert.equal(next.tasks.ink[0].candidate_id, "task-add-search");
+  assert.equal(next.tasks.pencil.length, 0, "the candidate's CURRENT status is ink, not pencil");
+});
+
+test("a revision ink is recorded with REC, and the prior ink is preserved in history, not deleted", () => {
+  const pencil = pencilTask({ id: "task-x", score: 5 }, { dependents: 0, baseQuantile: 0.9 });
+  let next = applyCommand(state(), { type: "task.pencil", payload: pencil });
+  const firstInk = inkTask(pencil, passingValidation());
+  next = applyCommand(next, { type: "task.ink", payload: firstInk.task, inputs: [next.events[0].event_id] });
+
+  const revisionPencil = pencilTask({ id: "task-x", score: 6 }, { dependents: 0, baseQuantile: 0.9, supersedes: firstInk.task.id });
+  next = applyCommand(next, { type: "task.pencil", payload: revisionPencil, inputs: [next.events[1].event_id] });
+  const secondInk = inkTask(revisionPencil, passingValidation());
+  assert.equal(secondInk.task.emergence.op, "REC");
+  next = applyCommand(next, { type: "task.ink", payload: secondInk.task, inputs: [next.events[2].event_id] });
+
+  assert.equal(next.events[3].op, "REC", "the ledger reads the revision's operator from genesis, not a hardcoded EVA");
+  assert.equal(next.tasks.ink.length, 1, "one CURRENT ink per candidate_id");
+  assert.equal(next.tasks.ink[0].event_id, next.events[3].event_id, "the current view is the latest ink");
+
+  const tasks = readTasks(next);
+  assert.equal(tasks.schema, "TaskSet@1");
+  const fullHistory = tasks.history["task-x"];
+  assert.equal(fullHistory.length, 4, "pencil, ink, revision-pencil, revision-ink — every attempt preserved");
+  assert.deepEqual(fullHistory.map((e) => e.event_type), ["task.penciled", "task.inked", "task.penciled", "task.inked"]);
+});
+
+test("a held task (failed validation) is visible in the ledger, not just returned to the caller", () => {
+  const pencil = pencilTask({ id: "task-risky", score: 5 }, { dependents: 0, baseQuantile: 0.9 });
+  let next = applyCommand(state(), { type: "task.pencil", payload: pencil });
+  next = applyCommand(next, {
+    type: "task.hold",
+    payload: { ...pencil, reason: "validation-failed" },
+    inputs: [next.events[0].event_id],
+  });
+  assert.equal(next.tasks.held[0].candidate_id, "task-risky");
+  assert.equal(next.tasks.pencil.length, 0, "held supersedes pencil as the candidate's current status");
+  const tasks = readTasks(next);
+  assert.equal(tasks.history["task-risky"].length, 2);
+});
+
+test("priors cited on a task survive replay verbatim — provenance is not summarized away", () => {
+  const priors = [{ prior_id: "coding-prior:react-forms", content_hash: "hash1", weight: 0.7 }];
+  const pencil = pencilTask({ id: "task-y", score: 5 }, { dependents: 0, priorsCited: priors });
+  const next = applyCommand(state(), { type: "task.pencil", payload: pencil });
+  assert.deepEqual(next.tasks.pencil[0].priors_cited, priors);
+  const replayed = replay(next.events, { engineVersion: "0.1.0", operatorEpoch: "eo-2026-07", priorSnapshot });
+  assert.deepEqual(replayed.tasks.pencil[0].priors_cited, priors);
+});
+
+test("task command types are accepted by validateCommand alongside the existing vocabulary", () => {
+  // Regression guard for packages/spec/validation/index.js's allowed set —
+  // this would throw "unknown command type" if the addition were reverted.
+  const pencil = pencilTask({ id: "task-z", score: 1 });
+  assert.doesNotThrow(() => applyCommand(state(), { type: "task.pencil", payload: pencil }));
 });
 
 test("referent merge events are replayed explicitly", () => {

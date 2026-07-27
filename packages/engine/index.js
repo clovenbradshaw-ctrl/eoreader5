@@ -7,7 +7,7 @@ export {
   applyNameBind,
 } from "./referents/index.js";
 export { CORE_SUBASSEMBLIES, assembleWatchmaker, defineSubassembly } from "./subassemblies/index.js";
-export { createState, applyCommand, appendEvents, replay, read } from "./replay/index.js";
+export { createState, applyCommand, appendEvents, replay, read, readTasks } from "./replay/index.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";
@@ -253,6 +253,26 @@ export {
   segmentChapters,
   consensusBoundaries,
 } from "./emergence/chapters/index.js";
+
+// Task genesis: the fold that grows a task tree instead of authoring one.
+// DEF over a caller-scored candidate spectrum decides what collapses;
+// pencilTask/inkTask carry it through a provisional-then-settled
+// lifecycle (never deleting, never mutating — see replay's task.pencil/
+// task.ink/task.hold commands and readTasks for the ledger side);
+// completionDiagnostic tells whole-project completion apart from
+// generation having drifted into noise that merely fails DEF for the
+// wrong reason. Priors and dependency-risk shape what gets PROPOSED to
+// collapseCandidates; they never touch DEF's own floor.
+export {
+  TASK_LIFECYCLE,
+  SOURCE_KINDS,
+  dependentsOf,
+  requiredValidationQuantile,
+  collapseCandidates,
+  pencilTask,
+  inkTask,
+  completionDiagnostic,
+} from "./emergence/genesis/index.js";
 
 // ── The invariant layer ──
 // The four constraints that define the system's legal state space.

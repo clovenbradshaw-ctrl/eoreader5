@@ -24,9 +24,17 @@ export function createState({ engineVersion, operatorEpoch, priorSnapshot }) {
     observationIndex: { fields: new Map(), axes: new Map(), values: [] },
     referents: new Map(),
     hypotheses: { accepted: [], competing: [], held: [], abstentions: [] },
+    // Task genesis (emergence/genesis): pencil = provisional, ink = settled,
+    // held = validation failed on this attempt. Every event stays in the
+    // ledger forever regardless of status — this bucket only tracks each
+    // candidate_id's CURRENT status; taskHistory (below) keeps every
+    // attempt, so nothing pencilled or held is ever actually lost, only
+    // superseded by a later event under the same candidate_id.
+    tasks: { pencil: [], ink: [], held: [] },
+    taskHistory: new Map(),
     frames: new Map([["frame:default", { frame_id: "frame:default", label: "Default frame" }]]),
     resolution: { verdict: "unresolved", evidence_event_ids: [] },
-    projectedState: { observations: [], referents: [], hypotheses: [], frames: [], resolution: null },
+    projectedState: { observations: [], referents: [], hypotheses: [], tasks: [], frames: [], resolution: null },
   };
 }
 
@@ -73,6 +81,17 @@ export function applyCommand(state, command) {
   if (command.type === "referent.merge") return appendEvents(state, [baseEvent(state, "referent.merged", "REC", command.payload, inputs, role)]);
   if (command.type === "referent.split") return appendEvents(state, [baseEvent(state, "referent.split", "REC", command.payload, inputs, role)]);
   if (command.type === "referent.same_as") return appendEvents(state, [baseEvent(state, "referent.same_as", "REC", command.payload, inputs, role)]);
+  // Task genesis: payload is a TaskCandidate@1 object from
+  // emergence/genesis (pencilTask/inkTask's .task). The ledger does not
+  // re-derive genesis's decisions — same discipline as hypothesis.accept
+  // not re-deriving whether a hypothesis should be accepted — it only
+  // records what genesis already decided, permanently. task.ink's operator
+  // is read from the candidate's own emergence.op (EVA for a first commit,
+  // REC for a revision that supersedes a prior ink) rather than hardcoded,
+  // so the ledger reflects the same EVA/REC distinction genesis computed.
+  if (command.type === "task.pencil") return appendEvents(state, [baseEvent(state, "task.penciled", "EVA", command.payload, inputs, role)]);
+  if (command.type === "task.ink") return appendEvents(state, [baseEvent(state, "task.inked", command.payload?.emergence?.op === "REC" ? "REC" : "EVA", command.payload, inputs, role)]);
+  if (command.type === "task.hold") return appendEvents(state, [baseEvent(state, "task.held", "EVA", command.payload, inputs, role)]);
   if (command.type === "discovery.advance" || command.type === "discovery.resume") {
     const budget = command.budget ?? {};
     const nObs = state.observations.length;
@@ -111,6 +130,8 @@ function reduceEvents(state) {
   const byId = new Map();
   const abstentions = [];
   const referentEvents = [];
+  const tasksById = new Map();
+  const taskHistory = new Map();
   const frames = new Map(state.frames);
   let resolution = { verdict: "unresolved", evidence_event_ids: [] };
   for (const event of state.events) {
@@ -140,6 +161,22 @@ function reduceEvents(state) {
       byId.set(event.payload.replacement_id ?? event.event_id, { ...event.payload, event_id: event.event_id, status: "superseded" });
     }
     if (event.event_type === "discovery.abstained") abstentions.push({ ...event.payload, event_id: event.event_id });
+    // Task genesis lifecycle. Grouped by candidate_id (the underlying
+    // candidate's stable identity, stable across pencil -> ink -> a
+    // revision's fresh pencil -> ink) so `tasksById` always reflects the
+    // CURRENT status, while taskHistory keeps every event under that
+    // candidate_id in order — nothing a pencil or a held attempt recorded
+    // is ever dropped, only superseded by a later status for the same
+    // candidate_id.
+    if (["task.penciled", "task.inked", "task.held"].includes(event.event_type)) {
+      const candidateId = event.payload?.candidate_id;
+      if (candidateId) {
+        const entry = { ...event.payload, event_id: event.event_id, event_type: event.event_type };
+        tasksById.set(candidateId, entry);
+        const history = taskHistory.get(candidateId) ?? [];
+        taskHistory.set(candidateId, [...history, entry]);
+      }
+    }
     if (event.payload?.frame) frames.set(event.payload.frame.frame_id, event.payload.frame);
     if (event.payload?.resolution) resolution = { ...event.payload.resolution, evidence_event_ids: event.inputs };
   }
@@ -149,12 +186,35 @@ function reduceEvents(state) {
     else if (hypothesis.status === "competing") competing.push(hypothesis);
     else held.push(hypothesis);
   }
+  const taskPencil = [], taskInk = [], taskHeld = [];
+  for (const task of tasksById.values()) {
+    if (task.event_type === "task.inked") taskInk.push(task);
+    else if (task.event_type === "task.held") taskHeld.push(task);
+    else taskPencil.push(task);
+  }
   const semanticHead = state.events.length ? stableId("head", state.events.map((event) => event.event_id)) : "head:empty";
   const referents = projectReferents(referentEvents);
   const observationIndex = materializeObservationIndex(observations, blockStore);
-  return { ...state, semanticHead, observations, blockStore, observationIndex, referents, hypotheses: { accepted, competing, held, abstentions }, frames, resolution, projectedState: { observations, referents: [...referents.values()], hypotheses: [...accepted, ...competing, ...held], frames: [...frames.values()], resolution } };
+  return { ...state, semanticHead, observations, blockStore, observationIndex, referents, hypotheses: { accepted, competing, held, abstentions }, tasks: { pencil: taskPencil, ink: taskInk, held: taskHeld }, taskHistory, frames, resolution, projectedState: { observations, referents: [...referents.values()], hypotheses: [...accepted, ...competing, ...held], tasks: [...taskPencil, ...taskInk, ...taskHeld], frames: [...frames.values()], resolution } };
 }
 
 export function replay(events, options) { return appendEvents(createState({ engineVersion: options.engineVersion ?? "unknown", operatorEpoch: options.operatorEpoch ?? "unknown", priorSnapshot: options.priorSnapshot }), events); }
 
 export function read(state) { return { schema: "HypothesisSet@1", hypothesis_set_id: stableId("hypotheses", state.events.map((e) => e.event_id)), semantic_head: state.semanticHead, context: { engine_version: state.engineVersion, operator_epoch: state.operatorEpoch }, ...state.hypotheses }; }
+
+// TaskSet@1: the current status of every task ever proposed through
+// task.pencil/task.ink/task.hold, grouped by candidate_id. `history`
+// exposes EVERY event under each candidate_id in order, not just the
+// current one — the ledger-level guarantee that pencils and held attempts
+// are preserved, not merely "not literally deleted from an array
+// somewhere". Same read-only, evidence-bearing contract as read().
+export function readTasks(state) {
+  return {
+    schema: "TaskSet@1",
+    task_set_id: stableId("tasks", state.events.map((e) => e.event_id)),
+    semantic_head: state.semanticHead,
+    context: { engine_version: state.engineVersion, operator_epoch: state.operatorEpoch },
+    ...state.tasks,
+    history: Object.fromEntries(state.taskHistory),
+  };
+}
