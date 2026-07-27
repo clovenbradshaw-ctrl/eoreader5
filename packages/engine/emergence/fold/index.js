@@ -42,16 +42,37 @@ export function scoreChunk(chunk, context) {
   const { query, focus, history, queryCoord } = context;
   let score = 0;
 
-  // Text relevance (keyword matching)
-  const queryWords = (query ?? "").toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+  const STOPWORDS = new Set([
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
+    "been", "has", "had", "have", "do", "does", "did", "will", "would",
+    "could", "should", "may", "might", "can", "shall", "what", "which",
+    "who", "whom", "when", "where", "why", "how", "this", "that", "these",
+    "those", "it", "its", "they", "them", "their", "we", "our", "you",
+    "your", "he", "she", "his", "her", "him", "me", "my", "not", "no",
+    "nor", "so", "if", "then", "than", "just", "about", "into", "over",
+    "after", "before", "between", "under",
+  ]);
+  const queryWords = (query ?? "").toLowerCase()
+    .split(/\s+/).filter((w) => w.length > 2 && !STOPWORDS.has(w));
+  if (queryWords.length === 0) return 0;
+
   const chunkText = (chunk.text ?? "").toLowerCase();
+  const wordCount = chunkText.split(/\s+/).filter(Boolean).length;
+
+  // Text relevance (keyword density — normalizes by chunk size so
+  // a dense 200-word passage beats a diffuse 2000-word one)
+  let keywordMatches = 0;
   for (const w of queryWords) {
-    if (chunkText.includes(w)) score += 3;
+    if (chunkText.includes(w)) keywordMatches++;
+  }
+  if (keywordMatches > 0 && wordCount > 0) {
+    score += (keywordMatches / wordCount) * 300;
   }
 
   // Exact phrase match
   const queryPhrase = queryWords.join(" ");
-  if (queryPhrase && chunkText.includes(queryPhrase)) score += 20;
+  if (queryPhrase && chunkText.includes(queryPhrase)) score += 100;
 
   // Coordinate match (terrain/stance/operator alignment)
   const chunkCoord = chunk.coord ?? classify(chunk.text);

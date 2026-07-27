@@ -172,12 +172,18 @@ function typeBoundary(boundaryText) {
 
 export function extractEvents(frames, boundaries, entities, entityName, options = {}) {
   const { maxEvents = 12, proximityWindow: optProximity } = options;
-  const en = norm(entityName);
-  const entityTokens = en.split(/\s+/).filter((t) => t.length > 2);
-  const entityPositions = new Set();
-  for (const f of frames) {
-    const text = norm(f.text);
-    if (entityTokens.some((t) => text.includes(t))) entityPositions.add(f.order);
+  // Presence-derived positions (perceiver/text/presence.js) take precedence:
+  // token inclusion cannot see injected aliases or first-person narration,
+  // so an emanon's own tale would otherwise be invisible to event extraction.
+  let entityPositions = options.entityPositions ?? null;
+  if (!entityPositions) {
+    const en = norm(entityName);
+    const entityTokens = en.split(/\s+/).filter((t) => t.length > 2);
+    entityPositions = new Set();
+    for (const f of frames) {
+      const text = norm(f.text);
+      if (entityTokens.some((t) => text.includes(t))) entityPositions.add(f.order);
+    }
   }
   const proximityWindow = optProximity ?? 5;
   const filtered = boundaries.filter((b) => {

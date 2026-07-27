@@ -16,45 +16,119 @@ import { OPERATOR_CODES } from "@eoreader/spec/operators";
 // ── Terrain classification ──
 // Regex-based, deterministic. Maps free text to one of 9 terrains.
 
-const TERRAIN_PATTERNS = [
-  { terrain: "Void",        pattern: /\b(nothing|void|empty|absence|missing|silence|null|none)\b/i },
-  { terrain: "Entity",      pattern: /\b(who|person|people|name|identity|he|she|they|I am|my name|character|figure|individual|actor|agent)\b/i },
-  { terrain: "Kind",         pattern: /\b(type|kind|category|class|definition|is a|are a|was a|species|genre|sort|variety)\b/i },
-  { terrain: "Field",        pattern: /\b(data|information|text|content|context|passage|quote|chapter|book|story|narrative|document|corpus)\b/i },
-  { terrain: "Link",         pattern: /\b(relation|connection|link|dependency|bond|ally|enemy|friend|reports?\s+to|works?\s+for|between|relates)\b/i },
-  { terrain: "Network",      pattern: /\b(system|network|structure|empire|state|republic|government|army|legion|senate|organization|institution)\b/i },
-  { terrain: "Atmosphere",   pattern: /\b(feeling|mood|tone|emotion|passion|fear|anger|love|hate|desire|sentiment|atmosphere|ambience)\b/i },
-  { terrain: "Lens",         pattern: /\b(perspective|view|angle|focus|frame|lens|interpretation|analysis|reading|stance|posture)\b/i },
-  { terrain: "Paradigm",     pattern: /\b(theory|model|framework|paradigm|worldview|philosophy|principle|axiom|doctrine|canon)\b/i },
+// Each category carries STRONG evidence (terms that specifically denote it)
+// and WEAK evidence (terms that co-occur with it but are ubiquitous in running
+// prose). The split exists because the previous first-match-wins cascade let
+// ubiquitous function words decide the coordinate: `Void` was tested first and
+// matched "nothing/none", `Entity` second and matched "he/she/they", so between
+// them they claimed 99.2% of War and Peace frames and Atmosphere/Lens/Paradigm
+// fired on ZERO frames — which made the REC_Cultivating_Paradigm diagonal
+// (recontextualisation) structurally unreachable.
+//
+// Scoring all nine and taking amplitudes instead means a passage that mentions
+// "she" thirty times but "love/tears/grief" five times reads as Atmosphere,
+// not Entity — the evidence competes rather than short-circuiting on order.
+
+const WEAK = 0.15;
+
+const TERRAIN_TERMS = [
+  { terrain: "Void",       strong: /\b(void|absence|emptiness|nothingness|oblivion|silence|vacant|barren)\b/gi,
+                           weak:   /\b(nothing|empty|missing|none|null|no\s+one)\b/gi },
+  { terrain: "Entity",     strong: /\b(who|person|people|name|identity|character|figure|individual|actor|agent|my\s+name|I\s+am)\b/gi,
+                           weak:   /\b(he|she|they|him|her|his|their|them)\b/gi },
+  { terrain: "Kind",       strong: /\b(type|kind|category|class|definition|species|genre|sort|variety)\b/gi,
+                           weak:   /\b(is\s+a|are\s+a|was\s+a)\b/gi },
+  { terrain: "Field",      strong: /\b(data|information|content|passage|quote|narrative|document|corpus|record)\b/gi,
+                           weak:   /\b(text|context|chapter|book|story)\b/gi },
+  { terrain: "Link",       strong: /\b(relation|connection|link|dependency|bond|ally|enemy|reports?\s+to|works?\s+for|relates)\b/gi,
+                           weak:   /\b(between|friend|with)\b/gi },
+  { terrain: "Network",    strong: /\b(system|network|empire|republic|government|army|legion|senate|organization|institution|regiment|society)\b/gi,
+                           weak:   /\b(structure|state)\b/gi },
+  { terrain: "Atmosphere", strong: /\b(feeling|feelings|mood|emotion|passion|fear|anger|love|loved|hate|desire|sentiment|atmosphere|joy|joyful|grief|sorrow|tenderness|shame|despair|rapture|terror|pity|weep|wept|weeping|tears|sobbed|sobbing|trembled|trembling|blushed)\b/gi,
+                           weak:   /\b(tone|happy|sad|glad|afraid)\b/gi },
+  { terrain: "Lens",       strong: /\b(perspective|standpoint|angle|lens|interpretation|analysis|stance|posture|point\s+of\s+view|in\s+his\s+eyes|in\s+her\s+eyes|as\s+if\s+seeing)\b/gi,
+                           weak:   /\b(view|focus|frame|reading|seemed\s+to\s+him|seemed\s+to\s+her)\b/gi },
+  { terrain: "Paradigm",   strong: /\b(theory|framework|paradigm|worldview|philosophy|doctrine|canon|providence|destiny|the\s+meaning\s+of\s+life|God's\s+will|first\s+principles)\b/gi,
+                           weak:   /\b(model|principle|axiom|fate|truth|faith|law\s+of)\b/gi },
 ];
 
-// ── Stance classification ──
-
-const STANCE_PATTERNS = [
-  { stance: "Clearing",     pattern: /\b(clear|remove|delete|empty|purge|wipe|erase|clean)\b/i },
-  { stance: "Dissecting",   pattern: /\b(analyze|break\s+down|examine|inspect|dissect|compare|deconstruct|debug)\b/i },
-  { stance: "Unraveling",   pattern: /\b(interpret|meaning|significance|why|reason|purpose|explain|decipher)\b/i },
-  { stance: "Tending",      pattern: /\b(maintain|support|help|assist|care|nurture|sustain|preserve)\b/i },
-  { stance: "Binding",      pattern: /\b(connect|link|relate|depend|bond|attach|join|unite|associate)\b/i },
-  { stance: "Tracing",      pattern: /\b(what|tell\s+me|describe|summarize|overview|track|follow|trace|path|history|timeline)\b/i },
-  { stance: "Cultivating",  pattern: /\b(grow|develop|evolve|learn|understand|deepen|mature|progress)\b/i },
-  { stance: "Making",       pattern: /\b(create|make|build|construct|implement|produce|generate|forge)\b/i },
-  { stance: "Composing",    pattern: /\b(organize|arrange|structure|design|plan|compose|orchestrate|layout)\b/i },
+const STANCE_TERMS = [
+  { stance: "Clearing",    strong: /\b(clear|remove|delete|purge|wipe|erase|clean|abandon|renounce)\b/gi,
+                           weak:   /\b(empty|leave|left)\b/gi },
+  { stance: "Dissecting",  strong: /\b(analyze|analyse|break\s+down|examine|inspect|dissect|deconstruct|debug|scrutin)\w*\b/gi,
+                           weak:   /\b(compare|study)\b/gi },
+  { stance: "Unraveling",  strong: /\b(interpret|significance|decipher|unravel|make\s+sense\s+of|puzzle)\w*\b/gi,
+                           weak:   /\b(meaning|why|reason|purpose|explain)\b/gi },
+  { stance: "Tending",     strong: /\b(nurse|nursed|nursing|tend|tended|care\s+for|nurture|sustain|preserve|comfort|soothe|watch\s+over)\b/gi,
+                           weak:   /\b(maintain|support|help|assist|care)\b/gi },
+  { stance: "Binding",     strong: /\b(bind|bound|betroth|engage[dm]|marry|married|wed|vow|pledge|unite|attach)\w*\b/gi,
+                           weak:   /\b(connect|link|relate|depend|bond|join|associate)\b/gi },
+  { stance: "Tracing",     strong: /\b(tell\s+me|describe|summarize|summarise|overview|trace|timeline|recount)\b/gi,
+                           weak:   /\b(what|track|follow|path|history)\b/gi },
+  // Cultivating carries the growth/realisation sense: the stance a character is
+  // in when their understanding is changing, not merely when time passes.
+  { stance: "Cultivating", strong: /\b(realiz|realis|understood|recogniz|recognis|came\s+to\s+see|dawned|matured|grew\s+to|learned\s+that|for\s+the\s+first\s+time)\w*\b/gi,
+                           weak:   /\b(grow|develop|evolve|learn|understand|deepen|progress)\b/gi },
+  { stance: "Making",      strong: /\b(create|construct|implement|forge|fashion)\w*\b/gi,
+                           weak:   /\b(make|build|produce|generate)\b/gi },
+  { stance: "Composing",   strong: /\b(orchestrate|compose|arrange|layout|choreograph)\w*\b/gi,
+                           weak:   /\b(organize|organise|structure|design|plan)\b/gi },
 ];
 
-// ── Operator classification ──
-
-const OPERATOR_PATTERNS = [
-  { operator: "NUL", pattern: /\b(nothing|void|empty|remove|delete|clear|erase|purge)\b/i },
-  { operator: "SEG", pattern: /\b(segment|piece|part|section|divide|split|cut|partition|chunk)\b/i },
-  { operator: "DEF", pattern: /\b(define|declare|specify|set|establish|name|nominate|label)\b/i },
-  { operator: "SIG", pattern: /\b(signal|indicate|point|show|reveal|express|manifest|display)\b/i },
-  { operator: "CON", pattern: /\b(connect|link|relate|depend|bind|join|tie|attach|associate)\b/i },
-  { operator: "EVA", pattern: /\b(evaluate|judge|assess|compare|measure|test|appraise|rank)\b/i },
-  { operator: "INS", pattern: /\b(insert|add|create|make|build|generate|produce|introduce)\b/i },
-  { operator: "SYN", pattern: /\b(synthesize|combine|merge|integrate|unify|fuse|blend|meld)\b/i },
-  { operator: "REC", pattern: /\b(record|log|track|remember|capture|store|archive|document)\b/i },
+const OPERATOR_TERMS = [
+  { operator: "NUL", strong: /\b(void|annihilat|obliterat|vanish|cease)\w*\b/gi,
+                     weak:   /\b(nothing|empty|remove|delete|clear|erase|purge)\b/gi },
+  { operator: "SEG", strong: /\b(segment|partition|subdivide|demarcat)\w*\b/gi,
+                     weak:   /\b(piece|part|section|divide|split|cut|chunk)\b/gi },
+  { operator: "DEF", strong: /\b(define|declare|specify|nominate|stipulate)\w*\b/gi,
+                     weak:   /\b(set|establish|name|label)\b/gi },
+  { operator: "SIG", strong: /\b(signal|indicate|manifest|betoken)\w*\b/gi,
+                     weak:   /\b(point|show|reveal|express|display)\b/gi },
+  { operator: "CON", strong: /\b(interlink|interrelate|correlate)\w*\b/gi,
+                     weak:   /\b(connect|link|relate|depend|bind|join|tie|attach|associate)\b/gi },
+  { operator: "EVA", strong: /\b(evaluate|appraise|adjudge|condemn|approve|reproach|blame|forgive|forgave)\w*\b/gi,
+                     weak:   /\b(judge|assess|measure|test|rank)\b/gi },
+  { operator: "INS", strong: /\b(insert|introduce|instantiate)\w*\b/gi,
+                     weak:   /\b(add|create|make|build|generate|produce)\b/gi },
+  { operator: "SYN", strong: /\b(synthesiz|synthesis|integrat|unif|fuse|coalesc)\w*\b/gi,
+                     weak:   /\b(combine|merge|blend)\b/gi },
+  // REC is RECONTEXTUALISATION — the operator that fires when the reader's or a
+  // character's frame on someone/something CHANGES. The previous vocabulary
+  // (record|log|archive|document) encoded filing-cabinet bookkeeping instead,
+  // which is why REC fired on 2.4% of frames and never at a narrative turn.
+  { operator: "REC", strong: /\b(for\s+the\s+first\s+time|no\s+longer|never\s+before|had\s+never|suddenly\s+(?:saw|understood|realiz|realis|felt)|now\s+seemed|seemed\s+different|changed\s+his\s+mind|changed\s+her\s+mind|came\s+to\s+see|it\s+dawned|struck\s+him|struck\s+her|occurred\s+to\s+(?:him|her)|as\s+never\s+before|understood\s+for)\w*\b/gi,
+                     weak:   /\b(record|log|remember|remembered|recall|archive|reconsider)\b/gi },
 ];
+
+// Count occurrences without leaking regex lastIndex between calls.
+const hits = (t, re) => (t.match(re) ?? []).length;
+
+// Evidence weight for one category. log1p damps repetition so a word used
+// thirty times is stronger than one used five times, but not six times stronger.
+function evidence(t, { strong, weak }) {
+  return Math.log1p(hits(t, strong)) + WEAK * Math.log1p(hits(t, weak));
+}
+
+/**
+ * amplitudesFor(text, table, key) -> Array<{ label, score, amplitude }>
+ *
+ * Scores ALL categories in a dimension and normalises to amplitudes. This is
+ * the superposition the fold is defined over: a passage is not "Entity", it is
+ * mostly-Atmosphere-partly-Entity, and collapsing to a single label before any
+ * measurement is what previously destroyed the signal.
+ */
+function amplitudesFor(text, table, key) {
+  const t = String(text ?? "");
+  const scored = table.map((row) => ({ label: row[key], score: evidence(t, row) }));
+  const total = scored.reduce((s, r) => s + r.score, 0);
+  return scored.map((r) => ({ ...r, amplitude: total > 0 ? r.score / total : 0 }));
+}
+
+function argmax(amps, fallback) {
+  let best = null;
+  for (const a of amps) if (a.score > 0 && (!best || a.score > best.score)) best = a;
+  return best ? best.label : fallback;
+}
 
 /**
  * classifyTerrain(text) -> string
@@ -63,11 +137,7 @@ const OPERATOR_PATTERNS = [
  * Falls back to "Field" (the default domain for undifferentiated content).
  */
 export function classifyTerrain(text) {
-  const t = String(text ?? "");
-  for (const { terrain, pattern } of TERRAIN_PATTERNS) {
-    if (pattern.test(t)) return terrain;
-  }
-  return "Field";
+  return argmax(amplitudesFor(text, TERRAIN_TERMS, "terrain"), "Field");
 }
 
 /**
@@ -77,11 +147,7 @@ export function classifyTerrain(text) {
  * Falls back to "Tracing" (the default approach).
  */
 export function classifyStance(text) {
-  const t = String(text ?? "");
-  for (const { stance, pattern } of STANCE_PATTERNS) {
-    if (pattern.test(t)) return stance;
-  }
-  return "Tracing";
+  return argmax(amplitudesFor(text, STANCE_TERMS, "stance"), "Tracing");
 }
 
 /**
@@ -91,11 +157,22 @@ export function classifyStance(text) {
  * Falls back to "SIG" (the default act).
  */
 export function classifyOperator(text) {
-  const t = String(text ?? "");
-  for (const { operator, pattern } of OPERATOR_PATTERNS) {
-    if (pattern.test(t)) return operator;
-  }
-  return "SIG";
+  return argmax(amplitudesFor(text, OPERATOR_TERMS, "operator"), "SIG");
+}
+
+/**
+ * classifyAmplitudes(text) -> { operator, terrain, stance }
+ *
+ * The uncollapsed fold: full amplitude distribution over each dimension,
+ * sorted strongest-first. `classify` is the argmax projection of this.
+ */
+export function classifyAmplitudes(text) {
+  const bySize = (a, b) => b.amplitude - a.amplitude;
+  return {
+    operator: amplitudesFor(text, OPERATOR_TERMS, "operator").sort(bySize),
+    terrain: amplitudesFor(text, TERRAIN_TERMS, "terrain").sort(bySize),
+    stance: amplitudesFor(text, STANCE_TERMS, "stance").sort(bySize),
+  };
 }
 
 /**

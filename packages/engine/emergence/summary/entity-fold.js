@@ -25,6 +25,7 @@ import {
 } from "./text-organ.js";
 import { classify, classifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
+import { admitReferent, presenceByFrame } from "../../perceiver/text/presence.js";
 
 // Diacritical mapping for engine-level entity name matching.
 // NOT signal-path normalization — this is the engine discovering
@@ -55,6 +56,8 @@ function matchSurface(name, surfaces) {
     if (sWords.length === 1 && sWords[0].length <= 3) continue;
     // Count how many name tokens appear in this surface
     const score = tokens.filter((t) => sn.includes(t)).length;
+    if (score === 0) continue; // no shared token = no match; an unnamed
+    // entity (emanon) must fall through to its own seed, not win by tiebreak
     // Prefer surfaces with more matching tokens; break ties by shortness
     const lengthPenalty = s.length / 100;
     const adjusted = score - lengthPenalty;
@@ -71,6 +74,9 @@ export function entityFold(text, entityName = null, options = {}) {
     title = null,
     sceneCount = 12,
     place = null,
+    referent = null,       // per-text coref prior entry (eoPriors coref artifact)
+    aliases = null,        // legacy escape hatch: flat descriptor aliases
+    narratorSpans = null,  // legacy escape hatch: numeric first-person spans
   } = options;
 
   // 1. Frame text into signal windows
@@ -97,12 +103,30 @@ export function entityFold(text, entityName = null, options = {}) {
   const allSurfaces = [...new Set(extractSurfaces(text))];
   const targetSurface = matchSurface(entityName, allSurfaces) ?? entityName ?? "unknown";
 
-  // 3. Find frames containing the target entity (by any name token)
-  const targetNameTokens = norm(targetSurface).split(/\s+/).filter((t) => t.length > 2);
-  const targetFrames = frames.filter((f) => {
-    const text = norm(f.text);
-    return targetNameTokens.some((t) => text.includes(t));
+  // 3. Referent-centric presence (perceiver/text/presence.js). The unit of
+  // identity is the REFERENT: surfaces are scoped evidence pointing at it,
+  // admitted as lifecycle events and projected through the referents organ.
+  // Name variants come from the structural coreference rule (TIER.RESOLVED);
+  // descriptor surfaces and narrator spans come from a per-text coref prior
+  // (witness-channel knowledge — injected, never derived).
+  const normText = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const prior = referent ?? {
+    id: entityName ?? targetSurface,
+    name: /^\p{Lu}/u.test(String(targetSurface).trim()) ? targetSurface : null,
+    surfaces: (aliases ?? []).map((a) => ({ surface: a })),
+    narratorSpans: (narratorSpans ?? []).map((sp) => ({ from: sp.from, to: sp.to })),
+  };
+  if (referent && !prior.name && /^\p{Lu}/u.test(String(targetSurface).trim())) {
+    // A prior may omit `name` for a holon; the matched surface supplies it.
+    prior.name = targetSurface;
+  }
+  const admission = admitReferent(frames, prior, {
+    nameSurfaces: allSurfaces,
+    fullText: normText,
   });
+  const presence = presenceByFrame(frames, admission.surfaces);
+  const targetFrames = frames.filter((f) => (presence.get(f.order) ?? 0) > 0);
+  const entityPositions = new Set(targetFrames.map((f) => f.order));
 
   // 4. Build per-chunk surface map for figure detection
   const perChunk = new Map();
@@ -164,10 +188,12 @@ export function entityFold(text, entityName = null, options = {}) {
   // 5. Detect boundaries (topic shifts) — lower threshold for more events
   const boundaries = detectBoundaries(frames, { zThreshold: 1.8 });
 
-  // 6. Extract typed events near the entity
+  // 6. Extract typed events near the entity — presence-derived positions,
+  // so injected aliases and narrator spans count as "near".
   const events = extractEvents(frames, boundaries, [], targetSurface, {
     maxEvents: sceneCount,
     proximityWindow: 10, // wider window to catch more boundaries near entity
+    entityPositions,
   });
 
   // 7. Optional relation extraction — the PERCEIVER's organ output, wired
@@ -177,8 +203,12 @@ export function entityFold(text, entityName = null, options = {}) {
   let relations = [];
   if (options.withRelations) {
     // Compare in the same normalization space: rn below is diacritic-
-    // stripped, so the name tokens must be stripped too.
-    const targetTokens = [...targetNameTokenSet].map(diaNorm);
+    // stripped, so the name tokens must be stripped too. Alias head tokens
+    // are included so "the monster seized..." clauses attach to the referent.
+    const aliasTokens = (prior.surfaces ?? []).flatMap((s) =>
+      diaNorm(s.surface ?? s).split(/\s+/).filter((t) => t.length > 3),
+    );
+    const targetTokens = [...new Set([...[...targetNameTokenSet].map(diaNorm), ...aliasTokens])];
     relations = extractTextRelations(
       targetFrames.map((f) => ({ text: snapToSentences(f.text), foldScore: 0, order: f.order })),
       { limit: Infinity },
@@ -213,9 +243,27 @@ export function entityFold(text, entityName = null, options = {}) {
       .map((m) => ({ ...m, text: snapToSentences(m.text), context: snapToSentences(m.context ?? m.text) }));
   }
 
+  // Top up: one-per-type event dedup can leave far fewer moments than asked
+  // for (4 types → 4 moments regardless of sceneCount). Fill the remainder
+  // from the significance spine, skipping anything already covered.
+  if (sceneMoments.length < sceneCount && targetFrames.length) {
+    const spine = significanceSpine(targetFrames, { budget: 600, k: sceneCount });
+    const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
+    for (const m of buildSceneMoments(targetFrames, spine, { contextWindow: 1 })) {
+      if (sceneMoments.length >= sceneCount) break;
+      if (sceneMoments.some((s) => near(s.offset, m.offset))) continue;
+      sceneMoments.push({
+        ...m,
+        text: snapToSentences(m.text),
+        context: snapToSentences(m.context ?? m.text),
+      });
+    }
+    sceneMoments.sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0));
+  }
+
   // 9. Build EOT packet. Absence is reported, never papered over: an entity
   // with no matching frames yields an explicit gap.
-  const gaps = [];
+  const gaps = [...(admission.gaps ?? [])];
   if (!targetFrames.length) {
     gaps.push({
       reason: placeWindow ? "entity_not_found_at_place" : "entity_not_found",
