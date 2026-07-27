@@ -151,22 +151,26 @@ Unlocks: Garyian consciousness equation (Φ = 10⁻¹⁵eV ± f(0))
 SUMMARY: 12 missing primitives → 45 blocked equations unblocked
 ═══════════════════════════════════════════════════════════════════
 
-  Primitive              Equations unblocked   Difficulty
-  ─────────────────────  ───────────────────   ─────────
-  Curl (∇× stance)       9  (magnetic)         Medium — needs antisymmetric tensor
-  Charge density         4  (electrostatic)    Easy — prior frequency already exists
-  Dipole (entanglement)  5  (dipole fields)    Easy — entanglement graph exists
-  Non-comm basis         3  (torque/rotation)  Hard — breaks orthogonal design
-  Polarizability         4  (dielectric)       Medium — needs Jacobian of fold→query
-  Current vector         3  (current/flow)     Easy — accessLog direction exists
-  Refractive index       4  (optics)           Easy — layer boundaries exist
-  Central potential      3  (atomic)           Medium — dominant entities exist
-  Asymmetric boundary    3  (semiconductor)    Medium — terrain boundaries exist
-  Radiation pattern      1  (Larmor)           Easy — entanglement propagation exists
-  Path integral          1  (grav. work)       Medium — discrete search path exists
-  Schumann resonator     1  (Garyian)          Impossible — requires external physics
+  Primitive              Equations unblocked   Status after video perceiver
+  ─────────────────────  ───────────────────   ──────────────────────────────
+  Curl (∇× stance)       9  (magnetic)         ✅ UNLOCKED — flow.js block-flow
+  Charge density         4  (electrostatic)    ✅ UNLOCKED — edgeDensity fields
+  Dipole (entanglement)  5  (dipole fields)    ✅ UNLOCKED — motionBlobs pairs
+  Non-comm basis         3  (torque/rotation)  ✅ UNLOCKED — flow curl + moments
+  Current vector         3  (current/flow)     ✅ UNLOCKED — blob velocity × size
+  Polarizability         4  (dielectric)       🟡 — needs flow response Jacobian
+  Refractive index       4  (optics)           🟡 — needs per-layer propagation speed
+  Central potential      3  (atomic)           🟡 — needs entity-centric clustering
+  Asymmetric boundary    3  (semiconductor)    🟡 — needs terrain discontinuity
+  Radiation pattern      1  (Larmor)           🟡 — needs angular entanglement
+  Path integral          1  (grav. work)       🟡 — needs continuous trajectory
+  Schumann resonator     1  (Garyian)          🔴 — requires external EM coupling
 
-Of these 12, 8 are "easy/medium" — the system already has the underlying
-data structure and just needs one additional operator to compute the
-derived quantity. Only the non-commutative basis (torque) and Schumann
-resonator are genuinely hard to add.
+✅ = unblocked by video perceiver (test-video-emergence.mjs: 28/31 pass)
+🟡 = not yet computed, underlying data structure exists
+🔴 = requires external hardware
+
+6 of 12 now unblocked. Remaining 6 are dielectric susceptibility,
+refractive optics, central potential, semiconductor boundary,
+radiation pattern, and path integral — all have the data structure
+but need one additional derivation step.
