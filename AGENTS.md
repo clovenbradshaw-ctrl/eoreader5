@@ -31,6 +31,22 @@ make sense for a nameless leitmotif in music, or it is string-thinking.
   shape). Not machine-scored; the plan is EOT-first, prosify later by porting
   `eoreader4.2/src/weave/write/brief.js` (phraser→talker: engine determines
   content, model only makes it fluent, veto strips inventions).
+- `scripts/bench-retrieval-vs-colbert.mjs` + `scripts/bench/` — benchmarks
+  the associative-memory store (`buildStore`/`surface`) against a
+  ColBERT-style late-interaction retriever (MaxSim over WordLlama static
+  token embeddings — a substitute for the real ColBERTv2 checkpoint, whose
+  only host, huggingface.co, this sandbox's network policy blocks; see
+  `scripts/bench/README.md`) and a pooled-cosine dense baseline. On the 4
+  frozen memory-golden events, all three systems correctly hit both
+  engine-tier events and correctly GAP both model-tier ones (no leaks) — the
+  tier boundary held even against a semantic retriever. On 60 auto-derived
+  long-range verbatim-motif pairs per book (mined from `store.posting`,
+  mechanical, not hand-picked): engine ≥ colbert-maxsim ≥ dense-cosine on
+  both books (pg84 R@10 13/10/4 of 60; pg2600 R@10 4/3/2 of 60) — late
+  interaction beats pooled dense as ColBERT's own claim predicts, and the
+  Hebbian sparse code holds a small edge over it at the range these motifs
+  actually recur. All three are weak at long range; see
+  `scripts/bench/RESULTS.md` for the full table.
 
 Tests that must stay green: `cube/index.test.js`,
 `perceiver/text/presence.test.js`, `emergence/store/store.test.js` (the
