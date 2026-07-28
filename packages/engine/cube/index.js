@@ -131,32 +131,45 @@ function argmax(amps, fallback) {
 }
 
 /**
- * classifyTerrain(text) -> string
+ * advisoryClassifyTerrain(text) -> string
  *
  * Deterministic terrain classification. Returns one of the 9 TERRAINS.
  * Falls back to "Field" (the default domain for undifferentiated content).
  */
-export function classifyTerrain(text) {
+// !REC (eo-2026-07-28, spec 09): these are KEYWORD-FREQUENCY ESTIMATORS, not
+// readings. Measured 2026-07-27 over 2,527 paragraphs of Moby-Dick: shuffling
+// the words inside each paragraph — destroying every proposition, reference
+// and syntactic relation, preserving only the word inventory — left 95.7% of
+// full cell assignments unchanged (terrain 97.2%, operator 98.9%, stance
+// 99.4%). Length-matched random words drawn from the same book land on the
+// modal cell SIG|Entity|Tracing at 34.7%, against real prose's 33.5%.
+// Cells ever occupied: 221 of 729; effective cells by entropy: 22.6.
+//
+// They may inform display, ordering, or a prior weight.
+// They may NEVER gate, veto, route, or address. That is why they are named
+// `advisory*`: a call site that wants to gate has to rename it to do so.
+
+export function advisoryClassifyTerrain(text) {
   return argmax(amplitudesFor(text, TERRAIN_TERMS, "terrain"), "Field");
 }
 
 /**
- * classifyStance(text) -> string
+ * advisoryClassifyStance(text) -> string
  *
  * Deterministic stance classification. Returns one of the 9 STANCES.
  * Falls back to "Tracing" (the default approach).
  */
-export function classifyStance(text) {
+export function advisoryClassifyStance(text) {
   return argmax(amplitudesFor(text, STANCE_TERMS, "stance"), "Tracing");
 }
 
 /**
- * classifyOperator(text) -> string
+ * advisoryClassifyOperator(text) -> string
  *
  * Deterministic operator classification. Returns one of the 9 operator codes.
  * Falls back to "SIG" (the default act).
  */
-export function classifyOperator(text) {
+export function advisoryClassifyOperator(text) {
   return argmax(amplitudesFor(text, OPERATOR_TERMS, "operator"), "SIG");
 }
 
@@ -182,9 +195,9 @@ export function classifyAmplitudes(text) {
  */
 export function classify(text) {
   return {
-    operator: classifyOperator(text),
-    terrain: classifyTerrain(text),
-    stance: classifyStance(text),
+    operator: advisoryClassifyOperator(text),
+    terrain: advisoryClassifyTerrain(text),
+    stance: advisoryClassifyStance(text),
   };
 }
 

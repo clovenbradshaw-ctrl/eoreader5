@@ -56,9 +56,9 @@ export { verifyObservationBundle, materializeObservationIndex, blockContentHash 
 // Ported from4.2: src/wiki/terrains.js, src/turn/meta-route.js.
 export {
   classify,
-  classifyTerrain,
-  classifyStance,
-  classifyOperator,
+  advisoryClassifyTerrain,
+  advisoryClassifyStance,
+  advisoryClassifyOperator,
   scoreCoordinate,
   focusBias,
   TERRAINS,

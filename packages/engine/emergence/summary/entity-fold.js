@@ -23,7 +23,7 @@ import {
   snapToSentences,
   TURNING_EVENT_TYPES,
 } from "./text-organ.js";
-import { classify, classifyTerrain } from "../../cube/index.js";
+import { classify, advisoryClassifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 import { admitReferent, presenceByFrame } from "../../perceiver/text/presence.js";
 import { buildStore, surface as surfaceMemory } from "../store/index.js";
@@ -161,7 +161,7 @@ export function entityFold(text, entityName = null, options = {}) {
       if (targetNameTokenSet.has(sn)) continue;
       if (s.includes("\n")) continue;
       // Stage 1: surface-level Entity terrain = pronoun → filter
-      if (classifyTerrain(s) === "Entity") continue;
+      if (advisoryClassifyTerrain(s) === "Entity") continue;
       const words = s.split(/\s+/);
       // Stage 2: cap/lower ratio for single-word surfaces.
       // - lower=0, upper>0: proper name (always capitalized) → keep

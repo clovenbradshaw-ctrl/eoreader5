@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   classify,
-  classifyTerrain,
-  classifyStance,
-  classifyOperator,
+  advisoryClassifyTerrain,
+  advisoryClassifyStance,
+  advisoryClassifyOperator,
   scoreCoordinate,
   focusBias,
   isDiagonal,
@@ -14,36 +14,36 @@ import {
   STANCES,
 } from "./index.js";
 
-test("classifyTerrain returns one of the 9 terrains", () => {
+test("advisoryClassifyTerrain returns one of the 9 terrains", () => {
   for (const t of TERRAINS) assert.ok(TERRAINS.includes(t));
-  assert.equal(classifyTerrain("who was Caesar"), "Entity");
-  assert.equal(classifyTerrain("the empire was large"), "Network");
-  assert.equal(classifyTerrain("I feel fear"), "Atmosphere");
-  assert.equal(classifyTerrain("nothing here"), "Void");
-  assert.equal(classifyTerrain("random unrelated text"), "Field");
+  assert.equal(advisoryClassifyTerrain("who was Caesar"), "Entity");
+  assert.equal(advisoryClassifyTerrain("the empire was large"), "Network");
+  assert.equal(advisoryClassifyTerrain("I feel fear"), "Atmosphere");
+  assert.equal(advisoryClassifyTerrain("nothing here"), "Void");
+  assert.equal(advisoryClassifyTerrain("random unrelated text"), "Field");
 });
 
-test("classifyStance returns one of the 9 stances", () => {
-  assert.equal(classifyStance("describe what happened"), "Tracing");
-  assert.equal(classifyStance("break down the argument"), "Dissecting");
-  assert.equal(classifyStance("why did this happen"), "Unraveling");
-  assert.equal(classifyStance("help me understand"), "Tending");
-  assert.equal(classifyStance("connect these ideas"), "Binding");
-  assert.equal(classifyStance("create something new"), "Making");
-  assert.equal(classifyStance("organize the data"), "Composing");
-  assert.equal(classifyStance("tell me about it"), "Tracing");
+test("advisoryClassifyStance returns one of the 9 stances", () => {
+  assert.equal(advisoryClassifyStance("describe what happened"), "Tracing");
+  assert.equal(advisoryClassifyStance("break down the argument"), "Dissecting");
+  assert.equal(advisoryClassifyStance("why did this happen"), "Unraveling");
+  assert.equal(advisoryClassifyStance("help me understand"), "Tending");
+  assert.equal(advisoryClassifyStance("connect these ideas"), "Binding");
+  assert.equal(advisoryClassifyStance("create something new"), "Making");
+  assert.equal(advisoryClassifyStance("organize the data"), "Composing");
+  assert.equal(advisoryClassifyStance("tell me about it"), "Tracing");
 });
 
-test("classifyOperator returns one of the 9 operator codes", () => {
-  assert.equal(classifyOperator("remove the old data"), "NUL");
-  assert.equal(classifyOperator("segment this text"), "SEG");
-  assert.equal(classifyOperator("define the term"), "DEF");
-  assert.equal(classifyOperator("show me the results"), "SIG");
-  assert.equal(classifyOperator("connect these points"), "CON");
-  assert.equal(classifyOperator("evaluate the performance"), "EVA");
-  assert.equal(classifyOperator("build a new model"), "INS");
-  assert.equal(classifyOperator("merge these datasets"), "SYN");
-  assert.equal(classifyOperator("record the findings"), "REC");
+test("advisoryClassifyOperator returns one of the 9 operator codes", () => {
+  assert.equal(advisoryClassifyOperator("remove the old data"), "NUL");
+  assert.equal(advisoryClassifyOperator("segment this text"), "SEG");
+  assert.equal(advisoryClassifyOperator("define the term"), "DEF");
+  assert.equal(advisoryClassifyOperator("show me the results"), "SIG");
+  assert.equal(advisoryClassifyOperator("connect these points"), "CON");
+  assert.equal(advisoryClassifyOperator("evaluate the performance"), "EVA");
+  assert.equal(advisoryClassifyOperator("build a new model"), "INS");
+  assert.equal(advisoryClassifyOperator("merge these datasets"), "SYN");
+  assert.equal(advisoryClassifyOperator("record the findings"), "REC");
 });
 
 test("classify returns full coordinate", () => {

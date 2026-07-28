@@ -32,6 +32,9 @@ import * as transitions from "./emergence/transitions/index.js";
 import { redShift, restFrameDivergence, phaseVolatility } from "./emergence/trajectory/index.js";
 import { assertLens, speakLensAssertion } from "./emergence/lens-assertion/index.js";
 
+/** The cell the v5 read path emits into. Declared, never inferred. */
+const READ_PATH_CELL = Object.freeze({ operator: "SIG", terrain: "Field", stance: "Tracing" });
+
 export function createEOReaderEngine(defaults = {}) {
   const engineVersion = defaults.engineVersion ?? "0.1.0";
 
@@ -202,8 +205,14 @@ export function createEOReaderEngine(defaults = {}) {
           const source = (searchResult.passages ?? []).map(p =>
             (p.anchors?.exact_text ?? []).join(" ")
           ).join(" ");
+          // The read path DECLARES the cell it emits into rather than
+          // letting the veto infer one from the summary's own words: a
+          // folded summary signals what the source material says, so
+          // SIG(Field, Tracing). See emergence/veto's header for why the
+          // inference was removed.
           vetoResult = veto(foldedReading.summary, {
             source,
+            declaredCell: READ_PATH_CELL,
             strict: context?.strict_veto ?? true,
           });
         }
