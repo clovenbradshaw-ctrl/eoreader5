@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/encounter-event.schema.json",
+  "title": "EncounterEvent",
+  "description": "One creature's testimony about meeting another individuated creature — peer-to-peer, not reader-to-text and not engine-inference-over-text. Same firewall reasoning as ReactionEvent@1, one register over: an EncounterEvent is an OBSERVATION BY ONE REFERENT OF ANOTHER, never an engine inference, so it lives in its own append-only log rather than the semantic ledger — it carries no operator, no prior_id, and no operator_epoch, and it may never mint an observation, referent, hypothesis, or task about the peer it describes. self_id and peer_id must differ and are referent ids, not name strings (docs/nameless-referent.md: same-string identity is never assumed). kind is a closed, DECLARED vocabulary — never inferred from payload content (cube/index.js's dead-ends: a coordinate that gates is derived from a declaration). ts and seq are HOST-SUPPLIED and never generated engine-side, for the same replay-determinism reason as ReactionEvent@1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "encounter_id",
+    "self_id",
+    "peer_id",
+    "world_id",
+    "ts",
+    "seq",
+    "kind",
+    "context",
+    "payload"
+  ],
+  "properties": {
+    "schema": {
+      "const": "EncounterEvent@1"
+    },
+    "encounter_id": {
+      "type": "string",
+      "description": "Content address of every other field. encounter:sha256:<64 hex>.",
+      "pattern": "^encounter:sha256:[0-9a-f]{64}$"
+    },
+    "self_id": {
+      "type": "string",
+      "description": "The individuated creature testifying. A referent id, not a name string.",
+      "minLength": 1
+    },
+    "peer_id": {
+      "type": "string",
+      "description": "The individuated creature encountered. Must differ from self_id — a creature does not encounter itself.",
+      "minLength": 1
+    },
+    "world_id": {
+      "type": "string",
+      "description": "The shared substrate the encounter happened within (a machine, a room, a corpus context) — the stigmergic commons both creatures wrote to, not a merged state.",
+      "minLength": 1
+    },
+    "ts": {
+      "type": "integer",
+      "description": "Host-supplied milliseconds since the Unix epoch. The engine never reads an ambient clock.",
+      "minimum": 0
+    },
+    "seq": {
+      "type": "integer",
+      "description": "Host-supplied per-(self,world) monotone counter. Gives the log a total order independent of clock resolution.",
+      "minimum": 0
+    },
+    "kind": {
+      "type": "string",
+      "description": "The four declared encounter kinds. withdraw is disengagement, not a negative valence — nothing in this spec assigns kinds a sign, because weighting them against each other is an inference deferred until the channel has data (same discipline as ReactionEvent@1's skip/abandon).",
+      "enum": [
+        "observe",
+        "play",
+        "teach",
+        "withdraw"
+      ]
+    },
+    "context": {
+      "type": "object",
+      "description": "What medium the encounter happened over — creatures on one machine may be specialized to different perceiver modalities (text, audio, video), so this is required to read an encounter against what each party could actually perceive.",
+      "additionalProperties": false,
+      "required": [
+        "medium"
+      ],
+      "properties": {
+        "medium": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Kind-specific detail. May carry a DECLARED valence/arousal or a proposed prior update (for kind=teach), but the engine never computes these from content — they are asserted by the emitting creature or absent. Deliberately unconstrained: the channel collects first and the shapes are not yet known."
+    }
+  }
+}
