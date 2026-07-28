@@ -21,12 +21,14 @@ import {
   extractEvents,
   extractSurfaces,
   snapToSentences,
+  locateRawSpan,
   TURNING_EVENT_TYPES,
 } from "./text-organ.js";
 import { classify, advisoryClassifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 import { admitReferent, presenceByFrame } from "../../perceiver/text/presence.js";
 import { buildStore, surface as surfaceMemory } from "../store/index.js";
+import { readEntityField, selectTopFieldMoments } from "./fold-field-surfer.js";
 
 // Diacritical mapping for engine-level entity name matching.
 // NOT signal-path normalization — this is the engine discovering
@@ -244,69 +246,26 @@ export function entityFold(text, entityName = null, options = {}) {
       .map((m) => ({ ...m, text: snapToSentences(m.text), context: snapToSentences(m.context ?? m.text) }));
   }
 
-  // Top up: one-per-type event dedup can leave far fewer moments than asked
-  // for (4 types → 4 moments regardless of sceneCount). Fill the remainder
-  // from the significance spine — STRATIFIED across the entity's presence
-  // extent. Forward surprise is measured against an accumulating history, so
-  // early text scores high by construction; taking globally-ranked peaks
-  // confines every moment to the opening chapters (measured: 12/12 spans in
-  // the first 27.5% of W&P). One winner per stratum spends the budget across
-  // the whole arc instead.
+  // Top up: entity-specific, prior-driven holon field.
+  // The entity's OWN holon field is seeded with the entity as a raw-span
+  // holon. Each entity-present sentence is folded against accumulated
+  // textual priors (the "human never reads a sentence blind" principle)
+  // and processed against the entity's holon field. The delta between
+  // the predicted fold (gravitational centroid of existing holons) and
+  // the actual fold generates NEW reading-created holons or reinforces
+  // existing ones.
+  //
+  // A sentence is significant when:
+  //   - It created a NEW reading-created holon (delta exceeded threshold)
+  //   - An existing holon CLIMBED the ontological ladder
+  //   - The delta was very high (major prediction error ≈ major surprise)
   if (sceneMoments.length < sceneCount && targetFrames.length) {
-    // Every presence frame is a candidate, scored by motif-self-surprise x
-    // presence: targetFrames are the entity's statements in order, so
-    // forwardScore reads "how unlike this entity's previous appearances is
-    // this one". This is the best MEASURED selector on the span golden
-    // (5/21); see golden/span-golden.json notes. Variants measured and
-    // rejected — do not silently retry them:
-    //   presence-only ............................ 4/21
-    //   cold-start mask (minHistory) ............. 4/21 (kills exposition
-    //     scenes — a theme's first statement is canonical, not noise)
-    //   sentence-stream reduction ................ 3/21 (per-sentence bags
-    //     are too small to carry a KL; the "instrument line" idea is right,
-    //     the lexical field vector is too weak an extractor for it)
-    // The residual gap to the golden is a MISSING OBSERVABLE (what the
-    // entity does/feels — relations, dialogue, affect channels), not a
-    // rearrangement of this one.
-    const spine = significanceSpine(targetFrames, { budget: targetFrames.length, k: sceneCount * 3 });
-    const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
-    const candidates = [...spine.scoreByPos.entries()]
-      .map(([pos, score]) => {
-        const f = targetFrames[pos];
-        return {
-          idx: f.order,
-          offset: f.offset,
-          text: f.text,
-          context: f.text,
-          score: (score || 1e-6) * Math.log1p(presence.get(f.order) ?? 0),
-        };
-      })
-      .filter((m) => m.offset != null && !sceneMoments.some((s) => near(s.offset, m.offset)));
-
-    const lo = targetFrames[0].offset;
-    const hi = targetFrames[targetFrames.length - 1].offset + 1;
-    const slots = sceneCount - sceneMoments.length;
-    const strata = Array.from({ length: slots }, () => []);
-    for (const m of candidates) {
-      const s = Math.min(slots - 1, Math.floor(((m.offset - lo) / (hi - lo)) * slots));
-      strata[s].push(m);
+    const { significantSentences } = readEntityField(
+      normText, targetSurface, targetFrames, boundaries
+    );
+    if (significantSentences.length >= 2) {
+      selectTopFieldMoments(significantSentences, sceneMoments, sceneCount);
     }
-    const picked = strata
-      .map((bucket) => bucket.sort((a, b) => b.score - a.score)[0])
-      .filter(Boolean);
-    // Strata the entity never peaks in stay empty; backfill by global score.
-    for (const m of candidates.sort((a, b) => b.score - a.score)) {
-      if (picked.length >= slots) break;
-      if (!picked.includes(m) && !picked.some((p) => near(p.offset, m.offset))) picked.push(m);
-    }
-    for (const m of picked.slice(0, slots)) {
-      sceneMoments.push({
-        ...m,
-        text: snapToSentences(m.text),
-        context: snapToSentences(m.context ?? m.text),
-      });
-    }
-    sceneMoments.sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0));
   }
 
   // 9. Build EOT packet. Absence is reported, never papered over: an entity
@@ -331,6 +290,7 @@ export function entityFold(text, entityName = null, options = {}) {
     gaps,
     scope: placeWindow ? "entity@place" : "entity",
     place: placeWindow,
+    resolveRawSpan: (offset, spanText) => locateRawSpan(normText, offset, spanText),
   });
 
   // 10. Echoes — associative memory (emergence/store). For each selected span,

@@ -3,11 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Host-side adapters for the pure engine: media decode/encode via external tools (ffmpeg). The engine never spawns processes, reads clocks, or touches the network — everything ambient lives here, at the host boundary.",
+  "description": "Host-side adapters for the pure engine: media decode/encode via external tools (ffmpeg), and the corpus adapter every host uses to admit text and read grounded spans. The engine never spawns processes, reads clocks, touches the network, or reads files — everything ambient lives here, at the host boundary.",
   "exports": {
-    "./video": "./video.js"
+    "./video": "./video.js",
+    "./corpus": "./corpus.js",
+    "./compression-embed": "./compression-embed.js"
+  },
+  "scripts": {
+    "test": "node --test"
   },
   "dependencies": {
-    "@eoreader/engine": "*"
+    "@eoreader/engine": "*",
+    "@eoreader/spec": "*"
   }
 }

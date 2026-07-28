@@ -7,6 +7,20 @@
 // contribution to the sentence's structure.
 //
 // No LLM needed — just zlib (built into Node.js).
+//
+// WHY THIS IS A HOST MODULE. It lived in packages/engine/emergence, where
+// `import { deflateSync } from "zlib"` violates the P0 purity gate
+// (conformance/invariants/forbidden-dependencies.test.js): the engine may name
+// no Node built-ins, because the rule is about what the module graph may
+// reference, not what a given code path happens to call. A platform codec is
+// an ambient capability, which is exactly what this package is for — the same
+// reason ffmpeg lives in ./video rather than inside the video perceiver.
+//
+// It has no callers anywhere in the workspace today. If it is later wired into
+// engine-side scoring it cannot be imported from there (engine must not depend
+// on host); the shape that works is to keep the measurement pure in the engine
+// and have the host inject a `compress(bytes) -> length` function, the same way
+// `ts`/`seq` are host-supplied to the reaction channel.
 
 import { deflateSync } from "zlib";
 

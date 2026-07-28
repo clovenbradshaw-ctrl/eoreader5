@@ -9,5 +9,8 @@
   "scripts": {
     "test": "npm test --workspaces --if-present && node --test scripts/__tests__/*.test.mjs",
     "transfer:eoreader42:plan": "node scripts/transfer-eoreader42.mjs"
+  },
+  "devDependencies": {
+    "acorn": "^8.18.0"
   }
 }

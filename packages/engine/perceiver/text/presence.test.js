@@ -68,6 +68,23 @@ test("narrator spans admit first person at reduced weight, via anchors", () => {
   assert.ok(fp.every((s) => Array.isArray(s.scope)), "and only inside the narrator span");
 });
 
+test("anchor resolution tolerates whitespace/line-wrap differences", () => {
+  // The anchor was authored against a single-line quote, but the live text
+  // has been re-wrapped (line break + extra interior spacing) — same
+  // characters, different whitespace. Exact substring match fails; the
+  // whitespace-collapsed mapping (shared with text-organ.js::locateRawSpan)
+  // must still find it.
+  const text = "Victor spoke. THE TALE\n  BEGINS I was benevolent   and good. THE TALE ENDS Victor again.";
+  const { resolved, unresolved } = resolveSpans(text, [
+    { fromAnchor: "THE TALE BEGINS", toAnchor: "THE TALE ENDS" },
+  ]);
+  assert.equal(unresolved.length, 0, "whitespace-flexible match should resolve, not drop, the anchor");
+  assert.equal(resolved.length, 1);
+  const { from, to } = resolved[0];
+  assert.equal(text.slice(from, from + 3), "THE", "resolved offset points at the true raw start");
+  assert.ok(to > from);
+});
+
 test("unresolved anchors are reported, never guessed", () => {
   const { surfaces, gaps } = admitReferent(
     [{ offset: 0, order: 0, text: "some text" }],

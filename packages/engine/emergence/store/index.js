@@ -214,3 +214,81 @@ export function surface(store, cueText, options = {}) {
   }
   return out.sort((a, b) => b.activation - a.activation);
 }
+
+/**
+ * spontaneousSurface(store, options) -> [{ order, activation, motif, linkedBy }]
+ *
+ * Surplus REC — the store exploring its OWN strongest patterns without any
+ * query cue. Analogous to play: the system noticing connections it formed
+ * while reading, not because a question demanded them but because the
+ * connections exist and registering them IS the delight.
+ *
+ * This is the engine-level analog of "Ananda = svātantrya, free self-
+ * expression" — activity not in service of reducing anyone's surprise.
+ * The Hebbian edges were already written (they're a byproduct of reading),
+ * and surfacing them costs nothing extra. The value is in noticing what
+ * the store already knows.
+ *
+ * Each result carries `linkedBy` — the motif that bridges the two
+ * passages — and `motif` — its weight in the store. This is a SYN
+ * connection nobody asked for: the system making a discovery for the
+ * delight of it, not to lower a residual.
+ *
+ * @param {Store} store — from buildStore
+ * @param {object} options — { count, minStrength, scoreBy }
+ * @returns {Array<{ order: number, activation: number, motif: string, linkedBy: string }>}
+ */
+export function spontaneousSurface(store, options = {}) {
+  const { count = 10, minStrength = 0.5 } = options;
+  const { edges, posting, frames } = store;
+
+  if (!edges || !edges.size || !posting || !posting.size) return [];
+
+  // Rank edges by strength — these are the store's "discoveries"
+  const rankedEdges = [];
+  for (const [motifA, neighbours] of edges) {
+    for (const [motifB, strength] of neighbours) {
+      // Avoid double-counting undirected edges (a→b and b→a are symmetric)
+      if (motifA < motifB && strength >= minStrength) {
+        rankedEdges.push({ a: motifA, b: motifB, strength });
+      }
+    }
+  }
+
+  rankedEdges.sort((a, b) => b.strength - a.strength);
+
+  // For each strong edge, find the passages where both motifs co-occurred
+  const results = [];
+  const seen = new Set();
+
+  for (const edge of rankedEdges) {
+    if (results.length >= count) break;
+
+    const postingA = posting.get(edge.a);
+    const postingB = posting.get(edge.b);
+    if (!postingA || !postingB) continue;
+
+    for (const [order, weight] of postingA) {
+      if (results.length >= count) break;
+      const bWeight = postingB.get(order);
+      if (bWeight == null) continue; // not co-present in this frame
+
+      const key = `${order}:${edge.a}:${edge.b}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const frame = frames?.find((f) => f.order === order);
+      results.push({
+        order,
+        activation: edge.strength,
+        motif: `${edge.a} + ${edge.b}`,
+        linkedBy: `${edge.a} ↔ ${edge.b}`,
+        strength: edge.strength,
+        passage_preview: frame?.text?.slice(0, 120) ?? null,
+      });
+    }
+  }
+
+  return results;
+}
+

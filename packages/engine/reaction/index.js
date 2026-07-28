@@ -48,6 +48,8 @@
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 import { validateReactionEvent, REACTION_KINDS } from "@eoreader/spec";
 
+export { REACTION_KINDS };
+
 // Fixed iteration order for per-kind tallies. Sorted once, here, so that the
 // key order of every `by_kind` object is a constant of this module rather
 // than a function of which kinds happened to occur first in a session.
@@ -146,6 +148,15 @@ export function replayReactions(events, { reader_id, session_id }) {
 }
 
 /**
+ * readerOrientationFromLog(log) -> ReaderOrientation
+ *
+ * Derive the reader's motivational orientation from their reaction history.
+ * Re-exported from motivation/index.js for convenience — the reaction channel
+ * is the data source, and the motivation organ is the interpreter.
+ */
+export { readerOrientationFromLog } from "../motivation/index.js";
+
+/**
  * salienceRanking(log) -> { schema, head, reader_id, session_id, blocks }
  *
  * READ THIS BEFORE USING IT. This is a TALLY, not a salience model.
@@ -197,5 +208,122 @@ export function salienceRanking(log) {
     reader_id: log.reader_id,
     session_id: log.session_id,
     blocks,
+  };
+}
+
+/**
+ * reactionResonanceBursts(log) -> BurstAnalysis
+ *
+ * Detects temporal clusters (bursts) of reader engagement in the reaction log.
+ * Beyond the simple tally (salienceRanking above), this finds WHERE the reader
+ * showed concentrated attention — rapid sequences of dwell, re-read, probe,
+ * and follow-figure reactions on nearby blocks.
+ *
+ * A burst is a run of 3+ reactions where:
+ *   - Every reaction is an engagement kind (dwell, reread, probe, follow-figure,
+ *     verify, decollapse — not skip, scrub, or abandon)
+ *   - Adjacent reactions are within a proximity window (nearby block_ids or
+ *     within a small seq range)
+ *   - The total density (reactions per distance) exceeds the background rate
+ *
+ * This is mechanical pattern detection over the tally, not a salience model.
+ * It surfaces WHERE the reader felt joy/flow without asserting WHY — the
+ * interpretation ("aha moment", "resonance", "deep reading") is for a
+ * downstream organ, not the reaction channel itself.
+ *
+ * @param {ReactionLog} log
+ * @param {object} options — { minBurstLength, proximityWindow }
+ * @returns {{ bursts: Array<Burst>, burstCount: number, engagementDensity: number }}
+ */
+export function reactionResonanceBursts(log, options = {}) {
+  const { minBurstLength = 3, proximityWindow = 5 } = options;
+
+  const ENGAGEMENT_KINDS = new Set([
+    "dwell", "reread", "probe", "follow-figure", "verify", "decollapse",
+    "demand_witness", "face_gap",
+  ]);
+
+  if (!log.reactions.length) {
+    return { bursts: [], burstCount: 0, engagementDensity: 0 };
+  }
+
+  // Collect engagement reactions with their block positions
+  const engaged = [];
+  const blockIds = [];
+  for (const r of log.reactions) {
+    blockIds.push(r.block_id);
+    if (ENGAGEMENT_KINDS.has(r.kind)) {
+      engaged.push(r);
+    }
+  }
+
+  // Map block_ids to linear positions for proximity measurement
+  const blockOrder = [...new Set(blockIds)].sort();
+  const blockPos = new Map(blockOrder.map((b, i) => [b, i]));
+
+  // Find temporal clusters of engagement
+  const bursts = [];
+  let currentBurst = [];
+
+  for (let i = 0; i < engaged.length; i++) {
+    const curr = engaged[i];
+
+    if (currentBurst.length === 0) {
+      currentBurst.push(curr);
+      continue;
+    }
+
+    const prev = currentBurst[currentBurst.length - 1];
+    const currPos = blockPos.get(curr.block_id) ?? 0;
+    const prevPos = blockPos.get(prev.block_id) ?? 0;
+    const dist = Math.abs(currPos - prevPos);
+
+    if (dist <= proximityWindow) {
+      currentBurst.push(curr);
+    } else {
+      if (currentBurst.length >= minBurstLength) {
+        bursts.push(summarizeBurst(currentBurst, blockPos));
+      }
+      currentBurst = [curr];
+    }
+  }
+  if (currentBurst.length >= minBurstLength) {
+    bursts.push(summarizeBurst(currentBurst, blockPos));
+  }
+
+  // Overall engagement density: engaged reactions / total distance covered
+  let totalDist = 0;
+  if (blockOrder.length > 1) {
+    totalDist = blockPos.get(blockOrder[blockOrder.length - 1]) - blockPos.get(blockOrder[0]);
+  }
+  const engagementDensity = totalDist > 0 ? engaged.length / Math.max(1, totalDist) : 0;
+
+  return {
+    bursts: bursts.sort((a, b) => b.intensity - a.intensity),
+    burstCount: bursts.length,
+    engagementDensity: +engagementDensity.toFixed(4),
+  };
+}
+
+function summarizeBurst(reactions, blockPos) {
+  const blocks = reactions.map((r) => r.block_id);
+  const kinds = {};
+  for (const r of reactions) {
+    kinds[r.kind] = (kinds[r.kind] ?? 0) + 1;
+  }
+
+  const positions = blocks.map((b) => blockPos.get(b) ?? 0);
+  const span = positions.length > 1 ? positions[positions.length - 1] - positions[0] : 0;
+  const density = span > 0 ? reactions.length / span : reactions.length;
+  const dominantKind = Object.entries(kinds).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  return {
+    length: reactions.length,
+    blocks: [...new Set(blocks)],
+    kinds,
+    span,
+    density: +density.toFixed(4),
+    dominantKind,
+    seqRange: [reactions[0].seq, reactions[reactions.length - 1].seq],
   };
 }

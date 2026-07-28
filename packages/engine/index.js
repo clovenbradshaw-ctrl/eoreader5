@@ -11,7 +11,18 @@ export { createState, applyCommand, appendEvents, replay, read, readTasks } from
 // The reaction channel. Its own append-only log, deliberately NOT the
 // semantic ledger: a reaction is an observation of a reader, not an engine
 // inference, and it must never mint an observation or a referent.
-export { mintReaction, createReactionLog, appendReactions, replayReactions, salienceRanking } from "./reaction/index.js";
+export { mintReaction, createReactionLog, appendReactions, replayReactions, salienceRanking, readerOrientationFromLog, REACTION_KINDS } from "./reaction/index.js";
+
+// The motivation organ. Drives and reader orientation — the engine's model
+// of what the reader actually cares about, derived deterministically from
+// their accumulated reaction history. Not an inference: an observation of
+// observed behaviour.
+export { createReaderOrientation, motivationalBias, tierDemandGap, drivesSummary } from "./motivation/index.js";
+
+// Gap-navigation system. Makes gaps enumerable, navigable, and actionable —
+// the truth-seeking impulse as a structural property of the interface between
+// the engine's known and unknown.
+export { navigableGap, navigableGaps, gapSeverity, gapActions, unresolvedClaims, gapSummary } from "./motivation/gaps.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";
@@ -277,6 +288,21 @@ export {
   inkTask,
   completionDiagnostic,
 } from "./emergence/genesis/index.js";
+
+// Cross-modal structural query: shape-based similarity search across folded corpora.
+// Given any two folded signals (text span, audio movement, video sequence),
+// measures structural similarity via novelty/recurrence/operator-distribution
+// shape descriptors, with Born-null (temporal shuffle) + specificity gates.
+export {
+  structuralQuery,
+  buildFoldCache,
+  buildShapeDescriptors,
+  resolveArchetype,
+  synthesizeArchetype,
+  runGateA,
+  runGateB,
+  shapeDistance,
+} from "./emergence/structural-query/index.js";
 
 // ── The invariant layer ──
 // The four constraints that define the system's legal state space.

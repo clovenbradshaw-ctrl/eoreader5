@@ -14,6 +14,7 @@
 
 import { extractSurfaces, buildSurfaceMap, buildEntityRecords } from "../../perceiver/text/surfaces.js";
 import { cosineSimilarity } from "../../perceiver/text/text-signal.js";
+import { collapseWhitespace } from "../../perceiver/text/presence.js";
 
 export { cosineSimilarity };
 
@@ -237,6 +238,63 @@ export function snapToSentences(text) {
   }
   const snapped = s.slice(start, end).trim();
   return snapped.length >= s.length * 0.4 ? snapped : s;
+}
+
+// ── Raw span provenance ──
+// A span's `offset` names a position in the SOURCE; its `text` is prose that
+// has been through frameText's window-trim and/or snapToSentences' whitespace
+// collapse — neither operation preserves the offset/text pairing exactly
+// (frameText.trim() strips leading whitespace without adjusting offset;
+// snapToSentences collapses interior whitespace runs to a single space).
+// locateRawSpan recovers the true `{offset, length}` such that
+// sourceText.slice(offset, offset+length), once its own whitespace is
+// collapsed the same way, reproduces displayText exactly — i.e. it finds
+// the literal raw substring the display text was derived from. Whitespace-
+// tolerant only: it does not diacritic-normalize (that's presence.js's job
+// for identity matching, not source fidelity). No match within the search
+// window is reported as a typed gap (`verified: false`), never a guess.
+
+export function locateRawSpan(sourceText, approxOffset, displayText, options = {}) {
+  const src = String(sourceText ?? "");
+  const disp = String(displayText ?? "");
+  const radius = options.radius ?? 2500;
+
+  if (!disp || approxOffset == null || approxOffset < 0 || !src) {
+    return { offset: approxOffset ?? null, length: 0, raw: null, verified: false, drift: null };
+  }
+
+  const winStart = Math.max(0, approxOffset - radius);
+  const winEnd = Math.min(src.length, approxOffset + disp.length + radius);
+  const window = src.slice(winStart, winEnd);
+
+  // Collapse whitespace runs to a single space, recording for every character
+  // emitted into `collapsed` the raw index (within `window`) it came from —
+  // the exact inverse of the frameText/snapToSentences transform. Shared with
+  // presence.js::resolveSpans, which uses the same mapping to make
+  // anchor-quote resolution whitespace-tolerant.
+  const { collapsed, map } = collapseWhitespace(window);
+
+  let bestCi = -1;
+  let bestDist = Infinity;
+  let idx = collapsed.indexOf(disp);
+  while (idx !== -1) {
+    const rawStart = winStart + map[idx];
+    const dist = Math.abs(rawStart - approxOffset);
+    if (dist < bestDist) { bestDist = dist; bestCi = idx; }
+    idx = collapsed.indexOf(disp, idx + 1);
+  }
+
+  if (bestCi === -1) {
+    return {
+      offset: approxOffset, length: disp.length, raw: null,
+      verified: false, drift: null, reason: "no_match_in_window",
+    };
+  }
+
+  const offset = winStart + map[bestCi];
+  const endCi = bestCi + disp.length - 1;
+  const end = winStart + map[endCi] + 1;
+  return { offset, length: end - offset, raw: src.slice(offset, end), verified: true, drift: offset - approxOffset };
 }
 
 // ── Entity-kinds boosting ──

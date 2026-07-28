@@ -22,6 +22,7 @@ export { induceKind } from "./kinds/index.js";
 export { induceParameters, parameterProfiles, profileJaccard } from "./parameters/index.js";
 export { induceEntityKinds, buildKindVocabulary, pluralize } from "./entity-kinds/index.js";
 export { induceCalculus, induceExtensions } from "./calculus/index.js";
+export { structuralQuery, buildFoldCache, buildShapeDescriptors, resolveArchetype, synthesizeArchetype, runGateA, runGateB, shapeDistance } from "./structural-query/index.js";
 
 // Surprise measure (portedsurprise/index.js from4.2 src/core/surprise.js)
 export {

@@ -57,7 +57,11 @@
         "skip",
         "query",
         "span-select",
-        "abandon"
+        "abandon",
+        "probe",
+        "verify",
+        "demand_witness",
+        "face_gap"
       ]
     },
     "block_id": {

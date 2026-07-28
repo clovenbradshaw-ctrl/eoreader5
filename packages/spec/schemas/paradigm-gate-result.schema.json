@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/paradigm-gate-result.schema.json",
+  "title": "ParadigmGateResult",
+  "description": "ParadigmGateResult@1 — the combined result of the paradigm promotion gate. Controls when a corpus prior or Kind graduates from pocket-local to widely accepted across independent lenses. Three sub-gates (correlated-error, Blackwell-Dubins, Zollman), each gated by deriveNull.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidate_id",
+    "gate_result",
+    "continuity",
+    "correlation",
+    "zollman"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ParadigmGateResult@1"
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["admitted", "status", "reason"],
+      "properties": {
+        "admitted": { "type": "boolean" },
+        "status": {
+          "type": "string",
+          "enum": ["active", "pending", "field"]
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "continuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "reason", "compatible_lenses", "incompatible_pairs"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "compatible_lenses": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "incompatible_pairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["lens_a", "lens_b", "direction", "value", "threshold", "detail"]
+          }
+        },
+        "mean_continuity": { "type": "number" },
+        "threshold": { "type": "number" },
+        "pairwise": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to", "value"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "reason", "score", "replicated_families", "total_families", "family_counts", "all_same_family"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "score": { "type": "number" },
+        "replicated_families": { "type": "integer", "minimum": 0 },
+        "total_families": { "type": "integer", "minimum": 0 },
+        "family_counts": { "type": "object" },
+        "all_same_family": { "type": "boolean" },
+        "null_result": { "type": "object" }
+      }
+    },
+    "zollman": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "reason", "min_window", "evidence_counts"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "min_window": { "type": "integer", "minimum": 0 },
+        "threshold": { "type": "number" },
+        "evidence_counts": { "type": "object" },
+        "null_result": { "type": "object" }
+      }
+    },
+    "total_supporting": { "type": "integer", "minimum": 0 },
+    "compatible_after_continuity": { "type": "integer", "minimum": 0 },
+    "removed_by_continuity": { "type": "integer", "minimum": 0 }
+  }
+}
