@@ -97,6 +97,69 @@ test("buildKindVocabulary builds a valid vocabulary from candidates", () => {
   }
 });
 
+// docs/mereotopology.md §4/§7: the fusion supplementation gate should catch
+// what pure similarity-clustering can't - a cluster whose members are
+// exact duplicates (interchangeable, contribute nothing individually) - and
+// still let genuinely composite clusters through unaffected.
+const DUPLICATES = [
+  makeEntity("d1", [["template_field", "string"], ["boilerplate_marker", "string"]]),
+  makeEntity("d2", [["template_field", "string"], ["boilerplate_marker", "string"]]),
+  makeEntity("d3", [["template_field", "string"], ["boilerplate_marker", "string"]]),
+  makeEntity("d4", [["template_field", "string"], ["boilerplate_marker", "string"]]),
+];
+
+// A genuinely composite group: members share a common core (delta) but
+// differ on alpha/beta/gamma/epsilon such that no single member is
+// redundant - removing any one measurably changes what the group predicts
+// about the rest (unlike DUPLICATES, where removing any member changes
+// nothing).
+const COMPOSITE = [
+  makeEntity("c0", [["delta", "string"]]),
+  makeEntity("c1", [["gamma", "string"], ["delta", "string"]]),
+  makeEntity("c2", [["alpha", "string"], ["beta", "string"], ["delta", "string"], ["epsilon", "string"]]),
+  makeEntity("c3", [["alpha", "string"], ["beta", "string"], ["gamma", "string"], ["delta", "string"], ["epsilon", "string"]]),
+  makeEntity("c4", [["delta", "string"]]),
+];
+
+test("without the fusion gate, an exact-duplicate cluster is promoted just like a real one", () => {
+  const entities = [...PEOPLE, ...PLACES, ...ORGS, ...DUPLICATES, ...COMPOSITE];
+  const kinds = induceEntityKinds(entities, {
+    population: "test:fusion-baseline",
+    minPrevalence: 0.07,
+    cohesionThreshold: 0.2,
+    minKindSize: 2,
+    permutations: 300,
+    quantile: 0.8,
+  });
+  const duplicateKind = kinds.find((k) => k.member_entity_ids.includes("d1"));
+  assert.ok(duplicateKind, "the duplicate cluster clears cohesion-null on similarity alone");
+  assert.equal(duplicateKind.cohesion, 1, "exact duplicates are maximally 'cohesive' despite contributing nothing individually");
+});
+
+test("with the fusion gate, the exact-duplicate cluster is rejected but the composite cluster survives", () => {
+  const entities = [...PEOPLE, ...PLACES, ...ORGS, ...DUPLICATES, ...COMPOSITE];
+  const kinds = induceEntityKinds(entities, {
+    population: "test:fusion-gated",
+    minPrevalence: 0.07,
+    cohesionThreshold: 0.2,
+    minKindSize: 2,
+    permutations: 300,
+    quantile: 0.8,
+    useFusionGate: true,
+  });
+
+  const duplicateKind = kinds.find((k) => k.member_entity_ids.includes("d1"));
+  assert.equal(duplicateKind, undefined, "the fusion gate rejects a cluster whose members are all interchangeable");
+
+  const compositeKind = kinds.find((k) => k.member_entity_ids.includes("c3"));
+  assert.ok(compositeKind, "a genuinely composite cluster still passes");
+  assert.ok(compositeKind.fusion_gate.passed, "each composite member measurably changes what the group predicts");
+  assert.ok(compositeKind.fusion_gate.mean_contribution > 0);
+  for (const kind of kinds) {
+    assert.equal(kind.fusion_gate.passed, true, "every surviving kind must have cleared the fusion gate");
+  }
+});
+
 test("induceEntityKinds is deterministic", () => {
   const entities = [...PEOPLE, ...PLACES];
   const a = induceEntityKinds(entities, { population: "test:det", minPrevalence: 0.2, minKindSize: 2, permutations: 100, quantile: 0.8 });

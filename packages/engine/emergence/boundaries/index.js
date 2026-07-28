@@ -15,20 +15,19 @@
 // ../nulls/index.js for a deterministic way to do it).
 
 import { deriveNull } from "../nulls/index.js";
+import { regionOverlap } from "../mereotopology/index.js";
 
 /**
  * Symmetric-difference distance between two boundaries, each expressed as
  * an iterable of comparable members (e.g. observation ids or byte spans
  * collapsed to a coordinate). 0 = identical boundary, 1 = disjoint.
+ *
+ * Thin re-export over mereotopology's regionOverlap (docs/mereotopology.md
+ * §3/§6 step 1) kept for call-site stability - a boundary is a region, and
+ * this distance is 1 - jaccard.
  */
 export function jaccardDistance(boundaryA, boundaryB) {
-  const setA = new Set(boundaryA);
-  const setB = new Set(boundaryB);
-  if (setA.size === 0 && setB.size === 0) return 0;
-  let intersection = 0;
-  for (const member of setA) if (setB.has(member)) intersection += 1;
-  const union = setA.size + setB.size - intersection;
-  return union === 0 ? 0 : 1 - intersection / union;
+  return 1 - regionOverlap(boundaryA, boundaryB).jaccard;
 }
 
 function mean(values) {
