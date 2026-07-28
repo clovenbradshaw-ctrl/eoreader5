@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present && node --test scripts/__tests__/*.test.mjs",
-    "transfer:eoreader42:plan": "node scripts/transfer-eoreader42.mjs"
+    "transfer:eoreader42:plan": "node scripts/transfer-eoreader42.mjs",
+    "demo:ingest": "node scripts/demo/ingest.mjs",
+    "demo:chat": "node scripts/demo/chat.mjs"
   }
 }
