@@ -274,6 +274,33 @@ export {
   completionDiagnostic,
 } from "./emergence/genesis/index.js";
 
+// Genesis, self-seeding: the candidate generation genesis/index.js
+// declined, plus the loop that closes the circuit. seedPool derives a
+// spectrum from the settled history alone (discovery = frontier
+// extrapolation, mutation = single-locus perturbation at the history's own
+// spread, splice = channel-slice graft citing both parents); growTaskTree
+// runs the fold round after round, feeding every ink back into the next
+// round's settled set. The host supplies only `validate` — running a
+// task's product is I/O — and `shapePool`, which may reweight what was
+// offered and provably cannot add to it. Read seeding.js's header before
+// changing the score: the geometric observable is measured, and measured
+// not to sustain generational depth.
+export {
+  SEED_MODES,
+  centroid,
+  spread,
+  scoreCandidate,
+  discoveryCandidates,
+  mutationCandidates,
+  spliceCandidates,
+  seedPool,
+} from "./emergence/genesis/seeding.js";
+export {
+  growTaskTree,
+  applyShaping,
+  perturbedCoherenceSamples,
+} from "./emergence/genesis/loop.js";
+
 // ── The invariant layer ──
 // The four constraints that define the system's legal state space.
 // These CHECK rather than clamp: quantum/project() and interfere()
