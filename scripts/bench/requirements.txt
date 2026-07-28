@@ -1,0 +1,4 @@
+wordllama==0.4.0.post1
+safetensors>=0.4
+tokenizers>=0.20
+numpy>=1.26
