@@ -1,6 +1,6 @@
 # Retrieval benchmark: associative-memory store vs. ColBERT-style late interaction
 
-Books: pg84, pg2600
+Books: pg84 (439 frames), pg2600 (3227 frames)
 
 ## pg84
 
