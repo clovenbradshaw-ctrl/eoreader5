@@ -2,8 +2,74 @@ import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 import { CURRENT_OPERATOR_EPOCH } from "@eoreader/spec/operators";
 import { createSeededRng, seededShuffle, deriveNull } from "../nulls/index.js";
 import { induceParameters, parameterProfiles, profileJaccard } from "../parameters/index.js";
+import { fusionSupplementationGate, regionOverlap } from "../mereotopology/index.js";
 import { pluralize } from "./pluralize.js";
 export { pluralize } from "./pluralize.js";
+
+// SYN/fusion supplementation (docs/mereotopology.md §2, §4, build order step
+// 5): does a cluster's own predictive value depend on each of its members,
+// or would any same-sized random group of entities do just as well? Opt-in
+// (default off) - the leave-one-out null cost is O(k^2) per candidate kind
+// per permutation, unmeasured at corpus scale (doc §8).
+//
+// consensusVector: majority-vote (strict >0.5, so ties break to "absent" -
+// a tie is exactly the case where removing one member should be able to
+// flip the vote) attribute-presence profile for a set of member vectors.
+function consensusVector(vectors, dim) {
+  const counts = new Float64Array(dim);
+  for (const vector of vectors) for (let i = 0; i < dim; i += 1) counts[i] += vector[i];
+  const n = vectors.length;
+  const consensus = new Float64Array(dim);
+  for (let i = 0; i < dim; i += 1) consensus[i] = n > 0 && counts[i] / n > 0.5 ? 1 : 0;
+  return consensus;
+}
+
+// Jaccard over each vector's present-attribute set (mereotopology's
+// regionOverlap, dogfooded here) rather than raw accuracy: with sparse
+// profiles, plain per-slot accuracy is dominated by trivially-matching
+// absent attributes and can't discriminate real structure from noise.
+function profileAgreement(vector, consensus, dim) {
+  const vectorSet = [];
+  const consensusSet = [];
+  for (let i = 0; i < dim; i += 1) {
+    if (vector[i] === 1) vectorSet.push(i);
+    if (consensus[i] === 1) consensusSet.push(i);
+  }
+  return regionOverlap(vectorSet, consensusSet).jaccard;
+}
+
+// Per-member contribution: how much does including member j change the
+// group's ability to predict the OTHER members' attribute profiles from
+// consensus? contribution_j = (accuracy predicting the rest of the cluster
+// with j present) - (accuracy predicting the rest without j), evaluated
+// over the same held-out members either way. A member interchangeable with
+// the rest (e.g. an exact duplicate) scores 0: the consensus doesn't move
+// whether it's there or not. Needs at least 2 other members to leave one
+// out of the "other" pool too; smaller residues contribute 0 (no signal,
+// not a claim of zero contribution).
+function memberContributions(memberIds, profiles, dim) {
+  const n = memberIds.length;
+  const contributions = [];
+  for (let j = 0; j < n; j += 1) {
+    const withoutJ = memberIds.filter((_, idx) => idx !== j);
+    if (withoutJ.length < 2) {
+      contributions.push(0);
+      continue;
+    }
+    let withJSum = 0;
+    let withoutJSum = 0;
+    for (let mi = 0; mi < withoutJ.length; mi += 1) {
+      const heldOut = withoutJ[mi];
+      const heldOutVector = profiles.get(heldOut);
+      const restWithJ = withoutJ.filter((_, idx) => idx !== mi).concat([memberIds[j]]);
+      const restWithoutJ = withoutJ.filter((_, idx) => idx !== mi);
+      withJSum += profileAgreement(heldOutVector, consensusVector(restWithJ.map((id) => profiles.get(id)), dim), dim);
+      withoutJSum += profileAgreement(heldOutVector, consensusVector(restWithoutJ.map((id) => profiles.get(id)), dim), dim);
+    }
+    contributions.push((withJSum - withoutJSum) / withoutJ.length);
+  }
+  return contributions;
+}
 
 export function induceEntityKinds(entityRecords, {
   minEntityCount,
@@ -15,6 +81,7 @@ export function induceEntityKinds(entityRecords, {
   population = "entities:anonymous",
   language = "eng",
   pluralizePriors,
+  useFusionGate = false,
 } = {}) {
   const n = entityRecords.length;
   const resolvedMinEntityCount = minEntityCount ?? Math.max(3, Math.ceil(Math.sqrt(n)));
@@ -189,6 +256,39 @@ export function induceEntityKinds(entityRecords, {
       },
     });
 
+    let fusionGateResult = null;
+    if (useFusionGate) {
+      const heldOutScores = memberContributions(memberIds, profiles, parameterKeys.length);
+      const fusionRng = createSeededRng(canonicalHashSync({
+        population,
+        member_count: memberCount,
+        purpose: "kind-fusion-null",
+      }));
+      const nullHeldOutScores = [];
+      const fusionShuffledIds = seededShuffle(entityIds, fusionRng);
+      for (let i = 0; i < resolvedPermutations; i += 1) {
+        const shuffledGroup = fusionShuffledIds.slice(0, memberCount);
+        const groupContributions = memberContributions(shuffledGroup, profiles, parameterKeys.length);
+        const groupMean = groupContributions.length > 0
+          ? groupContributions.reduce((sum, value) => sum + value, 0) / groupContributions.length
+          : 0;
+        nullHeldOutScores.push(groupMean);
+        seededShuffle(fusionShuffledIds, fusionRng);
+      }
+      fusionGateResult = fusionSupplementationGate({
+        members: memberIds,
+        heldOutScores,
+        nullHeldOutScores,
+        quantile,
+        protocol: {
+          name: "random-cluster-member-contribution",
+          iterations: resolvedPermutations,
+          statistic: "mean-leave-one-out-attribute-agreement-delta",
+          scope: `${population} kind:${memberCount} members`,
+        },
+      });
+    }
+
     const kindParamRecords = [];
     const kindEntityRecords = memberIds.map((id) => entityById.get(id)).filter(Boolean);
     for (const param of params) {
@@ -243,11 +343,21 @@ export function induceEntityKinds(entityRecords, {
         eva: { operator: "EVA", mode: "Relate", domain: "Interpretation", act: "cohesion-null", method: "random-partition", passed: cohesionNullResult.passed, p_value: cohesionNullResult.p_value },
         def: { operator: "DEF", mode: "Differentiate", domain: "Interpretation", act: "kind-definition", label: bestLabel },
         ins: { operator: "INS", mode: "Generate", domain: "Existence", act: "member-instantiation", member_count: memberCount },
-        syn: { operator: "SYN", mode: "Generate", domain: "Structure", act: "vocabulary-synthesis", used_in: "buildKindVocabulary" },
+        syn: {
+          operator: "SYN",
+          mode: "Generate",
+          domain: "Structure",
+          act: "vocabulary-synthesis",
+          used_in: "buildKindVocabulary",
+          fusion_supplementation: useFusionGate
+            ? { passed: fusionGateResult.passed, p_value: fusionGateResult.null_result.p_value }
+            : { evaluated: false },
+        },
         rec: { operator: "REC", mode: "Generate", domain: "Interpretation", act: "rule-learning", status: "not-applied" },
       },
       cohesion,
       cohesion_null: cohesionNullResult,
+      fusion_gate: fusionGateResult,
       distinguishing_parameters: distinguishing,
       emergence: {
         operator_epoch: CURRENT_OPERATOR_EPOCH,
@@ -260,10 +370,11 @@ export function induceEntityKinds(entityRecords, {
       ...body,
       content_hash,
       _cohesion_null_passed: cohesionNullResult.passed,
+      _fusion_gate_passed: !useFusionGate || Boolean(fusionGateResult?.passed),
     }));
   }
 
-  const validated = kindRecords.filter((k) => k._cohesion_null_passed);
+  const validated = kindRecords.filter((k) => k._cohesion_null_passed && k._fusion_gate_passed);
   if (validated.length === 0) {
     kindRecords.sort((a, b) => b.cohesion - a.cohesion);
     return kindRecords.length > 0 ? [kindRecords[0]] : [];
