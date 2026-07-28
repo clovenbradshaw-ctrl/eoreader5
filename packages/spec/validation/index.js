@@ -32,6 +32,20 @@ export function validateObservationEnvelope(value, name = "ObservationEnvelope")
   hash(v.source_content_hash, name, "source_content_hash"); hash(v.blocks_hash, name, "blocks_hash");
   for (const axis of v.axes) { object(axis, name); string(axis.axis_id, name, "axis_id"); string(axis.topology, name, "topology"); }
   for (const field of v.fields) { object(field, name); string(field.field_id, name, "field_id"); string(field.value_type, name, "value_type"); string(field.block_id, name, "block_id"); }
+  // capture_provenance: now required (was optional). Every documented step must
+  // carry the three required provenance-of-capture fields (step_id, holon_id,
+  // lens_id) so mediation is always inspectable. This enforces the real-wall
+  // constraint: two reads under different lenses produce genuinely separate
+  // observation-blocks with distinct capture_provenance chains, not one block
+  // wearing two labels.
+  array(v.capture_provenance, name, "capture_provenance");
+  if (v.capture_provenance.length === 0) fail(name, "capture_provenance must have at least one step");
+  for (const step of v.capture_provenance) {
+    object(step, name);
+    string(step.step_id, name, "capture_provenance[].step_id");
+    string(step.holon_id, name, "capture_provenance[].holon_id");
+    string(step.lens_id, name, "capture_provenance[].lens_id");
+  }
   return v;
 }
 
@@ -73,6 +87,15 @@ export function validateSemanticEvent(value, name = "SemanticEvent") {
 // replay — the one invariant HANDOFF section 1.2 measured as load-bearing.
 export const REACTION_KINDS = new Set([
   "dwell", "reread", "scrub", "decollapse", "follow-figure", "skip", "query", "span-select", "abandon",
+  // Truth-seeking reaction kinds — the reader's orientation toward evidence.
+  // These are observations of a reader demanding, probing, and verifying
+  // rather than passively consuming. Same firewall discipline: no op, no
+  // operator_epoch, no prior_id — an observation of the reader, not an
+  // engine inference, and must never mint an observation or a referent.
+  "probe",          // reader actively investigates a specific claim or surface
+  "verify",         // reader cross-checks a claim against another source or passage
+  "demand_witness", // reader refuses ENGINE-tier resolution, demands MODEL-tier evidence
+  "face_gap",       // reader confronts a reported knowledge gap rather than bypassing it
 ]);
 const REACTION_ID_RE = /^reaction:sha256:[0-9a-f]{64}$/;
 

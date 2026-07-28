@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eoreader.dev/spec/schemas/observation-envelope.schema.json",
   "title": "ObservationEnvelope",
-  "description": "ObservationEnvelope@1 normalized observation field. Decoders expose source-given axes, fields, anchors, missingness, and losses without asserting semantic kinds.",
+  "description": "ObservationEnvelope@1 normalized observation field. Decoders expose source-given axes, fields, anchors, missingness, and losses without asserting semantic kinds. capture_provenance records the full capture chain — which ingest holon, which lens, what transformations happened, and what was dropped — making mediation a first-class inspectable fact about the record.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,7 +14,8 @@
     "fields",
     "anchors",
     "source_content_hash",
-    "blocks_hash"
+    "blocks_hash",
+    "capture_provenance"
   ],
   "properties": {
     "schema": {
@@ -48,6 +49,88 @@
           "type": "array",
           "items": {
             "type": "object"
+          }
+        }
+      }
+    },
+    "capture_provenance": {
+      "type": "array",
+      "description": "The full capture chain for this observation — every transform step from raw source to decoded field, with what holon performed it, through what lens, and what was dropped. Optional; absence means 'capture provenance was not recorded,' never 'no mediation happened.' Each entry is one step in the chain, earliest first.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["step_id", "holon_id", "lens_id"],
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable identifier for this step in the capture chain — typically content-addressed or versioned."
+          },
+          "holon_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ingest holon (module, pipeline, tool) that performed this transformation step."
+          },
+          "lens_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The viewing lens active during this step — declares what the holon was attending to, filtering for, or biased toward."
+          },
+          "operator": {
+            "type": "string",
+            "description": "EO operator for this transformation step (NUL=ingest, INS=translate, SEG=segment, CON=align, etc.)"
+          },
+          "terrain": {
+            "type": "string",
+            "description": "Terrain context for this step."
+          },
+          "stance": {
+            "type": "string",
+            "description": "Stance context for this step."
+          },
+          "transformations": {
+            "type": "array",
+            "description": "Named transformations applied by this step (e.g. read-file, strip-boilerplate, chunk, encode-utf8, normalize-whitespace).",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["type"],
+              "properties": {
+                "type": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "params": { "type": "object" }
+              }
+            }
+          },
+          "dropped": {
+            "type": "array",
+            "description": "What was discarded, elided, or lost at this step — material the source had that the capture chain removed before the observation was materialized.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["field"],
+              "properties": {
+                "field": { "type": "string", "description": "What was dropped — a field name, a span label, a modality channel." },
+                "reason": { "type": "string", "description": "Why it was dropped — 'out-of-band', 'boilerplate', 'below-min-chars', 'encoding-loss', etc." },
+                "approx_byte_range": {
+                  "type": "array",
+                  "items": { "type": "integer" },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "Approximate byte offset range of dropped material in the original source."
+                }
+              }
+            }
+          },
+          "decoder": {
+            "type": "object",
+            "description": "The decoder active at this step (may differ from the envelope's top-level decoder, which is the final step's decoder).",
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "version": { "type": "string" },
+              "loss": { "type": "array", "items": { "type": "object" } }
+            }
           }
         }
       }

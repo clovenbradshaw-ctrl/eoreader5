@@ -34,37 +34,88 @@ Two governing sentences from the spec:
 
 > A figure is a place where the cut keeps landing.
 
-## 2. Typing: mass × coupling × named
+## 2. The criterion: Tapas (concentration-energy)
+
+The gate measures whether Tapas — concentrated conscious-force
+(Aurobindo's term) — has converged enough on one locus to erect a wall
+of exclusion. This is not a statistical "mass" in the sense of frequency;
+it is whether connection-energy has concentrated, not merely accumulated.
+
+Individuation only happens through exclusive concentration: Tapas so
+absorbed in one line of its own movement that it becomes self-oblivious
+to the rest — not because the rest is inaccessible, but because attention
+is spent elsewhere. Crucially, a wall of exclusion must be REAL, not an
+act: "It may be aware of the rest all the time, yet act as if it were
+not aware of it; that would not be a state or act of Ignorance."
+Pretense-of-separation is not separation.
+
+The boundary stability check (`computeBoundaryStabilityGate` in
+`packages/engine/emergence/boundaries/index.js`) enforces this
+constraint. Mass concentration alone is a clustering heuristic that will
+happily individuate boilerplate; a recurring boilerplate phrase carries
+sighting mass but fails boundary stability because the cut won't stay
+put under re-segmentation — the wall was theatrical, not real. A
+referent that fails boundary stability remains field, regardless of what
+mass and coupling typed it as.
+
+## 3. Typing: Tapas × coupling × named
 
 Every referent is typed by two Born-null-gated observables plus one bit:
 
-| Type | Mass | Coupling | Named (INS bit) | Meaning |
+| Type | Tapas | Coupling | Named (INS bit) | Meaning |
 |---|---|---|---|---|
-| `field` | low | low | — | ambient, not individuated |
-| `emanon` | high | any | false | present and agentive, never name-admitted (a definite-description agent, e.g. "the creature") |
-| `protogon` | low | high | any | orbited but absent — talked about, rarely present (e.g. Kurtz) |
-| `holon` | high | any | true | fully individuated, name-bound |
+| `field` | low | low | — | ambient, energy unspent — stays sea, not wave |
+| `emanon` | high | any | false | Tapas concentrated, wall erected, present and agentive, never name-admitted (e.g. "the creature") |
+| `protogon` | low | high | any | orbited but absent — talked about, heavily coupled but energy not concentrated here (e.g. Kurtz) |
+| `holon` | high | any | true | Tapas concentrated AND name-bound — fully individuated |
+| `apparatus` | high | high (attributive) | any | high attributive share, coupling dispersed, no subject re-entry — frame demotion |
 
-Implementation note: the table's "high mass, any coupling" for `emanon`
-and `holon` collapses to one rule in `classifyIndividuationType`: mass is
-the primary split (high mass → `emanon`/`holon` branch, decided by the
-named bit; low mass → `field`/`protogon` branch, decided by coupling).
-This is a direct reading of spec 13.5 — a name-bind changes only the
-named bit, not mass or coupling, and is the sole thing that turns an
-`emanon` into a `holon`.
+Implementation note: the table's "high Tapas, any coupling" for `emanon`
+and `holon` collapses to one rule in `classifyIndividuationType`: Tapas
+is the primary split (high Tapas → `emanon`/`holon` branch, decided by
+the named bit; low Tapas → `field`/`protogon` branch, decided by
+coupling). This is a direct reading of spec 13.5 — a name-bind changes
+only the named bit, not Tapas or coupling, and is the sole thing that
+turns an `emanon` into a `holon`.
 
 **"High" and "low" are never hand-set constants.** Per spec 12.8 and 13.2,
-mass and coupling are each typed by `deriveNull`
+Tapas and coupling are each typed by `deriveNull`
 (`packages/engine/emergence/nulls/index.js`): the caller supplies a null
-distribution of what that referent's mass (or coupling) would look like
+distribution of what that referent's Tapas (or coupling) would look like
 under an explicit perturbation of the actual data — e.g. a shuffled
 sighting-to-referent assignment — and `classifyIndividuationType` calls
-mass/coupling "high" only when the observed value clears that
+Tapas/coupling "high" only when the observed value clears that
 distribution's derived quantile.
 
-## 3. Boundary stability: the individuation test
+## 4. Relation types: grounded_by vs part_of
 
-Mass concentration alone is a clustering heuristic and will happily
+Per the mereotopology discipline (`docs/mereotopology-relations.md`),
+two relation types are distinguished and never conflated:
+
+- **`grounded_by`** — asymmetric, instance→kernel. What the nine operators
+  supply to every fold. Every referent carries a pointer to the operator
+  that produced it (stored in `SemanticEvent` provenance). Two referents
+  individuated under the same lens share a grounding relation — both
+  inherit their generic character from the operator algebra — and their
+  individuating specifics are genuinely peer, non-relational,
+  incommensurable. They are not in a parthood relation with each other;
+  the question of cross-referent parthood was the category error.
+
+- **`part_of`** — only within one instance's specific character. A sub-span
+  within one referent's region (e.g. a character within a scene). This is
+  what the boundary stability gate measures the integrity of — if the
+  sub-region won't stay put under re-segmentation, the part-whole relation
+  is unstable.
+
+The previous framing treated "grounding" as one undifferentiated relation
+and tried to handle mutual containment (Indra's-net-style "A part-of B
+and B part-of A") as a parthood puzzle. It isn't. Two referents sharing a
+lens share a grounding relation to the operator algebra; their specific
+characters are peer, not parts of each other.
+
+## 5. Boundary stability: the individuation test
+
+Tapas concentration alone is a clustering heuristic and will happily
 individuate boilerplate. The gate additionally requires boundary
 invariance under re-segmentation (spec 13.3):
 
@@ -96,43 +147,49 @@ differs), and the engine may not draw ambient randomness
 to generate perturbations deterministically from an explicit seed.
 
 **A referent that fails boundary stability remains `field`, not admitted**
-— even if its mass and coupling typed it as `emanon` or `holon`. The
+— even if its Tapas and coupling typed it as `emanon` or `holon`. The
 boundary test can only downgrade a typed candidate, never promote one past
-what mass/coupling earned. This is the exact reading of the worked example
+what Tapas/coupling earned. This is the exact reading of the worked example
 in spec 20.2: "a recurring boilerplate phrase carries mass but fails
-boundary stability — remains field, not admitted."
+boundary stability — remains field, not admitted." In Tapas terms: the
+phrase has sighting mass but the wall of exclusion isn't real — the
+boundary collapses under perturbation.
 
-## 4. The gate result
+## 6. The gate result
 
 `individuateReferent` combines both checks into one `IndividuationResult@1`
 record (`packages/spec/schemas/individuation-result.schema.json`):
 
-- `individuation_type` — one of `field`/`emanon`/`protogon`/`holon`, after
-  any boundary-driven downgrade to `field`.
+- `individuation_type` — one of `field`/`emanon`/`protogon`/`holon`/`apparatus`,
+  after any boundary-driven downgrade to `field`.
 - `mass_null` / `coupling_null` — the full `NullProtocol@1` records used to
-  type mass and coupling (threshold, quantile, tail direction, p-value,
+  type Tapas and coupling (threshold, quantile, tail direction, p-value,
   and the null samples themselves, retained for replay).
 - `boundary_stability` — `null` if no boundary was evaluated, otherwise
   the full boundary gate result including its own `NullProtocol@1`.
+- `grounded_by` — `null` until populated at event time; carries the operator
+  that supplied this referent's generic character (asymmetric, instance→kernel).
+- `part_of` — `null` until a sub-region relation is asserted within this
+  referent's specific character.
 - `gate_result.admitted` — `true` only when typing is not `field` **and**
   boundary stability was evaluated and passed. There is no default-true
   path: a referent with no boundary evidence yet is `status: "pending"`,
   never silently admitted (spec 4.4, "fail closed when an inference lacks
   provenance").
 
-## 5. Name-bind promotion (emanon → holon)
+## 7. Name-bind promotion (emanon → holon)
 
 `applyNameBind` (spec 13.5) re-derives an `emanon`'s individuation result
-with the named bit flipped true, using the exact same mass, coupling, and
+with the named bit flipped true, using the exact same Tapas, coupling, and
 null samples — a name-bind changes identity status, not the underlying
 observables. It refuses to run on anything other than an `emanon`. Callers
 are expected to retain both the pre- and post-name-bind results for the
 audit trail (spec 7.11, "recursive audit"): this module never mutates a
 prior result in place, it only produces a new one.
 
-## 6. What this gate does not do (yet)
+## 8. What this gate does not do (yet)
 
-- It does not compute mass, coupling, agency signal, or boundaries from
+- It does not compute Tapas, coupling, agency signal, or boundaries from
   raw observations — those are row-specific extraction concerns (spec
   13.6) that belong in a sense organ / observation-normalization layer,
   not in the gate itself. This module is the gate only.
@@ -144,7 +201,7 @@ prior result in place, it only produces a new one.
   individuation event flow) is follow-up work.
 - Field → Link and Atmosphere → Lens (spec 13.6, the Structure and
   Significance rows) reuse this exact gate unmodified once a row supplies
-  its own mass/coupling/boundary observables — no changes to
+  its own Tapas/coupling/boundary observables — no changes to
   `individuation.js` are required for that; see spec 3.3 and 27.13
   ("terrain-parametricity tests").
 - The Figure → Pattern generalization gate (Entity → Kind: transfer +
@@ -153,12 +210,13 @@ prior result in place, it only produces a new one.
   parameters,transitions,lift}/` remain stub modules
   (`export const moduleStatus = "planned"`) pending it.
 
-## 7. Worked example (spec 20.2, in this codebase's terms)
+## 9. Worked example (spec 20.2, in this codebase's terms)
 
 ```js
 import { individuateReferent, applyNameBind } from "@eoreader/engine/referents";
 
-// "the creature": high mass, high coupling, never named -> emanon.
+// "the creature": high Tapas, high coupling, never named -> emanon.
+// The wall of exclusion is real — Tapas has concentrated here.
 const creature = individuateReferent({
   referentId: "referent:the-creature",
   mass: 9.5, coupling: 9.5, named: false,
@@ -167,8 +225,9 @@ const creature = individuateReferent({
 });
 // creature.individuation_type === "emanon", creature.gate_result.admitted === true
 
-// A recurring boilerplate phrase: high mass, but its boundary is
+// A recurring boilerplate phrase: high sighting mass, but its boundary is
 // indistinguishable from a random boundary -> remains field.
+// Tapas appeared to concentrate but the wall was theatrical — pretense.
 const boilerplate = individuateReferent({
   referentId: "referent:recurring-phrase",
   mass: 9.5, coupling: 9.5, named: false,

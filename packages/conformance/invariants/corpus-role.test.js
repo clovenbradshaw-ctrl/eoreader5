@@ -53,6 +53,7 @@ function observation(sourceId, referentId, text) {
     anchors: { scheme: "test", surfaces: [{ referent_id: referentId, text }] },
     source_content_hash: `sha256:${"b".repeat(64)}`,
     blocks_hash: `sha256:${"c".repeat(64)}`,
+    capture_provenance: [{ step_id: "step:test:1", holon_id: "holon:test", lens_id: "lens:neutral" }],
   };
 }
 

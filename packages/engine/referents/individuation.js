@@ -4,9 +4,39 @@
 //
 // A ReferentHypothesis (see ./index.js) is ambient material with a
 // provisional handle. It becomes a Figure only when this gate admits it:
-// mass x coupling typing (field/emanon/protogon/holon), gated additionally
-// by boundary stability under re-segmentation (a figure is a place where
-// the cut keeps landing, spec section 13.3/33.4).
+// the gate measures whether Tapas (concentration-energy, Aurobindo's term)
+// has concentrated enough on one locus to erect a wall of exclusion — the
+// referent has individuated out of the ambient sea. Two observables type
+// this, each gated by a Born null:
+//
+//   mass (Tapas-concentration) — how much attention/energy has converged on
+//     this locus. Low = the referent's connection-energy is unspent, it
+//     stays sea, not wave. High = energy has concentrated, a wall of
+//     exclusion is erected.
+//
+//   coupling (structural-wovenness) — how tightly this locus is coupled to
+//     the rest of the structure. A high-mass referent that is also highly
+//     coupled has Tapas both concentrated AND woven into the relational
+//     fabric. A high-coupling-low-mass referent is orbited but absent
+//     (Kurtz): talked about, rarely present.
+//
+// Plus boundary stability under re-segmentation (a figure is a place where
+// the cut keeps landing, spec section 13.3/33.4). Mass concentration alone
+// is a clustering heuristic that happily individuates boilerplate — the
+// boundary test rejects pretense-of-separation. A wall must be REAL, not
+// theatrical: if the cut won't stay put under perturbation, the referent
+// was never genuinely individuated.
+//
+// Two relation types, never conflated per the mereotopology discipline
+// (docs/mereotopology-relations.md):
+//   grounded_by — asymmetric, instance→kernel. What the nine operators
+//     supply to every fold. Every referent carries a pointer to the
+//     operator that produced it (stored in SemanticEvent provenance).
+//   part_of — only within one instance's specific character. A sub-span
+//     within one referent's region. Cross-referent comparison is never a
+//     parthood question; two referents individuated under the same lens
+//     share a grounding relation (both inherit from the operator algebra)
+//     and their individuating specifics are genuinely peer, non-relational.
 //
 // Every threshold here is a Born null from deriveNull, never a hand-set
 // constant (spec section 12.8, 13.2). This module is terrain-parametric in
@@ -21,26 +51,29 @@ import { computeBoundaryStabilityGate } from "../emergence/boundaries/index.js";
 export const INDIVIDUATION_TYPES = Object.freeze(["field", "emanon", "protogon", "holon", "apparatus"]);
 
 /**
- * Type a referent by mass x coupling, with the named/INS bit deciding
- * between emanon and holon on the high-mass side (spec 13.2, 13.5):
+ * Type a referent by Tapas (concentration-energy) × structural-coupling,
+ * with the named/INS bit deciding between emanon and holon on the
+ * high-Tapas side (spec 13.2, 13.5):
  *
- *   field:    low mass, low coupling   - ambient, not individuated
- *   protogon: low mass, high coupling  - orbited but absent (Kurtz)
- *   emanon:   high mass, unnamed       - present and agentive, never name-admitted
- *   holon:    high mass, named         - fully individuated, name-bound
+ *   field:    low Tapas, low coupling     - ambient, energy unspent, stays sea
+ *   protogon: low Tapas, high coupling    - orbited but absent (Kurtz), talked about but not present
+ *   emanon:   high Tapas, unnamed         - concentration-energy has erected a wall of exclusion,
+ *                                           present and agentive, never name-admitted
+ *   holon:    high Tapas, named           - fully individuated, name-bound, wall is real
+ *   apparatus: holon/emanon demoted       - attributive share high, coupling dispersed, no subject re-entry
  *
  * @param {object} args
- * @param {number} args.mass - sighting mass for this referent.
- * @param {number} args.coupling - rho, incident edge weight (co-occurrence
- *   / relational weight) for this referent.
+ * @param {number} args.mass - Tapas-concentration for this referent (sighting mass).
+ * @param {number} args.coupling - structural-wovenness: rho, incident edge weight
+ *   (co-occurrence / relational weight) for this referent.
  * @param {boolean} args.named - the INS bit: has a name-bind
  *   (unifyDescriptor-equivalent) ever fired for this referent.
- * @param {number[]} args.massNullSamples - mass values computed under an
- *   explicit perturbation of the actual data (e.g. shuffled sighting-to-
- *   referent assignment) - the null "what mass would this referent have by
- *   chance" distribution.
+ * @param {number[]} args.massNullSamples - Tapas-concentration values computed
+ *   under an explicit perturbation of the actual data (e.g. shuffled sighting-to-
+ *   referent assignment) - the null "what concentration would this referent have
+ *   by chance" distribution.
  * @param {number[]} args.couplingNullSamples - same, for coupling.
- * @param {number} [args.quantile=0.95] - Born-null quantile for both mass
+ * @param {number} [args.quantile=0.95] - Born-null quantile for both Tapas
  *   and coupling thresholds.
  */
 export function classifyIndividuationType({
@@ -116,6 +149,8 @@ export function classifyIndividuationType({
     attributive_null: frame.attributiveNull,
     dispersion_null: frame.dispersionNull,
     subject_reentry: frame.subjectReentry,
+    grounded_by: null,
+    part_of: null,
   });
 }
 
@@ -225,6 +260,8 @@ export function individuateReferent({
     dispersion_null: typing.dispersion_null,
     subject_reentry: typing.subject_reentry,
     boundary_stability: boundaryStability,
+    grounded_by: typing.grounded_by,
+    part_of: typing.part_of,
     gate_result: Object.freeze({ admitted, status, reason }),
   });
 }
