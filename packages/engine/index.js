@@ -8,6 +8,10 @@ export {
 } from "./referents/index.js";
 export { CORE_SUBASSEMBLIES, assembleWatchmaker, defineSubassembly } from "./subassemblies/index.js";
 export { createState, applyCommand, appendEvents, replay, read, readTasks } from "./replay/index.js";
+// The reaction channel. Its own append-only log, deliberately NOT the
+// semantic ledger: a reaction is an observation of a reader, not an engine
+// inference, and it must never mint an observation or a referent.
+export { mintReaction, createReactionLog, appendReactions, replayReactions, salienceRanking } from "./reaction/index.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";

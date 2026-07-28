@@ -61,6 +61,54 @@ export function validateSemanticEvent(value, name = "SemanticEvent") {
   return v;
 }
 
+// ReactionEvent@1 — the reaction channel (HANDOFF Part 4).
+//
+// A reaction is an observation OF A READER, not an engine inference, so it
+// deliberately carries no op, no operator_epoch, and no prior_id: it is not a
+// SemanticEvent and must never be appended to the semantic ledger, where it
+// could mint an observation or a referent. See packages/engine/reaction.
+//
+// ts and seq are host-supplied. The engine has no clock, and a reaction whose
+// address depended on an engine-side ambient clock would break byte-identical
+// replay — the one invariant HANDOFF section 1.2 measured as load-bearing.
+export const REACTION_KINDS = new Set([
+  "dwell", "reread", "scrub", "decollapse", "follow-figure", "skip", "query", "span-select", "abandon",
+]);
+const REACTION_ID_RE = /^reaction:sha256:[0-9a-f]{64}$/;
+
+function nonNegativeInteger(value, name, field) {
+  if (!Number.isInteger(value) || value < 0) fail(name, `${field} must be a non-negative integer`);
+}
+
+export function validateReactionEvent(value, name = "ReactionEvent") {
+  const v = object(value, name);
+  if (v.schema !== "ReactionEvent@1") fail(name, "schema must be ReactionEvent@1");
+  string(v.reaction_id, name, "reaction_id");
+  if (!REACTION_ID_RE.test(v.reaction_id)) fail(name, "reaction_id must be reaction:sha256:<64 hex>");
+  string(v.reader_id, name, "reader_id");
+  string(v.session_id, name, "session_id");
+  nonNegativeInteger(v.ts, name, "ts");
+  nonNegativeInteger(v.seq, name, "seq");
+  if (!REACTION_KINDS.has(v.kind)) fail(name, `invalid kind ${v.kind}`);
+  string(v.block_id, name, "block_id");
+  if (v.extent !== null) {
+    const extent = object(v.extent, `${name}.extent`);
+    nonNegativeInteger(extent.span_start, name, "extent.span_start");
+    nonNegativeInteger(extent.span_end, name, "extent.span_end");
+    if (extent.span_end < extent.span_start) fail(name, "extent.span_end must be >= extent.span_start");
+  }
+  const context = object(v.context, `${name}.context`);
+  array(context.visible_block_ids, name, "context.visible_block_ids");
+  for (const id of context.visible_block_ids) string(id, name, "context.visible_block_ids[]");
+  string(context.scale, name, "context.scale");
+  string(context.lens_id, name, "context.lens_id");
+  object(v.payload, `${name}.payload`);
+  const { reaction_id, ...body } = v;
+  const expected = `reaction:${canonicalHashSync(body)}`;
+  if (reaction_id !== expected) fail(name, "reaction_id does not match canonical reaction content");
+  return v;
+}
+
 export function validateEffectResult(value, name = "EffectResult") {
   const v = object(value, name);
   string(v.effect_id, name, "effect_id"); string(v.producer, name, "producer"); string(v.version, name, "version");

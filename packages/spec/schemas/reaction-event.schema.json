@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/reaction-event.schema.json",
+  "title": "ReactionEvent",
+  "description": "One observed reader reaction. The reaction channel is the ONLY input from which reader-dependent salience can be computed: identity/provenance is reader-independent and computable from text, salience is reader-dependent and computable from no text at all (HANDOFF section 1.6, three independent failed attempts). A ReactionEvent is an OBSERVATION OF A READER, never an engine inference, so it lives in its own append-only log rather than the semantic ledger — it carries no operator, no prior_id, and no operator_epoch, and it may never mint an observation, referent, hypothesis, or task. ts and seq are HOST-SUPPLIED and never generated engine-side, because the engine must contain no clock (same discipline as SemanticEvent@1) or replay stops being byte-identical.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "reaction_id",
+    "reader_id",
+    "session_id",
+    "ts",
+    "seq",
+    "kind",
+    "block_id",
+    "extent",
+    "context",
+    "payload"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ReactionEvent@1"
+    },
+    "reaction_id": {
+      "type": "string",
+      "description": "Content address of every other field. reaction:sha256:<64 hex>.",
+      "pattern": "^reaction:sha256:[0-9a-f]{64}$"
+    },
+    "reader_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ts": {
+      "type": "integer",
+      "description": "Host-supplied milliseconds since the Unix epoch. The engine never reads an ambient clock.",
+      "minimum": 0
+    },
+    "seq": {
+      "type": "integer",
+      "description": "Host-supplied per-session monotone counter. Required, and not redundant with ts: batched reactions routinely share a millisecond, and without seq two otherwise-identical reactions would collapse to one content address and be refused as duplicates. seq also gives the log a total order that does not depend on clock resolution.",
+      "minimum": 0
+    },
+    "kind": {
+      "type": "string",
+      "description": "The nine observed reaction kinds. Note that skip and abandon are disengagement, not engagement — nothing in this spec assigns them a sign, because weighting kinds against each other is an inference and inference is deliberately out of scope until the channel has collected data.",
+      "enum": [
+        "dwell",
+        "reread",
+        "scrub",
+        "decollapse",
+        "follow-figure",
+        "skip",
+        "query",
+        "span-select",
+        "abandon"
+      ]
+    },
+    "block_id": {
+      "type": "string",
+      "description": "The content-addressed block the reaction landed on.",
+      "minLength": 1
+    },
+    "extent": {
+      "description": "Sub-block span the reaction covered, or null when the reaction is whole-block.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "span_start",
+            "span_end"
+          ],
+          "properties": {
+            "span_start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "span_end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "context": {
+      "type": "object",
+      "description": "What was on screen when the reaction happened. Required so a reaction can later be read against its alternatives: a dwell on the only visible block means something different from a dwell on one of twelve.",
+      "additionalProperties": false,
+      "required": [
+        "visible_block_ids",
+        "scale",
+        "lens_id"
+      ],
+      "properties": {
+        "visible_block_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scale": {
+          "type": "string",
+          "description": "The altitude/scale the reader was at. A string, not a number, because unit size is not yet a swept parameter (HANDOFF Part 5).",
+          "minLength": 1
+        },
+        "lens_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Kind-specific detail (query text, dwell ms, scrub delta). Deliberately unconstrained: the channel collects first and the shapes are not yet known."
+    }
+  }
+}

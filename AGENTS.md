@@ -16,6 +16,7 @@ make sense for a nameless leitmotif in music, or it is string-thinking.
 | associative memory | `packages/engine/emergence/store/index.js` | Hebbian edges at co-occurrence; sparse-BAND keys (idf ≥ floor AND df ≥ 2); keyword and phrase stores separate; index all, wire top-k; one CA3 completion hop. Biology notes in header are load-bearing. |
 | entity fold | `packages/engine/emergence/summary/entity-fold.js` | offset-grounded spans (verified round-trip), presence-based frames, stratified whole-arc selection, `withRelations`, `referent` prior option, `echoes` (spans carry offset-anchored recalled antecedents from the store). |
 | spine | `summary/spine.js` | `scoreByPos` exposes ALL sampled scores (not just peaks); `minHistory` cold-start mask exists but masking kills exposition scenes — see dead-ends. |
+| reaction channel | `packages/engine/reaction/index.js` | `ReactionEvent@1` in its OWN append-only content-addressed log — never the semantic ledger (a reaction is an observation of a READER, not an inference; it carries no operator, no prior_id, no epoch). `ts`/`seq` are host-supplied; the engine has no clock. `salienceRanking` is a zero-weight TALLY, not a model — inferring from this channel is deliberately out of scope until it has data. Firewall: `conformance/invariants/reaction-channel-firewall.test.js`. |
 
 ## Goldens and scorers (frozen — the discipline is the point)
 
@@ -65,6 +66,40 @@ reported as typed `gaps` — faking them is the cardinal regression.
 
 - Distributional coref (frame-level lift; sentence-level complementary
   distribution) — both failed measurably; see `presence.js` header.
+- **Deriving a READER PRIOR from text — three independent mechanisms, all
+  failed the same way.** (a) IDF prior built from a different corpus: r =
+  0.974 with the intrinsic reading, adds nothing. (b) REC-gated learning
+  prior over 85 chapters: matched a greedy prior within 1% on transfer to
+  unseen authors. (c) compression-dictionary reader: a WORD-SCRAMBLED prior
+  agreed with reader A at r = 0.887 — *more* than a genuine second sample of
+  the same author (0.779). Every one collapses toward the text, by way of
+  vocabulary. A prior computed from what texts contain can only be a
+  statement about what texts contain. The complementary result: provenance
+  IS reader-independent (top-3 neighbour agreement 0.49–0.54 vs a 0.082
+  chance floor, flat across Melville/Doyle/word-salad seeds). So identity is
+  computable from text and salience is not — salience needs the reaction
+  channel (`packages/engine/reaction/`), which is why it exists.
+- The content classifier as a GATE. `cube/index.js` is order-invariant by
+  construction: shuffling words inside each of 2,527 Moby-Dick paragraphs
+  left 95.7% of cell assignments unchanged, and random words landed on the
+  modal cell at 34.7% vs real prose 33.5%. The fabrication veto that used it
+  passed three plain fabrications. Classifiers are `advisoryClassify*` now
+  and may inform display/ordering only — enforced by
+  `conformance/invariants/no-classifier-in-gates.test.js`. A coordinate that
+  gates, vetoes, routes, or addresses is derived from a DECLARATION.
+- Treating terrain and stance as free parameters. Naming an operator fixes
+  mode and domain; terrain is a function of (domain, grain) and stance of
+  (mode, grain). The coherent address space is operator×grain = **27**, not
+  729 — 702 of 729 are type errors by construction. Measured effective-cell
+  count was 22.6, just under 27, as expected.
+- Unconditional nulls. An externally-sourced "chance" channel correlated with
+  "surprise" at r = 1.000 *exactly* in all four test books: a global null
+  yields one mean and one sd, so z-scoring is an affine map and affine maps
+  preserve everything. Same shape as mean-induction's p≈0 trend,
+  kind-induction's missing effect-size floor, calculus-induction's
+  max-over-members cherry-pick. **An unconditional null is a units change;
+  only a conditional null earns a dimension** — it must vary along the axis
+  the gaming would exploit.
 - Corpus prior in the 4.2 phasepost basis — support disjoint from this
   engine's cube; use `eoPriors/priors/corpus-prior-cube.json` (rebuild:
   `eoPriors/scripts/build-corpus-prior-cube.mjs`). Cell-level prior surprise
