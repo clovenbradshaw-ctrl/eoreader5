@@ -109,6 +109,52 @@ export function validateReactionEvent(value, name = "ReactionEvent") {
   return v;
 }
 
+// EncounterEvent@1 — the encounter channel: one individuated creature's
+// testimony about meeting another individuated creature (peer-to-peer,
+// not reader-to-text). Same firewall reasoning as ReactionEvent@1, one
+// register over: an encounter is an observation BY one referent OF
+// another, never an engine inference, so it carries no op, no
+// operator_epoch, and no prior_id, and it must never be appended to the
+// semantic ledger, where it could mint an observation, referent,
+// hypothesis, or task about the peer. See packages/engine/encounter.
+//
+// self_id and peer_id must differ: a referent does not encounter itself,
+// and same-string identity is never assumed here either — self_id/peer_id
+// are referent ids, not name strings (docs/nameless-referent.md).
+//
+// kind is a closed, DECLARED vocabulary (cube/index.js's "a coordinate
+// that gates, vetoes, routes, or addresses is derived from a
+// DECLARATION" — never inferred from payload content). Any valence/
+// arousal carried in payload is likewise declared by the emitting
+// creature; this module does not compute affect from encounter content —
+// doing so would be the same classifier-as-gate mistake logged in
+// cube/index.js's dead-ends, one channel over.
+//
+// ts and seq are host-supplied, same clock discipline as ReactionEvent@1.
+export const ENCOUNTER_KINDS = new Set(["observe", "play", "teach", "withdraw"]);
+const ENCOUNTER_ID_RE = /^encounter:sha256:[0-9a-f]{64}$/;
+
+export function validateEncounterEvent(value, name = "EncounterEvent") {
+  const v = object(value, name);
+  if (v.schema !== "EncounterEvent@1") fail(name, "schema must be EncounterEvent@1");
+  string(v.encounter_id, name, "encounter_id");
+  if (!ENCOUNTER_ID_RE.test(v.encounter_id)) fail(name, "encounter_id must be encounter:sha256:<64 hex>");
+  string(v.self_id, name, "self_id");
+  string(v.peer_id, name, "peer_id");
+  if (v.self_id === v.peer_id) fail(name, "self_id and peer_id must differ: a referent does not encounter itself");
+  string(v.world_id, name, "world_id");
+  nonNegativeInteger(v.ts, name, "ts");
+  nonNegativeInteger(v.seq, name, "seq");
+  if (!ENCOUNTER_KINDS.has(v.kind)) fail(name, `invalid kind ${v.kind}`);
+  const context = object(v.context, `${name}.context`);
+  string(context.medium, name, "context.medium");
+  object(v.payload, `${name}.payload`);
+  const { encounter_id, ...body } = v;
+  const expected = `encounter:${canonicalHashSync(body)}`;
+  if (encounter_id !== expected) fail(name, "encounter_id does not match canonical encounter content");
+  return v;
+}
+
 export function validateEffectResult(value, name = "EffectResult") {
   const v = object(value, name);
   string(v.effect_id, name, "effect_id"); string(v.producer, name, "producer"); string(v.version, name, "version");
