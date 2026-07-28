@@ -226,20 +226,122 @@ lifecycle reuses the engine's existing objective-immortality guarantee
   keeps every pencil/ink/hold event for that `candidate_id` in order —
   nothing is ever dropped, only superseded.
 
-## What this is not
+## Self-seeding: `seeding.js` and `loop.js`
 
-This is the engine-side statistical kernel only. It does not:
+The original version of this document said candidate generation was
+outside the engine because "discovery, organic mutation, and CRISPR splice
+all require things the engine is not allowed to touch — reading a corpus,
+calling a model, walking a filesystem." That was true of one reading of
+those words, the one where a candidate is a sentence somebody writes. It
+is not true of the reading this document already specified, where a
+candidate is a **position** — a field vector at a coordinate — and the
+three modes are operations on positions:
 
-- generate candidates (discovery, mutation, splice are all host/eoPriors
-  concerns — reading a corpus, calling a model, walking a filesystem are
-  all forbidden inside `packages/engine`'s purity boundary);
-- execute or test a task's product (the `validation` `inkTask` requires
-  is caller-supplied, never computed here);
-- extract a coding prior from a corpus (that's eoPriors' job, the same
-  relationship it already has with literary reader priors);
-- name or design eoAI's own orchestration loop, which is the thing that
-  would actually call these functions in sequence against opencode and a
-  local model.
+| mode | operation | magnitude comes from | cites |
+|---|---|---|---|
+| discovery | reflect the centroid through a settled node | the hull radius | that node |
+| mutation | perturb one locus by ±σ_d | the settled set's own per-dimension spread | that node |
+| splice | graft a donor's channel slice onto an acceptor | the donor slice itself | both parents |
 
-Those are the next layer, once this kernel is exercised against something
-real.
+None of those reads a corpus, calls a model, or walks a filesystem. All
+are pure functions of the settled history. Crucially **no generator has a
+magnitude of its own** — writing one in would be the hand-set constant
+this engine forbids everywhere else — which is why the seeder refuses
+below two settled nodes: a one-point history has no spread to measure,
+the same floor `collapseCandidates` applies to a one-point spectrum.
+
+`growTaskTree` closes the circuit:
+
+```
+settled(0)   = seed
+settled(r+1) = settled(r) + { every ink promoted in round r }
+pool(r)      = seedPool(settled(r))
+```
+
+A candidate in round 7 can only exist because something in round 3
+validated. That is the property an outline structurally cannot have.
+
+The host supplies exactly two things. `validate` runs the task's product
+against a test and returns a `NullProtocol@1` result — I/O, so it can
+never live here. `shapePool` is the model's only entry point: it receives
+the generated pool and returns **scores** for candidates already in it.
+`applyShaping` rebuilds every candidate body from the pool by id and
+throws on an id the pool never produced, so a shaper cannot add, cannot
+alter a vector or its provenance, and cannot promote. This is the line
+above — "a prior may shape what gets *proposed*; it must never shape what
+*commits*" — made mechanical rather than aspirational. Tested both ways:
+a shaper that flattens every score commits nothing (DEF abstains on a flat
+spectrum), and a shaper that boosts one candidate to 1e6 gets it as far as
+a pencil and no further.
+
+Completion is finally decidable rather than "ambiguous" by default,
+because the loop has the geometry the diagnostic needs: observed coherence
+is the running centroid of the settled set sampled once per round, through
+`fieldCurrentDensity`; the null is the *same* settled positions arriving
+in a seeded-shuffled order, re-segmented into the same per-round groups —
+same content, undirected sequence, which is exactly the perturbed-
+discovery background `completionDiagnostic` asks for. When the settled set
+has not moved at all, every shuffle gives the identical coherence; that
+degenerate null is withheld rather than passed, so the diagnostic reports
+`ambiguous` instead of reading "done" off a comparison carrying no
+information.
+
+### Measured: the geometric observable does not sustain depth
+
+The loop is wired correctly and the tests pin it — inks join the settled
+set, later pools are demonstrably generated from the enlarged set. But
+across every geometry tried (symmetric seed; clustered seed with a
+deliberate outlier; 16-dimensional seeds of 5/8/16/24 nodes; aim inside
+the hull and outside it) the loop promotes in round 0 and then abstains
+every subsequent round. **No promoted task has ever been built from
+another promoted task.** Two tests pin this as the current measured
+behaviour so that a future fix is visibly a fix.
+
+Three spectrum shapes were built and measured; the finding is about the
+observable, not about tuning:
+
+1. **Sampled** generators (random anchor, random step) — the step noise
+   sits at the same magnitude as the signal and smears the settled set's
+   real isolation structure into a continuum. DEF is a gap detector; it
+   abstained on a spectrum that *had* structure before the generator
+   flattened it.
+2. **Full enumeration** (ships) — fails the other way. Splice enumerates
+   |settled|² × |channels| while DEF weighs only the leading 20 sorted
+   values, which past a handful of nodes are near-duplicate grafts
+   differing in the fourth decimal. Still the best measured option: it at
+   least promotes in round 0 across most geometries.
+3. **Anchor-reduced** (best per mode per anchor) — semantically nicer and
+   O(n) instead of O(n²), and was briefly the default on those grounds.
+   Reverted after measurement: an O(n) spectrum is too *thin* for DEF's
+   extreme-value correction to fit a background, so small seeds abstain
+   even in round 0 (the clustered 5-node seed went 8 promotions → 0).
+
+The diagnosis is not that DEF is too strict. A candidate score built only
+out of geometry is **isotropic**: once the frontier has been pushed out,
+every direction along it is about as novel and about as aligned as every
+other, so there genuinely is no standout next move. DEF abstaining on an
+isotropic frontier is DEF being right.
+
+This is the same shape as the engine's other standing open problem
+(span-golden recall capped by the lexical channel, the missing piece being
+a non-*lexical* observable). Here the missing piece is a non-*geometric*
+one: which candidates actually validated, and how strongly. That signal
+already exists — every ink carries its `NullProtocol@1` result, so a run
+produces a competency series, and `induceOperators` is the organ that
+mines a numeric series for structure. Feed realized validation strength
+back into the score rather than position alone, and measure it against a
+frozen golden before tuning anything.
+
+## What this is still not
+
+- It does not execute or test a task's product (the `validation`
+  `inkTask` requires is caller-supplied, never computed here).
+- It does not extract a coding prior from a corpus (that's eoPriors' job,
+  the same relationship it already has with literary reader priors).
+- It does not name or design eoAI's own orchestration loop, the thing that
+  would call `growTaskTree` against opencode and a local model.
+- It does not route promoted tasks through the individuation gate.
+  `referents/operator-adapter.js` does exactly that for induced operators
+  (mass = transfer gain, coupling = reference gain), and the analogous
+  mapping for a task is not obvious enough to invent — a fabricated field
+  mapping would be worse than the gap.

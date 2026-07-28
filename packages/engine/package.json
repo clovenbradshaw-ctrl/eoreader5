@@ -36,6 +36,8 @@
     "./invariants/cycles": "./invariants/cycles.js",
     "./emergence/chapters": "./emergence/chapters/index.js",
     "./emergence/genesis": "./emergence/genesis/index.js",
+    "./emergence/genesis/seeding": "./emergence/genesis/seeding.js",
+    "./emergence/genesis/loop": "./emergence/genesis/loop.js",
     "./emergence/trajectory": "./emergence/trajectory/index.js",
     "./emergence/trajectory/field-shift": "./emergence/trajectory/field-shift.js",
     "./perceiver/field-spec": "./perceiver/field-spec.js",

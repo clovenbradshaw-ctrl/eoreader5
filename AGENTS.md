@@ -16,6 +16,8 @@ make sense for a nameless leitmotif in music, or it is string-thinking.
 | associative memory | `packages/engine/emergence/store/index.js` | Hebbian edges at co-occurrence; sparse-BAND keys (idf ≥ floor AND df ≥ 2); keyword and phrase stores separate; index all, wire top-k; one CA3 completion hop. Biology notes in header are load-bearing. |
 | entity fold | `packages/engine/emergence/summary/entity-fold.js` | offset-grounded spans (verified round-trip), presence-based frames, stratified whole-arc selection, `withRelations`, `referent` prior option, `echoes` (spans carry offset-anchored recalled antecedents from the store). |
 | spine | `summary/spine.js` | `scoreByPos` exposes ALL sampled scores (not just peaks); `minHistory` cold-start mask exists but masking kills exposition scenes — see dead-ends. |
+| task genesis | `emergence/genesis/index.js` | DEF/EVA/REC gate: `collapseCandidates` → `pencilTask` → `inkTask` → `completionDiagnostic`. Append-only, content-hashed; a failed pencil is held verbatim, never dropped. |
+| genesis seeding | `emergence/genesis/seeding.js` + `loop.js` | self-seeding candidate generation (discovery/mutation/splice as operations on FIELD POSITIONS, magnitudes taken from the settled set's own geometry) and the loop that feeds every ink back into the next round's pool. `shapePool` is the model's only entry point and provably cannot add a candidate. **Measured: the geometric score is isotropic and sustains no generational depth — read the header before touching it.** |
 
 ## Goldens and scorers (frozen — the discipline is the point)
 
@@ -58,6 +60,15 @@ reported as typed `gaps` — faking them is the cardinal regression.
   small). Log lives beside the selector in `entity-fold.js`.
 - Trailing-window document-level KL as significance — anti-correlated
   (deathbed = 9th percentile).
+- Genesis candidate scoring from GEOMETRY alone (novelty × alignment over
+  field positions). Isotropic: once the frontier is pushed out, every
+  direction is about as novel and as aligned as every other, so DEF
+  correctly finds no standout and the loop abstains after one productive
+  round — it has never built a task on a task. Three spectrum shapes
+  measured (sampled / full enumeration / anchor-reduced); all three fail,
+  for different reasons, all logged in `genesis/seeding.js`'s header. The
+  missing channel is non-geometric: realized validation strength, which
+  every ink already carries as a `NullProtocol@1` result.
 
 ## Consistently reinvented — CHECK HERE BEFORE WRITING IT AGAIN
 
