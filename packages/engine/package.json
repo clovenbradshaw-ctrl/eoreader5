@@ -35,6 +35,8 @@
     "./cube": "./cube/index.js",
     "./emergence/summary": "./emergence/summary/index.js",
     "./emergence/summary/entity-fold": "./emergence/summary/entity-fold.js",
+    "./emergence/summary/text-organ": "./emergence/summary/text-organ.js",
+    "./perceiver/text/surfaces": "./perceiver/text/surfaces.js",
     "./quantum": "./quantum/index.js",
     "./invariants": "./invariants/index.js",
     "./invariants/cycles": "./invariants/cycles.js",
@@ -48,6 +50,7 @@
     "./perceiver/video/physics": "./perceiver/video/physics.js",
     "./perceiver/video/holontutor": "./perceiver/video/holontutor.js",
     "./perceiver/text/extraction": "./perceiver/text/extraction.js",
+    "./perceiver/text/presence": "./perceiver/text/presence.js",
     "./motivation": "./motivation/index.js",
     "./motivation/gaps": "./motivation/gaps.js"
   },
