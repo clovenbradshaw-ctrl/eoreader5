@@ -26,6 +26,10 @@ import { createState, applyCommand } from '@eoreader/engine/replay';
 import { search as engineSearch } from '@eoreader/engine/search';
 import { fold as compressFold } from '@eoreader/engine/emergence/fold';
 import { blockContentHash } from '@eoreader/engine/observation-index';
+import { frameText, detectBoundaries } from '@eoreader/engine/emergence/summary/text-organ';
+import { rankSurfaces } from '@eoreader/engine/perceiver/text/surfaces';
+import { admitReferent, presenceByFrame } from '@eoreader/engine/perceiver/text/presence';
+import { buildStore, surface as storeSurface } from '@eoreader/engine/emergence/store';
 import { canonicalHashSync } from '@eoreader/spec/canonical-json';
 import { CURRENT_OPERATOR_EPOCH } from '@eoreader/spec/operators';
 
@@ -33,7 +37,7 @@ import { CURRENT_OPERATOR_EPOCH } from '@eoreader/spec/operators';
 // assert on it at startup, so a mismatch fails at boot with a clear message
 // instead of surfacing as a wrong answer inside a chat turn weeks later —
 // which is precisely how the byte_start regression stayed invisible.
-export const CORPUS_API_VERSION = 1;
+export const CORPUS_API_VERSION = 2;
 
 // Defaults named once, so the hosts stop each picking their own and drifting.
 const DEFAULT_CHUNK_SIZE = 2000;
@@ -70,7 +74,30 @@ export function createSession({ engineVersion = '0.1.0', spanCap = DEFAULT_SPAN_
     state: createState({ engineVersion, operatorEpoch: CURRENT_OPERATOR_EPOCH, priorSnapshot }),
     spans: new Map(),
     spanCap,
+    // Admitted text per DOCUMENT, for the whole-document reads (outline,
+    // referents) that need more than a retrieved span. Keyed by the base
+    // source id with any `:chunk-N` suffix stripped, so the N chunks of one
+    // file reassemble into the one document they came from.
+    //
+    // This is retained at admit time rather than recovered from
+    // `state.blockStore`: the store is an engine internal this module
+    // deliberately does not reach into (see registerSpan), and a document
+    // read that went behind the facade would break the moment the engine
+    // refactored — the exact failure mode this package exists to prevent.
+    documents: new Map(),
   };
+}
+
+// The document a chunk belongs to. `admitChunked` mints `${sourceId}:chunk-N`
+// per chunk; the document is what remains once that suffix is removed.
+const documentIdOf = (sourceId) => String(sourceId ?? '').replace(/:chunk-\d+$/, '');
+
+function retainAdmitted(session, sourceId, text, byteStart) {
+  if (!session?.documents) return; // session from an older createSession
+  const docId = documentIdOf(sourceId);
+  const doc = session.documents.get(docId) ?? { sourceId: docId, pieces: [] };
+  doc.pieces.push({ text, byteStart });
+  session.documents.set(docId, doc);
 }
 
 // Build the observation bundle for one span of text.
@@ -133,6 +160,7 @@ export function admitText(session, { text, sourceId, byteStart = 0, capture } = 
     type: 'observation.admit',
     payload: { envelope, blocks },
   });
+  retainAdmitted(session, sourceId, text, byteStart);
   return {
     sourceId,
     blockId: blocks[0].block_id,
@@ -284,6 +312,12 @@ function registerSpan(session, passage, previewChars) {
     byte_start: selector.byte_start ?? null,
     byte_end: selector.byte_end ?? null,
     score: passage.score,
+    // Why this passage ranked where it did — rarity-weighted term coverage and
+    // the contiguous-phrase bonus, carried through from search. A ranked list
+    // without its reasons is an assertion; with them a reader can check the
+    // engine's work instead of trusting it.
+    coverage: passage.coverage ?? null,
+    phrase: passage.phrase ?? null,
     // The verbatim value, kept whole. exact_text is an array of block values;
     // joining it inserts separators that are not in the source — fine for a
     // preview, wrong for a quote.
@@ -320,6 +354,8 @@ export function searchSpans(session, { query, limit = 5, previewChars = DEFAULT_
       byte_start: rec.byte_start,
       byte_end: rec.byte_end,
       score: rec.score,
+      coverage: rec.coverage,
+      phrase: rec.phrase,
       preview: rec.preview,
     };
   });
@@ -407,5 +443,277 @@ export function foldSpans(session, { spans, units, query, tokenBudget = 600, max
     tokens: result.totalTokens,
     budget: result.budget,
     dropped: result.dropped,
+  };
+}
+
+// ── Whole-document reads ─────────────────────────────────────────────────────
+//
+// search/fold answer "what in the corpus bears on this query." A reader also
+// needs "what IS this document" — its divisions, who is in it, what relates to
+// what. Those are whole-document questions, and their absence from this facade
+// is why every host UI grew its own answer: the chat app scraped capitalized
+// words out of its own chat transcript and called them the document's entities,
+// which for a 4.4MB Bible yielded five terms from the title page.
+//
+// Nothing below is new intelligence. Each is a wiring of an organ that already
+// exists, through the one surface hosts are allowed to touch.
+
+export function documentIds(session) {
+  return [...(session?.documents?.keys() ?? [])];
+}
+
+// Reassemble a document from the chunks admitted for it. Chunks carry their
+// byte offset in the SOURCE FILE, so ordering by it restores reading order
+// regardless of admission order, and gaps between chunks (the sub-minChars
+// runs `admitChunked` drops) are padded so an offset into this string still
+// addresses the same byte in the original file.
+export function documentText(session, sourceId) {
+  const doc = session?.documents?.get(documentIdOf(sourceId));
+  if (!doc) return null;
+  const pieces = [...doc.pieces].sort((a, b) => a.byteStart - b.byteStart);
+  let out = '';
+  let cursor = pieces.length ? pieces[0].byteStart : 0;
+  const base = cursor;
+  for (const p of pieces) {
+    if (p.byteStart > cursor) out += ' '.repeat(p.byteStart - cursor);
+    out += p.text;
+    cursor = p.byteStart + byteLength(p.text);
+  }
+  return { sourceId: doc.sourceId, text: out, byteStart: base, chunks: pieces.length };
+}
+
+// Cache keyed by document id AND piece count, so a document that grows by
+// further admits recomputes rather than serving a stale reading. Framing a
+// 4.4MB text is seconds of work; a reader that re-asks on every tab switch
+// must not pay it twice.
+function analysisFor(session, sourceId) {
+  const doc = documentText(session, sourceId);
+  if (!doc) return null;
+  session._analysis ??= new Map();
+  const key = `${doc.sourceId}#${doc.chunks}`;
+  const hit = session._analysis.get(key);
+  if (hit) return hit;
+  const frames = frameText(doc.text);
+  const analysis = { doc, frames };
+  session._analysis.set(key, analysis);
+  return analysis;
+}
+
+// The document's own divisions, discovered rather than assigned.
+//
+// These are NOT heading matches. `detectBoundaries` finds where the word
+// distribution shifts (KL against a sliding prior), so it reports the places
+// the text actually turns — which is what makes it work on a document with no
+// headings at all, and why it is not a regex over "Chapter \d+".
+export function sessionOutline(session, { sourceId, zThreshold, window } = {}) {
+  const analysis = analysisFor(session, sourceId);
+  if (!analysis) return { error: `unknown source ${sourceId}`, sections: [] };
+  const { doc, frames } = analysis;
+  const opts = {};
+  if (zThreshold !== undefined) opts.zThreshold = zThreshold;
+  if (window !== undefined) opts.window = window;
+  const boundaries = detectBoundaries(frames, opts);
+
+  // Boundaries mark starts; a section runs to the next one. The first section
+  // begins at the document head even when the first boundary is far in, or the
+  // opening of the book would belong to no section.
+  const starts = [0, ...boundaries.map((b) => b.offset)].sort((a, b) => a - b);
+  const uniq = [...new Set(starts)];
+  const sections = uniq.map((start, i) => {
+    const end = i + 1 < uniq.length ? uniq[i + 1] : doc.text.length;
+    return {
+      index: i,
+      offset: start,
+      byteStart: doc.byteStart + start,
+      length: end - start,
+      // A label the reader can show without the host inventing one. The first
+      // non-empty line of the section is the document's own words, so it is
+      // evidence rather than a guess — and when the text has real headings it
+      // is exactly the heading.
+      label: (doc.text.slice(start, start + 400).split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 80),
+    };
+  });
+  return { sourceId: doc.sourceId, sections, frames: frames.length };
+}
+
+// Who is in this document, by the canonical coref path.
+//
+// rankSurfaces proposes candidates from capitalization physics;
+// admitReferent turns each into scoped, event-sourced surfaces projected
+// through the referents organ; presenceByFrame says where it is actually
+// present. A candidate that survives none of that is not reported.
+//
+// `priors` is the per-text witness knowledge (descriptor aliases, narrator
+// spans). Absent, descriptor coref is simply not done and is reported in
+// `gaps` — never guessed.
+export function sessionReferents(session, { sourceId, priors = [], limit = 40, query } = {}) {
+  const analysis = analysisFor(session, sourceId);
+  if (!analysis) return { error: `unknown source ${sourceId}`, referents: [] };
+  const { doc, frames } = analysis;
+
+  // Recomputing this is ~1.3s on a 4.4MB book; a reader switching tabs must
+  // not pay it repeatedly. Keyed on the prior set, so injecting witness
+  // knowledge invalidates it rather than serving the un-priored reading.
+  if (analysis.referents && analysis._priorCount === priors.length) {
+    return formatReferents(analysis, { limit, query, gaps: analysis._gaps ?? [] });
+  }
+
+  const byId = new Map();
+  const seenKey = new Set();
+  // Case-folded key, so "The LORD" and "The Lord" do not both occupy the
+  // panel with identical counts. This collapses ONE SURFACE's spellings; it
+  // does NOT merge "Lord" into "The LORD" — that is a referent identity
+  // claim, and without a per-text coref prior asserting it the two stay
+  // distinct and the absence is reported as a gap. Same-string surfaces must
+  // not auto-merge; same-surface case variants are not a merge at all.
+  const keyOf = (s) => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  for (const prior of priors) {
+    if (prior?.id || prior?.name) {
+      byId.set(prior.id ?? prior.name, prior);
+      seenKey.add(keyOf(prior.name ?? prior.id));
+    }
+  }
+  // Candidates the text itself proposes, for anything no prior named.
+  //
+  // rankSurfaces, NOT discoverMotifs: the latter ranks lowercased words by
+  // co-occurrence structure, so it reports what the document is ABOUT. Asked
+  // for the Bible's entities it answered "sanctuary, generations, iron, oxen,
+  // famine" — real motifs, but nobody in the book.
+  for (const cand of rankSurfaces(frames)) {
+    const k = keyOf(cand.surface);
+    if (byId.has(cand.surface) || seenKey.has(k)) continue;
+    seenKey.add(k);
+    byId.set(cand.surface, { id: cand.surface, name: cand.surface, _discovered: true });
+  }
+
+  const gaps = [];
+  const referents = [];
+  for (const prior of byId.values()) {
+    const admitted = admitReferent(frames, prior, { fullText: doc.text });
+    if (admitted.gaps?.length) gaps.push(...admitted.gaps);
+    const surfaces = admitted.surfaces ?? [];
+    if (!surfaces.length) continue;
+    const presence = presenceByFrame(frames, surfaces);
+    let mentions = 0;
+    const frameOrders = [];
+    for (const [order, n] of presence instanceof Map ? presence : new Map(Object.entries(presence ?? {}))) {
+      if (n > 0) { mentions += n; frameOrders.push(Number(order)); }
+    }
+    if (!mentions) continue;
+    referents.push({
+      _frames: new Set(frameOrders),
+      id: admitted.referentId ?? prior.id ?? prior.name,
+      display: prior.display ?? prior.name ?? prior.id,
+      individuation: prior.individuation ?? (prior._discovered ? 'emanon' : 'holon'),
+      surfaces: surfaces.map((s) => s.surface ?? s),
+      mentions,
+      // Spread across the document, not just how often. A name in one chapter
+      // and a name throughout are different kinds of thing, and ranking by
+      // count alone buries the second under the first.
+      frames: frameOrders.length,
+      firstFrame: frameOrders.length ? Math.min(...frameOrders) : null,
+      lastFrame: frameOrders.length ? Math.max(...frameOrders) : null,
+      fromPrior: !prior._discovered,
+    });
+  }
+
+  referents.sort((a, b) => b.frames - a.frames || b.mentions - a.mentions);
+  // Retained whole (not sliced) so pivot and the relation graph see every
+  // referent, while the caller's `limit` governs only what is displayed.
+  analysis.referents = referents;
+  analysis._priorCount = priors.length;
+  analysis._gaps = gaps;
+
+  return formatReferents(analysis, { limit, query, gaps });
+}
+
+// Search is a filter over the computed reading, never a re-derivation: the
+// panel, the graph and a search hit all describe the same referents.
+function formatReferents(analysis, { limit, query, gaps }) {
+  const strip = ({ _frames, ...rest }) => rest;
+  const referents = analysis.referents ?? [];
+  const q = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  const shown = q
+    ? referents.filter((r) =>
+        String(r.display ?? '').toLowerCase().includes(q) ||
+        r.surfaces.some((s) => String(s).toLowerCase().includes(q)))
+    : referents;
+  return {
+    sourceId: analysis.doc.sourceId,
+    referents: shown.slice(0, limit).map(strip),
+    total: shown.length,
+    totalUnfiltered: referents.length,
+    query: q || null,
+    gaps,
+  };
+}
+
+// Which referents this one actually shares ground with, across the whole
+// document.
+//
+// Co-presence is measured over every frame in the book, then normalized by
+// the smaller of the two footprints. Both halves matter. An unnormalized
+// count just re-ranks by overall frequency, so everything pivots to "Lord"
+// and the graph says nothing. And measuring co-occurrence inside ONE
+// retrieved passage — which is what the chat app was doing — returns a
+// complete graph in which every term relates to every other term, because
+// everything in a single paragraph trivially co-occurs.
+export function sessionRelated(session, { sourceId, id, count = 12 } = {}) {
+  const analysis = analysisFor(session, sourceId);
+  if (!analysis) return { error: `unknown source ${sourceId}`, related: [] };
+  if (!analysis.referents) sessionReferents(session, { sourceId, limit: 0 });
+  const all = analysis.referents ?? [];
+  const target = all.find((r) => r.id === id || r.display === id);
+  if (!target) return { error: `unknown referent ${id}`, related: [] };
+
+  const related = [];
+  for (const other of all) {
+    if (other === target) continue;
+    let shared = 0;
+    const [small, large] = target._frames.size <= other._frames.size
+      ? [target._frames, other._frames]
+      : [other._frames, target._frames];
+    for (const o of small) if (large.has(o)) shared++;
+    if (!shared) continue;
+    related.push({
+      id: other.id,
+      display: other.display,
+      shared,
+      // Of the places the rarer of the two appears, the fraction they share.
+      strength: shared / small.size,
+      mentions: other.mentions,
+      frames: other.frames,
+    });
+  }
+  related.sort((a, b) => b.strength - a.strength || b.shared - a.shared);
+  return {
+    sourceId: analysis.doc.sourceId,
+    id: target.id,
+    display: target.display,
+    related: related.slice(0, count),
+  };
+}
+
+// Pivot: what this document associates with a cue.
+//
+// This is `emergence/store` — Hebbian edges laid down at co-occurrence, with
+// one CA3 completion hop — and NOT an all-pairs tally over a retrieved
+// passage. That distinction is the whole point: all-pairs over one paragraph
+// returns a complete graph, in which every term relates to every other term
+// and nothing is learned. The store weights by what actually recurs together
+// across the document.
+export function sessionPivot(session, { sourceId, cue, count = 12 } = {}) {
+  const analysis = analysisFor(session, sourceId);
+  if (!analysis) return { error: `unknown source ${sourceId}`, related: [] };
+  const q = typeof cue === 'string' ? cue.trim() : '';
+  if (!q) return { sourceId: analysis.doc.sourceId, cue: '', related: [] };
+
+  analysis.store ??= buildStore(analysis.frames);
+  const surfaced = storeSurface(analysis.store, q, { count });
+  const items = Array.isArray(surfaced) ? surfaced : (surfaced?.items ?? surfaced?.recalled ?? []);
+  return {
+    sourceId: analysis.doc.sourceId,
+    cue: q,
+    related: items,
   };
 }
