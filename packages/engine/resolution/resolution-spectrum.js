@@ -73,6 +73,18 @@ export const SPECTRUM = Object.freeze([
     ]),
     needs: 'engine where a functional key separates them; the witness where only soft roles do',
   },
+  {
+    type: 'genre-self-presentation', tier: TIER.MODEL,
+    reason: 'content claims one genre (fact-claim, argument) while behaving structurally as another ' +
+      '(unfalsifiable, repetition-driven, identity-bonding, immune to counter-evidence) — which standard ' +
+      'applies (Erklären/correspondence vs Verstehen/internal-purpose) has to be typed before either ' +
+      'judgment runs, and genre self-presentation is not trustworthy evidence of genre',
+    needs: 'the witness channel — the cube\'s advisory terrain/operator amplitudes (cube/index.js: Lens, ' +
+      'Paradigm, EVA) may inform a PRIOR weight on the claimed-vs-behavioral divergence, but that ' +
+      'classifier is a measured keyword-frequency estimator with no propositional signal (shuffling word ' +
+      'order left 95.7% of cell assignments unchanged) and by its own doctrine may never gate, veto, ' +
+      'route, or address; resolving the divergence needs open-domain world-knowledge no keyword table covers',
+  },
 ]);
 
 const SPECTRUM_BY_TYPE = new Map(SPECTRUM.map((s) => [s.type, s]));

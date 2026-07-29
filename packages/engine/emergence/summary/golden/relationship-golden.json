@@ -1,0 +1,42 @@
+{
+  "relationship_golden_version": "relationship-golden@1.0.0",
+  "notes": [
+    "Frozen, EXTERNAL-reference relationship facts for War and Peace (pg2600) — never text-derived, never fitted to the engine's output. This is a scoring TARGET, same role as span-golden.json/memory-golden.json: the number that matters is how much of this the engine's own machinery (admitCast/presenceBySentence/buildCoOccurrenceEdges/classifyEdges in relationship-graph.js) recovers, run cold against priors/coref/war-and-peace.json + priors/lexicon/en-relations.json. Nobody should ever edit the graph output to match this file — only the engine's discovery/typing logic, scored by scripts/score-relationship-golden.mjs.",
+    "Source: https://en.wikipedia.org/wiki/List_of_War_and_Peace_characters (fetched 2026-07-29). An encyclopedia summary is itself a set of ASSERTIONS about the text, not a ground truth external to it — it is used here only because it is independent of the extraction pipeline being scored, not because it is infallible. Where a fact could not be located in the actual pg2600 text on a quick check, that is noted rather than assumed.",
+    "`referentGap: true` marks a fact whose referent is NOT in priors/coref/war-and-peace.json's current cast (Lise/Liza Bolkónskaya, young Nikólai/Nikólenka Bolkonsky, Count Kiríll Bezúkhov, Márya Ivánovna Dólokhova) — the scorer must report these as a missing-referent gap, never silently skip them, and never as a false 'miss' on the edge-detection logic.",
+    "`relation` values are the external vocabulary this golden speaks in; scripts/score-relationship-golden.mjs owns the (documented, revisable) mapping from these onto the engine's current lexicon categories (priors/lexicon/en-relations.json) and stated-relation verbs — that mapping is expected to evolve as the lexicon does, independent of this file."
+  ],
+  "text": "pg2600",
+  "facts": [
+    { "id": "kirill-pierre", "a": "kirill_bezukhov", "b": "pierre", "relation": "parent_child", "referentGap": true, "note": "Kirill Vladimirovich Bezukhov is Pierre's father; his death (Book 1) is a major early plot point." },
+    { "id": "old_prince-andrew", "a": "old_prince_bolkonsky", "b": "andrew", "relation": "parent_child", "note": "old Prince Bolkonsky is Andrew's father." },
+    { "id": "old_prince-mary", "a": "old_prince_bolkonsky", "b": "mary", "relation": "parent_child", "note": "old Prince Bolkonsky is Mary's father." },
+    { "id": "andrew-mary-siblings", "a": "andrew", "b": "mary", "relation": "sibling" },
+    { "id": "andrew-nikolenka", "a": "andrew", "b": "nikolenka", "relation": "parent_child", "referentGap": true, "note": "Andrew's son by his first wife Lise." },
+    { "id": "vasili-anatole", "a": "vasili_kuragin", "b": "anatole", "relation": "parent_child" },
+    { "id": "vasili-helene", "a": "vasili_kuragin", "b": "helene", "relation": "parent_child" },
+    { "id": "vasili-hippolyte", "a": "vasili_kuragin", "b": "hippolyte", "relation": "parent_child" },
+    { "id": "anatole-helene-siblings", "a": "anatole", "b": "helene", "relation": "sibling" },
+    { "id": "anatole-hippolyte-siblings", "a": "anatole", "b": "hippolyte", "relation": "sibling" },
+    { "id": "helene-hippolyte-siblings", "a": "helene", "b": "hippolyte", "relation": "sibling" },
+    { "id": "anna_mikhaylovna-boris", "a": "anna_mikhaylovna", "b": "boris", "relation": "parent_child" },
+    { "id": "dolokhov-mother", "a": "maria_dolokhova", "b": "dolokhov", "relation": "parent_child", "referentGap": true, "note": "Maria Ivanovna Dolokhova; minor character, low text frequency." },
+    { "id": "rostov-natasha-nikolai-siblings", "a": "natasha", "b": "nikolai_rostov", "relation": "sibling" },
+    { "id": "rostov-natasha-petya-siblings", "a": "natasha", "b": "petya", "relation": "sibling" },
+    { "id": "rostov-natasha-vera-siblings", "a": "natasha", "b": "vera", "relation": "sibling" },
+    { "id": "rostov-nikolai-petya-siblings", "a": "nikolai_rostov", "b": "petya", "relation": "sibling" },
+    { "id": "rostov-nikolai-vera-siblings", "a": "nikolai_rostov", "b": "vera", "relation": "sibling" },
+    { "id": "rostov-petya-vera-siblings", "a": "petya", "b": "vera", "relation": "sibling" },
+    { "id": "sonya-ward", "a": "sonya", "b": "ilya_rostov", "relation": "ward_guardian", "note": "the Rostovs take in Sonya, an orphaned cousin, as their ward." },
+    { "id": "andrew-lise-spouse", "a": "andrew", "b": "lise", "relation": "spouse", "referentGap": true, "note": "Andrew's first wife, 'the little princess'; dies in Book 1." },
+    { "id": "pierre-helene-spouse", "a": "pierre", "b": "helene", "relation": "spouse" },
+    { "id": "pierre-natasha-spouse", "a": "pierre", "b": "natasha", "relation": "spouse", "note": "Pierre's second marriage, after Helene's death; the epilogue's central pairing." },
+    { "id": "nikolai-mary-spouse", "a": "nikolai_rostov", "b": "mary", "relation": "spouse" },
+    { "id": "boris-julie-spouse", "a": "boris", "b": "julie", "relation": "spouse" },
+    { "id": "vera-berg-spouse", "a": "vera", "b": "berg", "relation": "spouse" },
+    { "id": "andrew-natasha-engaged", "a": "andrew", "b": "natasha", "relation": "engaged" },
+    { "id": "nikolai-sonya-engaged", "a": "nikolai_rostov", "b": "sonya", "relation": "engaged", "note": "promised himself to Sonya; engagement never formalized/fulfilled." },
+    { "id": "denisov-natasha-unrequited", "a": "denisov", "b": "natasha", "relation": "unrequited_romance", "note": "Denisov proposes to Natasha unsuccessfully." },
+    { "id": "dolokhov-sonya-unrequited", "a": "dolokhov", "b": "sonya", "relation": "unrequited_romance", "note": "Dolokhov proposes to Sonya unsuccessfully." }
+  ]
+}

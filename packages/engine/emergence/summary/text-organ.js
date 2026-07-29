@@ -317,6 +317,94 @@ export function boostFromSurfaces(entities, surfaces, entityName) {
   }).sort((a, b) => b.surfaceBoost - a.surfaceBoost);
 }
 
+// ── Sentence segmentation with offsets ──
+// snapToSentences trims ONE chunk to its sentence boundaries; this splits a
+// whole document into MANY sentences, each carrying the character offset it
+// started at. Same terminator/quote-closing rule as snapToSentences (kept
+// consistent on purpose) — extending the organ instead of forking a second
+// splitter (CLAUDE.md: "probes have hand-rolled splitters twice").
+//
+// A paragraph break is split FIRST, as its own hard boundary, before the
+// terminator scan runs inside each paragraph. A reader treats a blank line
+// as an absolute stop regardless of trailing punctuation — a chapter
+// heading ("CHAPTER XII", no period) followed by a blank line and a new
+// paragraph is never read as one continuous clause, but scanning terminators
+// over the raw text alone would glue the heading onto the next paragraph's
+// opening sentence, corrupting any span that quotes it.
+const SENTENCE_TERMINATORS = new Set([".", "!", "?", "…"]);
+const CLOSING_QUOTES = new Set(['"', "'", "”", "’"]);
+const PARAGRAPH_BREAK = /\n\s*\n+/g;
+
+function pushSentence(s, start, end, out) {
+  const raw = s.slice(start, end);
+  const trimmed = raw.trim();
+  if (!trimmed) return;
+  const leading = raw.length - raw.trimStart().length;
+  out.push({ text: trimmed, offset: start + leading, order: out.length });
+}
+
+function splitSentencesInRange(s, rangeStart, rangeEnd, out) {
+  let start = rangeStart;
+  for (let i = rangeStart; i < rangeEnd; i++) {
+    if (!SENTENCE_TERMINATORS.has(s[i])) continue;
+    let end = i + 1;
+    while (end < rangeEnd && CLOSING_QUOTES.has(s[end])) end += 1;
+    if (end < rangeEnd && !/\s/.test(s[end])) continue; // e.g. "Mr." mid-abbreviation-ish; keep scanning
+    pushSentence(s, start, end, out);
+    start = end;
+  }
+  pushSentence(s, start, rangeEnd, out);
+}
+
+// ── Clause segmentation (a TEXT-MEDIUM-SPECIFIC sub-sentence unit) ──
+// A "clause" bounded by comma/semicolon/colon/dash is meaningful only for
+// punctuated written language — it has no equivalent for a musical leitmotif
+// or a video shot. This is exactly why it lives here, in the text perceiver,
+// and not in relationship-graph.js's cross-entity edge logic: that module
+// needs SOME sub-sentence unit to test whether a descriptor sits in the
+// clause chain between two mentions, but which segmenter supplies those
+// units is medium-specific and must be injected, not assumed. A future
+// audio/video organ would supply its own unit boundaries (a phrase, a shot)
+// through the same options slot.
+export function splitClauses(sentenceText) {
+  const s = String(sentenceText ?? "");
+  const units = [];
+  const boundary = /[,;:]|--|—|–/g;
+  let start = 0;
+  let m;
+  while ((m = boundary.exec(s))) {
+    units.push({ start, end: m.index });
+    start = m.index + m[0].length;
+  }
+  units.push({ start, end: s.length });
+  return units;
+}
+
+export function unitIndexOf(units, pos) {
+  for (let i = 0; i < units.length; i++) {
+    if (pos >= units[i].start && pos < units[i].end) return i;
+  }
+  return units.length - 1;
+}
+
+export function splitSentences(text) {
+  const s = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const paragraphs = [];
+  let paraStart = 0;
+  let pm;
+  PARAGRAPH_BREAK.lastIndex = 0;
+  while ((pm = PARAGRAPH_BREAK.exec(s))) {
+    paragraphs.push({ start: paraStart, end: pm.index });
+    paraStart = pm.index + pm[0].length;
+  }
+  paragraphs.push({ start: paraStart, end: s.length });
+
+  const sentences = [];
+  for (const para of paragraphs) splitSentencesInRange(s, para.start, para.end, sentences);
+  sentences.forEach((sent, i) => { sent.order = i; });
+  return sentences;
+}
+
 // ── Bridge: findEntityMentions ──
 
 export function findEntityMentions(chunks, entityName) {

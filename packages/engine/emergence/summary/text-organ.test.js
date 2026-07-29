@@ -1,13 +1,9 @@
-// text-organ.test.js — raw-span provenance (locateRawSpan). See the
-// "Raw span provenance" section header in text-organ.js: offset/text pairs
-// produced by frameText (trims leading whitespace without moving offset)
-// and snapToSentences (collapses interior whitespace) are NOT guaranteed to
-// be the literal source slice at that offset. locateRawSpan recovers the
-// true raw span or reports a typed gap — never a silent guess.
+// text-organ.test.js — raw-span provenance (locateRawSpan) + sentence splitting.
+// See the "Raw span provenance" section header in text-organ.js.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { locateRawSpan } from "./text-organ.js";
+import { locateRawSpan, splitSentences } from "./text-organ.js";
 
 test("exact match: zero drift when offset already points at the text", () => {
   const source = "The quick brown fox jumps over the lazy dog.";
@@ -21,11 +17,9 @@ test("exact match: zero drift when offset already points at the text", () => {
 });
 
 test("frameText bug case: leading whitespace trimmed away from a window", () => {
-  // frameText slices a window at `offset`, then does chunk.trim() for its
-  // `text` field but never adjusts `offset` for what trim() dropped.
   const source = "prelude text here.   \n\n  The count arrived at the ball.";
-  const windowOffset = source.indexOf("   \n\n  The count"); // untrimmed window start
-  const displayText = "The count arrived at the ball.";       // post chunk.trim()
+  const windowOffset = source.indexOf("   \n\n  The count");
+  const displayText = "The count arrived at the ball.";
   const r = locateRawSpan(source, windowOffset, displayText);
   assert.equal(r.verified, true);
   assert.ok(r.drift > 0, "true offset is after the untrimmed window start");
@@ -34,9 +28,6 @@ test("frameText bug case: leading whitespace trimmed away from a window", () => 
 });
 
 test("snapToSentences bug case: interior whitespace/newlines collapsed", () => {
-  // snapToSentences replaces /\s+/g with a single space before snapping to
-  // a sentence boundary, so the display text has fewer, single-space
-  // whitespace runs than the raw source (which may have line wraps).
   const source = "Chapter start.\nNatasha   danced\nall   night\nlong. Next sentence.";
   const displayText = "Natasha danced all night long.";
   const approxOffset = source.indexOf("Natasha");
@@ -65,7 +56,6 @@ test("recurring phrase: picks the occurrence nearest the approximate offset, not
   const secondOccurrence = source.indexOf(phrase, firstOccurrence + 1);
   const thirdOccurrence = source.indexOf(phrase, secondOccurrence + 1);
   assert.ok(secondOccurrence > firstOccurrence && thirdOccurrence > secondOccurrence);
-  // approxOffset sits right next to the SECOND occurrence, far from the first/third.
   const r = locateRawSpan(source, secondOccurrence + 2, phrase);
   assert.equal(r.verified, true);
   assert.equal(r.offset, secondOccurrence);
@@ -73,8 +63,6 @@ test("recurring phrase: picks the occurrence nearest the approximate offset, not
 
 test("no match within the search radius: typed gap, not a guessed slice", () => {
   const source = "a".repeat(10000) + "the real sentence is here" + "b".repeat(10000);
-  // displayText was altered beyond whitespace (a real ellipsis-truncation
-  // case) so it can never be found verbatim in the source.
   const r = locateRawSpan(source, 5000, "the real sentence is here but truncated differently");
   assert.equal(r.verified, false);
   assert.equal(r.raw, null);
@@ -97,10 +85,7 @@ test("degenerate input: empty text, missing offset, empty source never throw", (
 });
 
 test("frame-boundary crossing: true text starts in the next overlapping frame", () => {
-  // Simulates a hop-boundary case: the approximate offset is the PRIOR
-  // frame's start, but the sentence actually begins ~900 chars later, in
-  // the next (overlapping) frame's window.
-  const prefix = "words ".repeat(150); // ~900 chars of filler between frames
+  const prefix = "words ".repeat(150);
   const source = prefix + "Pierre stood at the window and said nothing at all.";
   const priorFrameOffset = 0;
   const displayText = "Pierre stood at the window and said nothing at all.";
@@ -120,7 +105,6 @@ test("overlapping/nearby spans resolve independently with no shared state", () =
   assert.equal(a.offset, source.indexOf("Andrei entered"));
   assert.equal(b.offset, source.indexOf("Andrei sat"));
   assert.equal(c.offset, source.indexOf("Andrei said"));
-  // Resolving b or c must not have perturbed a's already-computed result.
   const aAgain = locateRawSpan(source, source.indexOf("Andrei entered"), "Andrei entered the room.");
   assert.deepEqual(a, aAgain);
 });
@@ -129,4 +113,37 @@ test("diacritics are NOT recovered (out of scope — presence.js owns identity m
   const source = "Natásha danced at the ball.";
   const r = locateRawSpan(source, 0, "Natasha danced at the ball.");
   assert.equal(r.verified, false, "diacritic mismatch is a genuine non-match, not silently accepted");
+});
+
+test("splitSentences: offsets round-trip to the source text", () => {
+  const text = "Pierre smiled. Prince Andrew frowned!";
+  const sentences = splitSentences(text);
+  assert.equal(sentences.length, 2);
+  for (const s of sentences) {
+    assert.equal(text.slice(s.offset, s.offset + s.text.length), s.text);
+  }
+});
+
+test("splitSentences: a paragraph break is a hard boundary even without terminating punctuation", () => {
+  const text = "CHAPTER XII\n\nWhen Natásha entered, Pierre rose.";
+  const sentences = splitSentences(text);
+  assert.equal(sentences[0].text, "CHAPTER XII");
+  assert.equal(sentences[1].text, "When Natásha entered, Pierre rose.");
+  assert.ok(!sentences[1].text.includes("CHAPTER"), "heading must not leak into the following sentence");
+});
+
+test("splitSentences: closing quotes stay attached to their sentence", () => {
+  const text = '"Well, Prince," he said. Then he left.';
+  const sentences = splitSentences(text);
+  assert.equal(sentences[0].text, '"Well, Prince," he said.');
+});
+
+test("splitSentences: sequential order and non-overlapping offsets", () => {
+  const text = "One. Two. Three.";
+  const sentences = splitSentences(text);
+  assert.deepEqual(sentences.map((s) => s.order), [0, 1, 2]);
+  for (let i = 1; i < sentences.length; i++) {
+    assert.ok(sentences[i].offset >= sentences[i - 1].offset + sentences[i - 1].text.length);
+  }
+});
 });
