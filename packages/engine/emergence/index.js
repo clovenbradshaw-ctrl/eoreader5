@@ -10,6 +10,11 @@ export {
   checkHolonLevelStability,
 } from "./holon-level/index.js";
 export {
+  seriesExistenceDependency,
+  seriesPossibilityConstraint,
+  discoverSeriesLevelRelation,
+} from "./holon-level/series.js";
+export {
   evalNode,
   evaluateProgram,
   predictWith,

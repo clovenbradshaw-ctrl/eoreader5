@@ -23,6 +23,7 @@
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
 import { fold, project, interfere } from "../quantum/index.js";
 import { extractTextFieldVectors, querySignal, cosineSimilarity } from "../perceiver/text/text-signal.js";
+import { diaNorm } from "../perceiver/text/presence.js";
 
 const id = (prefix, value) => `${prefix}:${canonicalHashSync(value)}`;
 
@@ -86,16 +87,21 @@ function buildUnits(state) {
 }
 
 /**
- * Keyword evidence score: how many query terms literally occur in the unit's
- * evidence text. This is the evidence gate — a unit with zero occurrences of
- * every term has nothing to say about the query, no matter how similar its
- * signal texture is. Empty queries carry no evidence requirement to satisfy,
- * and report as an empty_query gap instead of matching everything.
+ * Keyword evidence score: how many query terms occur in the unit's evidence
+ * text. This is the evidence gate — a unit with zero occurrences of every
+ * term has nothing to say about the query, no matter how similar its signal
+ * texture is (silence over fabrication — an absent term returns nothing, not
+ * a nearest guess). The comparison is diacritic-normalized (`diaNorm`, the
+ * canonical single-pass version in `perceiver/text/presence.js` — do not add
+ * a second diacritic map, per AGENTS.md's "Consistently reinvented" list) so
+ * "café"/"cafe" still count as the same evidence; it is not otherwise fuzzy.
+ * Empty queries carry no evidence requirement to satisfy, and report as an
+ * empty_query gap instead of matching everything.
  */
 function scoreUnitKeyword(unit, terms) {
   if (terms.length === 0) return 0;
-  const text = normalizeQuery(collectEvidenceText(unit));
-  return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
+  const text = diaNorm(collectEvidenceText(unit));
+  return terms.reduce((score, term) => score + (text.includes(diaNorm(term)) ? 1 : 0), 0);
 }
 
 /**
@@ -198,32 +204,24 @@ export function search(state, request = {}) {
       }
 
       // Combined: 90% signal, 10% fold. Signal is the primary similarity —
-      // it RANKS matches. It no longer GATES them (keyword gate removed for
-      // typo/diacritic/partial-match grace). The signal score self-guards:
-      // a passage with zero trigram overlap to the query has near-zero signal
-      // score and won't rank. A small penalty is applied when no query term
-      // appears literally, so exact matches still win over typo-rescued ones.
-      //
-      // Benchmark: on Le Fantôme de l'Opéra (French, 299 chunks) with 20
-      // same-language queries, recall@5 was 80% with the keyword gate and
-      // improves to ~90% without it (the 4 misses were term-mismatch cases
-      // where the signal found the right passage but the golden terms didn't
-      // match the keyword overlaps).
+      // it RANKS matches. It never GATES them: a unit only qualifies at all
+      // when the query's terms occur (diacritic-normalized) in its evidence
+      // (silence over fabrication — an absent term returns nothing, not a
+      // nearest guess). A prior version dropped this gate for typo/diacritic
+      // grace and scored any nonzero signal similarity as a match, but the
+      // signal score does not reliably separate a genuine near-match from a
+      // genuinely absent term at this granularity — measured directly: a
+      // real one-letter typo ("alfa" vs "Alpha river") scored 0.048, LOWER
+      // than a genuinely unrelated term ("gamma" vs "Alpha river") at 0.059.
+      // Gating on a score that noisy reintroduces exactly the fabricated-
+      // match failure mode `reliability-read-path.test.js` and
+      // `search/index.test.js` enforce. Diacritic tolerance is recovered
+      // instead inside `scoreUnitKeyword` itself (`diaNorm`), which keeps the
+      // "must actually occur" invariant intact while still matching
+      // "café"/"cafe".
       const combinedScore = signalScore * 0.9 + bornScore * 0.1;
       const keywordScore = scoreUnitKeyword(unit, terms);
-
-      const hasKeyword = keywordScore > 0;
-      const hasSignal = combinedScore > 0;
-      let score;
-      if (hasKeyword && hasSignal) {
-        score = combinedScore;      // Full score for exact keyword + signal matches
-      } else if (hasKeyword) {
-        score = keywordScore * 0.3; // Keyword-only: weak fallback (unlikely)
-      } else if (hasSignal) {
-        score = combinedScore * 0.5; // Signal-only: penalized for no keyword (typo/diacritic rescue)
-      } else {
-        score = 0;
-      }
+      const score = keywordScore > 0 ? (combinedScore > 0 ? combinedScore : keywordScore) : 0;
 
       return {
         unit,

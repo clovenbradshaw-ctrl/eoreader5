@@ -18,6 +18,7 @@
 import { analyzeStates, holonicDecompose, detectPhases } from "../states/index.js";
 import { computeBoundaryStabilityGate } from "../boundaries/index.js";
 import { DEF } from "../nulls/extreme-value.js";
+import { discoverSeriesLevelRelation } from "../holon-level/series.js";
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -763,10 +764,61 @@ export function terrainCoverage(result) {
  *
  * @returns {object} { tree, levels, entityCount }
  */
+// buildHolonicTree's states/events/phases/subModes containment is assumed —
+// true by construction (a phase is literally computed as a time-sub-segment
+// of an event), but never confirmed as a genuine holon-level relation
+// (docs/holon-level.md). This attaches that confirmation per event, using
+// the same discovery discipline as everywhere else: existence-dependency +
+// possibility-constraint (measured as real predictive competency gain, via
+// ../holon-level/series.js — never assumed just because the decomposition
+// nests them). Nulls in the raw series (a gap) are excluded, with an
+// original-index <-> compacted-index map so an event's frames still resolve
+// correctly in the gap-free series `discoverSeriesLevelRelation` needs.
+function confirmEventLevelRelations(values, events, { permutations = 50, quantile } = {}) {
+  const cleanSeries = [];
+  const origToCompact = new Map();
+  for (let i = 0; i < values.length; i++) {
+    if (typeof values[i] === "number" && Number.isFinite(values[i])) {
+      origToCompact.set(i, cleanSeries.length);
+      cleanSeries.push(values[i]);
+    }
+  }
+
+  return events.map((event) => {
+    const candidateIndices = [];
+    for (let i = event.startIndex; i <= event.endIndex; i++) {
+      const compact = origToCompact.get(i);
+      if (compact !== undefined) candidateIndices.push(compact);
+    }
+
+    if (candidateIndices.length < 2 || cleanSeries.length < candidateIndices.length + 4) {
+      return {
+        ...event,
+        level_relation: null,
+        level_relation_gap: "insufficient gap-free series data to confirm a holon-level relation for this event",
+      };
+    }
+
+    const level_relation = discoverSeriesLevelRelation({
+      series: cleanSeries,
+      candidateIndices,
+      subject_id: "whole-series",
+      candidate_id: `event:${event.id}`,
+      permutations,
+      quantile,
+    });
+
+    return { ...event, level_relation };
+  });
+}
+
 export function buildHolonicTree(reading, opts = {}) {
   const values = reading.units.map((u) => u.rawValue);
   const positions = reading.units.map((u) => u.pos);
   const tree = holonicDecompose(values, positions, opts);
+
+  const eventsWithLevelRelations = confirmEventLevelRelations(values, tree.events, opts);
+  const confirmedTree = { ...tree, events: eventsWithLevelRelations };
 
   // Count entities at each level
   const levelCounts = {
@@ -780,7 +832,7 @@ export function buildHolonicTree(reading, opts = {}) {
     levelCounts.phases + levelCounts.subModes;
 
   return {
-    tree,
+    tree: confirmedTree,
     levels: levelCounts,
     entityCount: totalEntities,
     reading,

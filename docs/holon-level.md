@@ -1,12 +1,16 @@
 # Holon level: discovered, never assigned
 
 Status: implemented.
-Code: `packages/engine/emergence/holon-level/index.js`,
+Code: `packages/engine/emergence/holon-level/index.js` (generic gates),
+`packages/engine/emergence/holon-level/series.js` (predictive-competency
+construction for numeric series),
+`packages/engine/emergence/structured/index.js` (`buildHolonicTree` wiring),
 `packages/engine/emergence/holon/index.js` (composeHolon wiring),
 `packages/engine/emergence/surprise/index.js` (tick detection),
 `packages/engine/emergence/paradigm/index.js` (Zollman-delay hysteresis,
 reused pattern).
 Schema: `packages/spec/schemas/holon-level-relation.schema.json`.
+Real-data proof: `scripts/test-holon-level-nexrad.mjs`.
 
 ## 1. The law
 
@@ -66,7 +70,64 @@ This also means the relation is not fixed at composition time. `composeHolon`
 a newly admitted holon is actually above its parts, rather than assuming SYN
 composition always produces a ladder rung.
 
-## 3. Time is per-holon, and it is signal, not a clock
+## 3. Possibility-constraint is measured as prediction, not similarity
+
+The first real-data check (Frankenstein text) tried operationalizing
+possibility-constraint as `pull = cos²(part, whole)` — a static feature-vector
+similarity borrowed from eoPriors' `spectral.js`. It came back mixed on real
+prose. The problem was the framing, not the noise: "above constrains, below
+enables" is a claim about what's *predictable*, not about vector geometry.
+For anything with a sequential/temporal axis, the right measurement is
+genuine predictive competency gain — and the engine already has a complete,
+domain-agnostic substrate for exactly that (`packages/engine/prediction/
+scoring` — proper scoring rules; `prediction/baselines`; `prediction/tasks`'
+leakage-safe `walkForward`; `competency/ledger`'s
+`competencyGain(m, b) = Σ L(b) − Σ L(m)`). None of it is textual.
+
+`packages/engine/emergence/holon-level/series.js` builds
+`existenceDependencyTest`/`possibilityConstraintTest` inputs for plain numeric
+series on top of that substrate:
+
+- **Existence-dependency**: does the whole series' own mean depend on
+  retaining this candidate's indices, more than an arbitrary same-size window
+  would (leave-out degradation vs. a random-window null)?
+- **Possibility-constraint**: does conditioning prediction on "am I inside
+  this candidate regime" beat an unconditioned baseline, by more than an
+  arbitrary same-size regime label would — the competency gain measured
+  under a proper scoring rule (default CRPS), walked forward
+  commit-before-reveal? The null must draw random **contiguous** windows, not
+  scattered index sets — a genuine regime is always contiguous, and a
+  scattered null gives its own regime-conditioned history a handful of
+  unrelated far-apart points, which produces wildly unstable variance
+  estimates under a proper scoring rule and has nothing to do with whether
+  the true candidate is informative. (Measured directly: switching a
+  scattered null to a contiguous one on the NEXRAD data below moved the null
+  threshold from the −400,000s to the low thousands — the same order of
+  magnitude as the observed statistic, which is what a well-posed null looks
+  like.)
+
+**Worked example, real data, no narrative text involved**:
+`scripts/test-holon-level-nexrad.mjs` runs this against the Albuquerque
+NEXRAD radar file-size series already in this workspace
+(`data/nexrad-s3-listing.xml`, 1000 scans, March 30–April 8 2020;
+narrated independently in `nexrad-chronicle.txt`). `buildHolonicTree`
+(`emergence/structured/index.js`) discovers 5 storm events from the raw
+series; only **event:1** — 78,572-byte peak, 113 scans, the same storm the
+human-written chronicle separately singles out as "The Great Storm" and its
+"climax" — clears both bars and discovers `above`, with a printed competency
+gain of ~39,898 against a Born-null threshold of ~−1,963. The other 4 events
+come back `peer`/`unstable`: the discovery is selective, not a rubber stamp —
+a smaller storm sitting inside the same ladder does not automatically inherit
+"above" just because it was also discovered as an event.
+
+`composeHolon`'s existing wiring (`emergence/holon/index.js`) still uses the
+static `pull` proxy for its possibility-constraint check, because its parts
+are feature vectors with no time axis — a predictive reframing does not apply
+there. That is a narrower, weaker proxy kept only for the no-time-axis case;
+`series.js`'s competency-gain construction is the preferred pattern for
+anything sequential.
+
+## 4. Time is per-holon, and it is signal, not a clock
 
 There is no universal clock in this engine, because it is designed
 omnimodally (text, video, audio, music — no modality gets a privileged clock).
@@ -108,7 +169,7 @@ consecutive ticks — the exact `checkZollmanDelay` pattern
 reinvented, so a single noisy tick can't register as "the relationship
 changed."
 
-## 4. What this is not
+## 5. What this is not
 
 This does not touch `individuation.js`'s `grounded_by`/`part_of`. Those fields
 are a deliberately different, single-hop, non-cross-referent relation —
@@ -118,18 +179,22 @@ depth for `part_of` would reintroduce exactly that error. This is new,
 additive machinery for a different question: the relation between two
 independently individuated candidates, of any kind, in any modality.
 
-## 5. Where the machinery lives
+## 6. Where the machinery lives
 
 | concern | module |
 |---|---|
-| existence-dependency + possibility-constraint gates | `packages/engine/emergence/holon-level/index.js` |
+| existence-dependency + possibility-constraint gates (generic) | `packages/engine/emergence/holon-level/index.js` |
 | relation classification (above/below/peer/unstable) | same, `classifyHolonLevelRelation` |
 | tick detection (signal from noise, per holon) | same, `holonTick`, built on `emergence/surprise/index.js` |
 | history + hysteresis | same, `holonLevelHistory` helpers, reusing `checkZollmanDelay` |
-| composeHolon confirmation wiring | `packages/engine/emergence/holon/index.js` |
+| predictive-competency construction for numeric series | `packages/engine/emergence/holon-level/series.js` |
+| structured-pipeline confirmation wiring (events vs. whole series) | `packages/engine/emergence/structured/index.js`'s `buildHolonicTree` |
+| composeHolon confirmation wiring (feature vectors, existence-only) | `packages/engine/emergence/holon/index.js` |
 | schema | `packages/spec/schemas/holon-level-relation.schema.json` |
+| real-data proof (NEXRAD radar, no narrative text) | `scripts/test-holon-level-nexrad.mjs` |
 
-Enforced by `packages/engine/emergence/holon-level/index.test.js` and
+Enforced by `packages/engine/emergence/holon-level/index.test.js`,
+`packages/engine/emergence/holon-level/series.test.js`, and
 `packages/conformance/invariants/forbidden-dependencies.test.js` (the module
 must stay pure — no `Date.now`, no ambient randomness, same as every other
 emergence gate).
