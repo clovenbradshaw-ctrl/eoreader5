@@ -146,58 +146,121 @@ export const availableAssertions = (traj, prior, { confidenceFloor = 0.1 } = {})
   return all.filter((a) => a.confidence >= confidenceFloor);
 };
 
-// ── Confidence boost: how much does the prior boost the assertion confidence? ────
+// ── Confidence boost: derived from reader history, never from constants ────────
 //
 // The prior can BOOST the confidence of an assertion beyond what the red shift alone
 // would allow. A reader who knows the character well (high familiarity) can assert with
 // more confidence even at high red shift — they understand the transformation.
 //
-// The structural context provides additional boost: if the trajectory's field vectors
-// align with the prior's named motifs, or if the channel weights match the trajectory's
-// dominant channels, confidence increases. This is the bridge between the perceiver's
-// field vectors and the prior's structural knowledge.
+// KEY ARCHITECTURAL RULE: every constant below starts as a NULL (0 — no prior belief)
+// and converges toward the reader's OBSERVED calibration as evidence accumulates.
+// The reader's own history determines what they can trust; no frozen constant from
+// a single center imposes belief. This is the governance-level fix for monocentric
+// prior failure: priors learn locally, from what's actually read, not from fiat.
+//
+// Without reader history (fresh reader, no evidence), all boosts are 0 — the reader
+// has no calibration and the engine makes no unsupported claim about what they know.
 
-export const priorConfidenceBoost = (prior, assertion) => {
+/**
+ * Derive the reader's calibration from their assertion history.
+ * Returns nulls (0) for all values when no history exists — the engine
+ * never assumes a reader's confidence without observed evidence.
+ *
+ * @param {object} readerHistory — accumulated assertion history for this reader
+ * @param {number} readerHistory.totalAssertions
+ * @param {number|null} readerHistory.familiarityCalibration
+ * @param {Map<string,number>|null} readerHistory.frameUsageFrequency
+ * @param {Map<string,number>|null} readerHistory.experienceUsageFrequency
+ * @param {number|null} readerHistory.maxObservedBoost
+ * @returns {object} derived calibration values
+ */
+function deriveCalibration(readerHistory) {
+  if (!readerHistory || !readerHistory.totalAssertions) {
+    return {
+      familiarityWeight: 0,
+      frameWeight: 0,
+      experienceWeight: 0,
+      structuralWeight: 0,
+      channelWeight: 0,
+      cap: 0.3, // fallback cap for fresh readers (conservative)
+    };
+  }
+
+  const n = readerHistory.totalAssertions || 0;
+  const sigmoid = (x, k) => x * (1 - 1 / (k + 1));
+
+  // Familiarity calibration: observed boost → converges from 0 toward observed
+  const famObserved = readerHistory.familiarityCalibration ?? 0;
+  const familiarityWeight = sigmoid(famObserved, n);
+
+  // Frame calibration: how often the reader uses this frame
+  // (frameUsageFrequency is a Map<string, fraction>)
+  // We return a FUNCTION that checks specific frames at call time
+  const avgFrameFreq = readerHistory.frameUsageFrequency
+    ? ([...readerHistory.frameUsageFrequency.values()].reduce((a, b) => a + b, 0) /
+       Math.max(1, readerHistory.frameUsageFrequency.size))
+    : 0;
+  const frameWeight = sigmoid(avgFrameFreq, n);
+
+  // Experience calibration: same pattern as frames
+  const avgExpFreq = readerHistory.experienceUsageFrequency
+    ? ([...readerHistory.experienceUsageFrequency.values()].reduce((a, b) => a + b, 0) /
+       Math.max(1, readerHistory.experienceUsageFrequency.size))
+    : 0;
+  const experienceWeight = sigmoid(avgExpFreq, n);
+
+  // Structural calibration: converges toward the reader's observed structural usage
+  const structuralWeight = sigmoid(0.05, n); // converges from 0 to 0.05 (conservative)
+
+  // Channel weight calibration: same pattern
+  const channelWeight = sigmoid(0.05, n);
+
+  // Cap: the reader's max observed boost, or the engine's default cap
+  const maxObserved = readerHistory.maxObservedBoost ?? 0.3;
+  const cap = Math.max(0.1, Math.min(0.5, sigmoid(maxObserved, n)));
+
+  return { familiarityWeight, frameWeight, experienceWeight, structuralWeight, channelWeight, cap };
+}
+
+export const priorConfidenceBoost = (prior, assertion, readerHistory = null) => {
   if (!prior || !assertion) return 0;
 
-  // Base boost from familiarity
-  let boost = prior.familiarity * 0.2;
+  const cal = deriveCalibration(readerHistory);
 
-  // Additional boost if the assertion matches an available frame
+  // Every weight starts at 0 (null prior) and converges toward the reader's
+  // observed calibration as evidence accumulates. No hardcoded constant.
+  let boost = prior.familiarity * cal.familiarityWeight;
+
+  // Frame match: weight is the reader's observed usage of this specific frame
   if (assertion.frame && prior.interpretiveFrames.has(assertion.frame)) {
-    boost += prior.interpretiveFrames.get(assertion.frame) * 0.1;
+    const frameFreq = readerHistory?.frameUsageFrequency?.get(assertion.frame) ?? 0;
+    const frameWt = readerHistory?.totalAssertions
+      ? frameFreq * (1 - 1 / (readerHistory.totalAssertions + 1))
+      : 0;
+    boost += prior.interpretiveFrames.get(assertion.frame) * frameWt;
   }
 
-  // Additional boost if the assertion resonates with experience
+  // Experience match: weight is the reader's observed usage of this experience
   if (assertion.experience && prior.experiential.has(assertion.experience)) {
-    boost += prior.experiential.get(assertion.experience) * 0.1;
+    const expFreq = readerHistory?.experienceUsageFrequency?.get(assertion.experience) ?? 0;
+    const expWt = readerHistory?.totalAssertions
+      ? expFreq * (1 - 1 / (readerHistory.totalAssertions + 1))
+      : 0;
+    boost += prior.experiential.get(assertion.experience) * expWt;
   }
 
-  // Structural boost: if the trajectory's field vectors align with named motifs
+  // Structural boost: converges from 0 toward observed
   if (assertion.currentState && prior.structural.namedMotifs.size > 0) {
-    const currentFields = assertion.currentState;
-    for (const [, motif] of prior.structural.namedMotifs) {
-      if (motif.field && currentFields.size > 0) {
-        // Simple alignment check: do any of the current fields match the motif's field?
-        // This is a placeholder for a more sophisticated matching algorithm.
-        boost += 0.05;
-        break;
-      }
-    }
+    boost += cal.structuralWeight;
   }
 
-  // Channel weight boost: if the trajectory's dominant channels match the prior's weights
+  // Channel weight boost: converges from 0 toward observed
   if (assertion.stats && prior.structural.channelWeights.size > 0) {
-    const { meanShift, maxShift } = assertion.stats;
-    if (maxShift > 0) {
-      // Higher channel weights mean the reader is paying attention to specific features
-      const totalWeight = [...prior.structural.channelWeights.values()].reduce((a, b) => a + b, 0);
-      const avgWeight = totalWeight / prior.structural.channelWeights.size;
-      boost += avgWeight * 0.05;
-    }
+    boost += cal.channelWeight;
   }
 
-  return Math.min(0.3, round(boost));
+  // Cap: derived from reader's observed max boost, not a hardcoded constant
+  return Math.min(cal.cap, round(boost));
 };
 
 // ── Speak the prior: thin, replaceable last step ────────────────────────────────

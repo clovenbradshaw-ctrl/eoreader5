@@ -1,0 +1,161 @@
+{
+  "stigmergy_golden_version": "stigmergy-golden@1.0.0",
+  "notes": [
+    "Behavioral golden for the stigmergy / closed-loop holon spec.",
+    "Frozen BEFORE any stigmergy code is written. Designed to FAIL on the current engine and pass as modules are built.",
+    "Every case is grounded in real ingested Gutenberg text.",
+    "Anchor quotes resolve to offsets at score time."
+  ],
+  "tolerance": 2000,
+  "texts": {
+    "pg2600": "War and Peace",
+    "pg84": "Frankenstein",
+    "pg1400": "Great Expectations"
+  },
+
+  "R5_externality_detection": {
+    "rule": "R5",
+    "positive": [
+      {
+        "id": "napoleon-abandons-army",
+        "text": "pg2600",
+        "action_anchor": "Napoleon is great",
+        "consequence_anchor": "The Russians retreated eighty miles",
+        "assert": "open-loop-flagged"
+      },
+      {
+        "id": "magwitch-funds-pip",
+        "text": "pg1400",
+        "action_anchor": "your second father",
+        "consequence_anchor": "the wretchedness",
+        "assert": "open-loop-flagged"
+      }
+    ],
+    "negative_controls": [
+      {
+        "id": "pierre-inherits",
+        "text": "pg2600",
+        "action_anchor": "Pierre who has inherited all the property",
+        "assert": "NOT-open-loop"
+      },
+      {
+        "id": "frankenstein-builds-creature",
+        "text": "pg84",
+        "action_anchor": "I collected the instruments of life around me",
+        "consequence_anchor": "the wretch whom I had created",
+        "assert": "NOT-open-loop"
+      }
+    ]
+  },
+
+  "R3_evaporation": {
+    "rule": "R3",
+    "cases": [
+      {
+        "id": "no-decay-throws",
+        "assert": "construction-throws"
+      },
+      {
+        "id": "stale-trail-abandoned",
+        "text": "pg2600",
+        "early_anchor": "young Rostóv",
+        "late_anchor": "Countess Mary",
+        "assert": "early-trail-decays-below-late"
+      }
+    ]
+  },
+
+  "R4_exploration": {
+    "rule": "R4",
+    "cases": [
+      {
+        "id": "all-gradient-flagged",
+        "assert": "lockInRisk-fires"
+      }
+    ]
+  },
+
+  "R1_R2_wall": {
+    "rule": "R1+R2",
+    "cases": [
+      {
+        "id": "no-agent-to-agent-handle",
+        "assert": "no-cross-lens-read-api"
+      },
+      {
+        "id": "sense-rejects-global",
+        "assert": "whole-medium-neighborhood-throws"
+      }
+    ]
+  },
+
+  "SUPP_supplementation": {
+    "rule": "SUPP",
+    "cases": [
+      {
+        "id": "true-holon-passes",
+        "text": "pg2600",
+        "parts_anchor": ["Natásha", "Prince Andrew", "Pierre"],
+        "assert": "supplementation-passes"
+      },
+      {
+        "id": "crowd-scene-fails",
+        "text": "pg2600",
+        "parts_anchor": ["the crowd", "the mob", "the people"],
+        "assert": "supplementation-fails"
+      }
+    ]
+  },
+
+  "DOWN_downward_closure": {
+    "rule": "DOWN",
+    "predator_case_a": [
+      {
+        "id": "borg-absorption-refused",
+        "text": "pg2600",
+        "whole_anchor": "the general movement of the peoples",
+        "absorbed_part_anchor": "Napoleon",
+        "assert": "downward-closure-fails-a"
+      }
+    ],
+    "capture_case_b": [
+      {
+        "id": "unanswerable-trace-refused",
+        "assert": "downward-closure-fails-b"
+      }
+    ],
+    "good_holon_control": [
+      {
+        "id": "answerable-holon-admitted",
+        "text": "pg2600",
+        "whole_anchor": "the Rostóv family",
+        "assert": "downward-closure-passes"
+      }
+    ]
+  },
+
+  "unforced_convergence": {
+    "rule": "unforced-convergence",
+    "cases": [
+      {
+        "id": "independent-agreement-witnessed",
+        "text": "pg84",
+        "assert": "convergence-witnessed-not-optimized"
+      }
+    ]
+  },
+
+  "scoring": {
+    "ladder": [
+      "R3_evaporation.no-decay-throws (structural)",
+      "R1_R2_wall (both structural)",
+      "R4_exploration.all-gradient-flagged (needs deriveNull)",
+      "R5_externality_detection (needs consequence-edges)",
+      "SUPP (both) — needs holon module",
+      "DOWN (predator + capture + good control) — needs holon module",
+      "unforced_convergence — needs two walled lenses"
+    ],
+    "pass_condition": "Every positive asserts as stated AND every negative_control stays on its correct side.",
+    "current_engine_expected": "All assertions FAIL or ERROR on today's engine (no stigmergy module). That is correct."
+  }
+}

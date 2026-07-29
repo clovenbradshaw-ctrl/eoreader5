@@ -10,6 +10,8 @@ export { consensus, engineDossier, engineDossiersFromPackets } from "./consensus
 export { playExchange, PlaySession } from "./play.js";
 export { createEngineOrientation, engineCouncil, archetypeDossier, ARCHETYPES } from "./specialization.js";
 export { createHive, hiveRead } from "./hive.js";
+export { CommonsCharter, foundCommons, replayCharter, mintCharterEvent, CHARTER_EVENT_KINDS } from "./commons.js";
+export { reactionChannelAsMedium, reactionLogDeposit, storeAsMedium, storeSense } from "./medium-adapters.js";
 
 // ── Shared: fold cosine similarity (used by both witness-exchange and consensus) ──
 

@@ -56,7 +56,7 @@ const relationSignature = (relations) => {
 //   medium confidence → "Pierre's lens MIGHT BE idealistic naivety"
 //   low confidence → "Pierre's lens is UNCERTAIN — he has changed too much"
 
-export const assertLens = (traj, prior, { confidenceFloor = 0.1 } = {}) => {
+export const assertLens = (traj, prior, { confidenceFloor = 0.1, readerHistory = null } = {}) => {
   if (!traj || !traj.focus) return null;
 
   const rs = redShift(traj);
@@ -72,8 +72,8 @@ export const assertLens = (traj, prior, { confidenceFloor = 0.1 } = {}) => {
   // The base confidence is INVERSELY proportional to the red shift
   const baseConfidence = evidence === 0 ? 0 : 1 - rs;
 
-  // The prior boosts confidence
-  const boost = prior ? priorConfidenceBoost(prior, {}) : 0;
+  // The prior boosts confidence — derived from reader's observed history, not constants
+  const boost = prior ? priorConfidenceBoost(prior, {}, readerHistory) : 0;
   const confidence = Math.min(1, baseConfidence + boost);
 
   // The assertion strength
