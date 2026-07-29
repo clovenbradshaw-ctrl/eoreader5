@@ -7,9 +7,15 @@
 // dependency (WAV PCM, UTF-8 text). Compressed audio (MP3, FLAC, OGG) needs
 // a decode step upstream (browser AudioContext, ffmpeg, etc.) that produces
 // PCM — the engine is codec-agnostic, not codec-omniscient.
+//
+// Structured data (CSV, TSV, JSON arrays, S3 XML listings) is routed to the
+// structured perceiver, which extracts typed columns and produces field
+// vectors for the engine's modality-blind organs (states, chapters, boundaries).
 
 import { sniffWav, decodeWav } from './audio/wav.js';
 import { buildAudioReading } from './audio/reading.js';
+import { buildStructuredReading } from './structured/reading.js';
+import { attachTerrainReport } from '../emergence/terrain/discovery.js';
 
 // A high printable-ASCII ratio indicates UTF-8/text content.
 const printableRatio = (bytes) => {
@@ -22,6 +28,40 @@ const printableRatio = (bytes) => {
     if ((b >= 0x20 && b <= 0x7e) || b === 0x09 || b === 0x0a || b === 0x0d) printable++;
   }
   return printable / n;
+};
+
+// Structured-data sniffing: look for tabular patterns in text content.
+// CSV: comma-separated with consistent column count.
+// TSV: tab-separated.
+// JSON: starts with [ or {.
+// XML S3 listing: contains <ListBucketResult or <Contents>.
+const sniffStructured = (text) => {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // S3 bucket listing XML
+  if (trimmed.includes("<ListBucketResult") || (trimmed.startsWith("<?xml") && trimmed.includes("<Contents>"))) {
+    return true;
+  }
+
+  // JSON array/object
+  if ((trimmed.startsWith("[") || trimmed.startsWith("{")) && trimmed.length > 10) {
+    try {
+      JSON.parse(trimmed);
+      return true;
+    } catch { /* fall through */ }
+  }
+
+  // CSV/TSV: check first few lines for consistent delimited structure
+  const lines = trimmed.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length >= 2) {
+    const commas = lines[0].split(",").length;
+    const tabs = lines[0].split("\t").length;
+    if (commas >= 3 && lines.slice(0, 10).every((l) => l.split(",").length === commas)) return true;
+    if (tabs >= 3 && lines.slice(0, 10).every((l) => l.split("\t").length === tabs)) return true;
+  }
+
+  return false;
 };
 
 // buildBinaryReading: the generic fallback perceiver for unrecognised bytes.
@@ -92,20 +132,31 @@ export const buildTextReading = (bytes) => {
  * opts.channelData — if you already have decoded PCM, skip decoding entirely.
  */
 export async function buildReadingFromBytes(bytes, opts = {}) {
+  let reading;
+
   if (opts.channelData && opts.sampleRate) {
-    return buildAudioReading({ channelData: opts.channelData, sampleRate: opts.sampleRate, sourceBytes: bytes });
+    reading = buildAudioReading({ channelData: opts.channelData, sampleRate: opts.sampleRate, sourceBytes: bytes });
+    return attachTerrainReport(reading);
   }
 
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 
   if (sniffWav(u8)) {
     const { sampleRate, channelData } = decodeWav(u8);
-    return buildAudioReading({ channelData, sampleRate, sourceBytes: u8 });
+    reading = buildAudioReading({ channelData, sampleRate, sourceBytes: u8 });
+    return attachTerrainReport(reading);
   }
 
   if (printableRatio(u8) >= 0.85) {
-    return buildTextReading(u8);
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(u8);
+    if (sniffStructured(text)) {
+      reading = buildStructuredReading(u8, opts);
+    } else {
+      reading = buildTextReading(u8);
+    }
+  } else {
+    reading = buildBinaryReading(u8);
   }
 
-  return buildBinaryReading(u8);
+  return attachTerrainReport(reading);
 }

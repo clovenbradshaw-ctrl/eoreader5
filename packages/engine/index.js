@@ -157,6 +157,10 @@ export {
   buildTextReading,
 } from "./perceiver/dispatch.js";
 export {
+  buildStructuredReading,
+  STRUCTURED_FIELD_SPEC,
+} from "./perceiver/structured/reading.js";
+export {
   buildAudioReading,
   extractFrameFields,
   frameSignal,
@@ -240,6 +244,48 @@ export {
   EOT_OPERATORS,
 } from "./perceiver/field-spec.js";
 export { TEXT_FIELD_SPEC, buildTextFieldText } from "./perceiver/text/text-signal.js";
+
+// Terrain discovery: modality-blind terrain analysis for any reading.
+// Attached automatically by buildReadingFromBytes; every reading carries
+// a TerrainReport@1 covering all 9 terrains.
+export {
+  buildTerrainReport,
+  attachTerrainReport,
+  bornGate,
+} from "./emergence/terrain/discovery.js";
+
+// State detection: find distinct modes in value distributions, recursively.
+// Modality-blind — works on any numeric series. No hand-set thresholds.
+export {
+  detectModes,
+  findTransitions,
+  findStateRuns,
+  detectSubModes,
+  detectPhases,
+  holonicDecompose,
+  analyzeStates,
+} from "./emergence/states/index.js";
+
+// Structured entity extraction: entities from tabular data, holonic trees,
+// cross-entity associations. The bridge from structured perceiver output to
+// the engine's entity model.
+export {
+  extractCategoricalEntities,
+  extractStateEntities,
+  extractEventEntities,
+  extractGapEntities,
+  detectTemporalRhythms,
+  buildHolonicTree,
+  buildEntityAssociations,
+  extractAllEntities,
+  structuredEntityFold,
+  detectVoidStructure,
+  detectNetworkStructure,
+  detectAtmosphereStructure,
+  detectLensStructure,
+  detectParadigmStructure,
+  terrainCoverage,
+} from "./emergence/structured/index.js";
 
 // Trajectory red shift and physics current density, unified: both are a
 // cosine comparison against a reference accumulated along an axis, so
