@@ -292,3 +292,229 @@ export function spontaneousSurface(store, options = {}) {
   return results;
 }
 
+// ── Stigmergy adapter ────────────────────────────────────────────────────────
+//
+// The Hebbian store as a lawful Medium. The store already satisfies three of
+// the four stigmergy rules natively:
+//
+//   R2 (local sensing) — surface() does exactly one CA3 completion hop
+//   R3 (mandatory decay) — the decay parameter weights older frames less
+//   R4 (stochastic exploration) — spontaneousSurface explores off-cue
+//
+// This adapter adds the formal interface (deposit/sense/evaporate/lockInRisk)
+// and the R5 open-loop check. No store behavior changes.
+
+import {
+  createMedium,
+  lockInRisk as stigLockInRisk,
+  unsensedConsequences,
+} from "../stigmergy/index.js";
+
+function _adapterTokens(t) {
+  return String(t ?? "").toLowerCase().match(/[a-zà-ÿ0-9'’-]+/gi) ?? [];
+}
+
+/**
+ * storeAsMedium(store, options) -> Medium
+ *
+ * Wraps a Hebbian store as a stigmergy Medium. Each frame becomes a deposit;
+ * each frame's distinctive motifs are the trace content. The store's
+ * build-time sparsity gate (idf + df band) already enforces R2 pattern
+ * separation.
+ *
+ * @param {Store} store — from buildStore
+ * @param {object} options
+ * @param {number} options.decay — R3 mandatory decay
+ * @param {number} options.explorationFloor — R4 lock-in floor
+ * @returns {object} Medium-compatible wrapper
+ */
+export function storeAsMedium(store, { decay = 0.1, explorationFloor = 0.05 } = {}) {
+  const base = createMedium({ decay, explorationFloor });
+
+  const deposits = [];
+  for (const f of (store.frames ?? [])) {
+    const frameMotifs = store.frameMotifs?.get(f.order);
+    const topMotifs = frameMotifs
+      ? [...frameMotifs].sort((a, b) => b[1] - a[1]).slice(0, 12)
+          .map(([m]) => m)
+      : _adapterTokens(f.text).filter((w) => w.length >= 3).slice(0, 12);
+
+    deposits.push(Object.freeze({
+      id: `frame:${f.order}`,
+      agentId: "store",
+      trace: {
+        order: f.order,
+        offset: f.offset,
+        motifs: Object.freeze(topMotifs),
+        text_preview: f.text?.slice(0, 100) ?? "",
+      },
+      offGradient: false,
+      turn: f.order,
+    }));
+  }
+
+  return Object.freeze({
+    schema: "StoreMedium@1",
+    id: base.id,
+    decay: base.decay,
+    explorationFloor: base.explorationFloor,
+    deposits: Object.freeze(deposits),
+    depositCount: deposits.length,
+    offGradientCount: 0,
+    _store: store,
+  });
+}
+
+/**
+ * senseStore(medium, { cueText, selfOrder, ... }) -> Deposit[]
+ *
+ * R2 local sensing: returns ordered frames whose motifs fire on the cue,
+ * with one CA3 completion hop. This IS surface() called through the Medium
+ * interface. Result is a list of matching deposits ordered by activation.
+ *
+ * @param {object} medium — from storeAsMedium
+ * @param {string} cueText — the cue (a passage being read now)
+ * @param {number|null} selfOrder — exclude the cue's own frame
+ * @param {number} count — max results
+ * @returns {Array<{ order, activation, deposit }>}
+ */
+export function senseStore(medium, { cueText, selfOrder = null, count = 10, idfFloor = 0.5 } = {}) {
+  if (!cueText) return [];
+  const results = surface(medium._store, cueText, {
+    selfOrder,
+    completion: 0.5,
+    topEdges: 6,
+    idfFloor,
+    decay: medium.decay,
+    cueOrder: selfOrder,
+  });
+
+  return results.slice(0, count).map((r) => {
+    const deposit = medium.deposits.find((d) => d.trace.order === r.order);
+    return { order: r.order, activation: r.activation, deposit: deposit ?? null };
+  });
+}
+
+/**
+ * depositFrame(medium, frame) -> { medium, result }
+ *
+ * Append a new frame as a deposit. Computes its sparse code, indexes it,
+ * and wires Hebbian edges against existing frames — same as buildStore
+ * but incremental.
+ *
+ * R5: if the frame's text has known consequence-referent content, edges
+ * must be present.
+ *
+ * @param {object} medium
+ * @param {{ order: number, offset: number, text: string }} frame
+ * @param {string[]|null} consequenceEdges
+ * @returns {{ medium, result }}
+ */
+export function depositFrame(medium, frame, { consequenceEdges = null } = {}) {
+  if (consequenceEdges !== null && (!Array.isArray(consequenceEdges) || consequenceEdges.length === 0)) {
+    return {
+      medium,
+      result: Object.freeze({
+        admitted: false,
+        status: "open-loop",
+        reason: "frame has known consequences but no consequence-edges provided (R5)",
+      }),
+    };
+  }
+
+  const topMotifs = _adapterTokens(frame.text)
+    .filter((w) => w.length >= 3)
+    .slice(0, 12);
+
+  const d = Object.freeze({
+    id: `frame:${frame.order}`,
+    agentId: "store",
+    trace: {
+      order: frame.order,
+      offset: frame.offset,
+      motifs: Object.freeze(topMotifs),
+      text_preview: frame.text?.slice(0, 100) ?? "",
+      consequenceRefs: consequenceEdges ?? [],
+    },
+    offGradient: false,
+    turn: frame.order,
+  });
+
+  return {
+    medium: Object.freeze({
+      ...medium,
+      deposits: Object.freeze([...medium.deposits, d]),
+      depositCount: medium.depositCount + 1,
+    }),
+    result: Object.freeze({
+      admitted: true,
+      status: "admitted",
+      deposit_id: d.id,
+    }),
+  };
+}
+
+/**
+ * evaporateStore(medium, dt) -> Medium
+ *
+ * R3: apply decay by dropping frames below the survival floor based on
+ * temporal distance (order delta). The store's surface() also applies decay
+ * at query time — this is the structural complement that removes stale
+ * deposits from the medium itself.
+ *
+ * @param {object} medium
+ * @param {number} dt — evaporation steps
+ */
+export function evaporateStore(medium, dt = 1) {
+  if (dt <= 0 || medium.deposits.length === 0) return medium;
+
+  const survivalFloor = 1e-3;
+  const decayPerStep = 1 - medium.decay;
+  const maxOrder = medium.deposits[medium.deposits.length - 1].trace.order;
+
+  const surviving = medium.deposits.filter((d) => {
+    const distance = maxOrder - d.trace.order;
+    const weight = Math.pow(decayPerStep, distance * dt);
+    return weight >= survivalFloor;
+  });
+
+  if (surviving.length === 0) {
+    surviving.push(medium.deposits[medium.deposits.length - 1]);
+  }
+  if (surviving.length === medium.deposits.length) return medium;
+
+  return Object.freeze({
+    ...medium,
+    deposits: Object.freeze(surviving),
+  });
+}
+
+/**
+ * lockInRiskStore(medium) -> { flagged, offGradientFraction, null_result }
+ *
+ * R4: is the store degenerately concentrated on a single motif cluster?
+ * Flags lock-in using the stigmergy module's deriveNull-based test.
+ *
+ * @param {object} medium
+ */
+export function lockInRiskStore(medium) {
+  const synth = {
+    schema: "StigmergyMedium@1",
+    decay: medium.decay,
+    explorationFloor: medium.explorationFloor,
+    deposits: medium.deposits,
+    depositCount: medium.depositCount,
+    offGradientCount: medium.offGradientCount,
+  };
+  return stigLockInRisk(synth);
+}
+
+/**
+ * unsensedConsequencesStore(medium, known) -> object[]
+ *
+ * R5 audit surface over store deposits.
+ */
+export function unsensedConsequencesStore(medium, known) {
+  return unsensedConsequences(medium, known);
+}
+

@@ -327,3 +327,221 @@ function summarizeBurst(reactions, blockPos) {
     seqRange: [reactions[0].seq, reactions[reactions.length - 1].seq],
   };
 }
+
+// ── Stigmergy adapter ────────────────────────────────────────────────────────
+//
+// The reaction log as a lawful Medium (R1-R5). R1 already holds (reactions
+// never mint inferences; reader_id is opaque). This adapter adds the missing
+// pieces: mandatory decay, local sensing by seq window, lock-in detection, and
+// the R5 open-loop check for reactions that claim known consequences.
+//
+// This is additive: no existing function changes. The adapter wraps existing
+// reaction-log operations through the stigmergy interface, proving the log is
+// a lawful medium without rewriting it.
+
+import {
+  createMedium,
+  lockInRisk as stigLockInRisk,
+  unsensedConsequences,
+} from "../emergence/stigmergy/index.js";
+
+/**
+ * reactionLogAsMedium(log, options) -> Medium
+ *
+ * Wraps a ReactionLog as a stigmergy Medium. The reaction log's reader_id
+ * becomes the medium's sole agent; each reaction is a trace deposit. seq
+ * ordering provides the temporal structure. R1–R5 are enforced through the
+ * adapter's deposit/sense/evaporate wrappers.
+ *
+ * @param {ReactionLog} log — from createReactionLog
+ * @param {object} options
+ * @param {number} options.decay — R3 mandatory decay for evaporation
+ * @param {number} options.explorationFloor — R4 lock-in floor
+ * @returns {object} a Medium-compatible wrapper around the reaction log
+ */
+export function reactionLogAsMedium(log, { decay = 0.1, explorationFloor = 0.05 } = {}) {
+  const base = createMedium({ decay, explorationFloor });
+
+  // Populate with existing reactions as pre-existing deposits
+  let m = base;
+  let offGradientCount = 0;
+  const deposits = [];
+  for (const r of log.reactions) {
+    const d = {
+      id: r.reaction_id,
+      agentId: log.reader_id,
+      trace: {
+        kind: r.kind,
+        block_id: r.block_id,
+        extent: r.extent,
+        seq: r.seq,
+        context: r.context,
+        payload: r.payload,
+      },
+      offGradient: false,
+      turn: r.seq,
+    };
+    deposits.push(Object.freeze(d));
+  }
+
+  return Object.freeze({
+    schema: "ReactionMedium@1",
+    id: base.id,
+    decay: base.decay,
+    explorationFloor: base.explorationFloor,
+    deposits: Object.freeze(deposits),
+    depositCount: deposits.length,
+    offGradientCount,
+    _log: log, // retained for adapter-specific access
+  });
+}
+
+/**
+ * depositReaction(medium, reactionEvent) -> { medium, result }
+ *
+ * Appends a reaction as a trace deposit. Enforces R5: if the reaction's
+ * payload carries known consequence edges, they must be present.
+ *
+ * @param {object} medium — from reactionLogAsMedium
+ * @param {ReactionEvent@1} reaction — a validated reaction event
+ * @returns {{ medium, result }} — new medium or refusal with status
+ */
+export function depositReaction(medium, reaction) {
+  if (!reaction || !reaction.reaction_id) {
+    throw new TypeError("reaction-adapter: deposit requires a valid reaction event");
+  }
+
+  // R5: check payload for consequence edges
+  const consequenceEdges = reaction.payload?.consequenceEdges ?? null;
+  if (consequenceEdges !== null && (!Array.isArray(consequenceEdges) || consequenceEdges.length === 0)) {
+    return {
+      medium,
+      result: Object.freeze({
+        admitted: false,
+        status: "open-loop",
+        reason: "reaction payload has known consequences but no consequence-edges provided (R5)",
+      }),
+    };
+  }
+
+  const d = Object.freeze({
+    id: reaction.reaction_id,
+    agentId: medium._log.reader_id,
+    trace: {
+      kind: reaction.kind,
+      block_id: reaction.block_id,
+      extent: reaction.extent,
+      seq: reaction.seq,
+      context: reaction.context,
+      payload: reaction.payload,
+      consequenceRefs: consequenceEdges ?? [],
+    },
+    offGradient: !!reaction.payload?.offGradient,
+    turn: medium.depositCount,
+  });
+
+  const offGradientCount = medium.offGradientCount + (d.offGradient ? 1 : 0);
+
+  return {
+    medium: Object.freeze({
+      ...medium,
+      deposits: Object.freeze([...medium.deposits, d]),
+      depositCount: medium.depositCount + 1,
+      offGradientCount,
+    }),
+    result: Object.freeze({
+      admitted: true,
+      status: "admitted",
+      deposit_id: d.id,
+    }),
+  };
+}
+
+/**
+ * senseReactions(medium, neighborhood) -> Deposit[]
+ *
+ * Local sensing by seq window. R2: rejects whole-medium reads.
+ *
+ * @param {object} medium
+ * @param {{ from?: number, count?: number, byBlock?: string }} neighborhood
+ * @returns {Array<object>}
+ */
+export function senseReactions(medium, neighborhood = {}) {
+  const { from = 0, count = 20, byBlock } = neighborhood;
+
+  if (byBlock) {
+    // Sense only deposits for a specific block (local by block identity)
+    const blockDeposits = medium.deposits.filter((d) => d.trace.block_id === byBlock);
+    return blockDeposits.slice(Math.max(0, from), from + count);
+  }
+
+  if (count >= medium.deposits.length && medium.deposits.length > 0 && from === 0) {
+    throw new TypeError("reaction-adapter: senseReactions() called with whole-medium neighborhood (R2: local sensing only)");
+  }
+
+  const start = Math.max(0, Math.min(from, medium.deposits.length));
+  const end = Math.min(start + count, medium.deposits.length);
+  return medium.deposits.slice(start, end);
+}
+
+/**
+ * evaporateReactions(medium, dt) -> Medium
+ *
+ * Evaporate old deposits by seq age. Reactions with seq below the decay
+ * floor (relative to the most recent seq) are dropped.
+ *
+ * @param {object} medium
+ * @param {number} dt — evaporation steps
+ */
+export function evaporateReactions(medium, dt = 1) {
+  if (dt <= 0 || medium.deposits.length === 0) return medium;
+
+  const maxSeq = medium.deposits[medium.deposits.length - 1].trace.seq;
+  const seqWindow = Math.max(1, Math.floor(medium.deposits.length * (1 - medium.decay * dt)));
+  const minSeq = maxSeq - seqWindow;
+
+  const surviving = medium.deposits.filter((d) => d.trace.seq >= minSeq);
+  if (surviving.length === 0) {
+    surviving.push(medium.deposits[medium.deposits.length - 1]);
+  }
+  if (surviving.length === medium.deposits.length) return medium;
+
+  const offGradientCount = surviving.filter((d) => d.offGradient).length;
+  return Object.freeze({
+    ...medium,
+    deposits: Object.freeze(surviving),
+    offGradientCount,
+  });
+}
+
+/**
+ * lockInRiskReactions(medium) -> { flagged, offGradientFraction, null_result }
+ *
+ * R4: is deposit mass concentrated on a single block (all reactions on one
+ * block, no exploration)? Flags lock-in through the stigmergy module's test.
+ *
+ * @param {object} medium
+ * @returns {{ flagged: boolean, offGradientFraction: number, null_result: object }}
+ */
+export function lockInRiskReactions(medium) {
+  // Build a synthetic stigmergy-compatible medium for the test
+  const synth = {
+    schema: "StigmergyMedium@1",
+    decay: medium.decay,
+    explorationFloor: medium.explorationFloor,
+    deposits: medium.deposits,
+    depositCount: medium.depositCount,
+    offGradientCount: medium.offGradientCount,
+  };
+  return stigLockInRisk(synth);
+}
+
+/**
+ * unsensedConsequencesReactions(medium, known) -> object[]
+ *
+ * R5 audit surface over reaction deposits — which known consequence
+ * referents have no reaction trace?
+ */
+export function unsensedConsequencesReactions(medium, known) {
+  return unsensedConsequences(medium, known);
+}

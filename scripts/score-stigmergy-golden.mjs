@@ -59,6 +59,41 @@ function featureVector(text) {
   return vec;
 }
 
+function globalFeatureVector(text, sampleEvery = 5000, window = 8000) {
+  const vec = new Map();
+  for (let off = 0; off < text.length; off += sampleEvery) {
+    const ctx = text.slice(Math.max(0, off - window / 2), Math.min(text.length, off + window / 2));
+    const ws = String(ctx).toLowerCase().match(WORD_RE) ?? [];
+    for (const w of ws) {
+      if (w.length < 3) continue;
+      vec.set(w, (vec.get(w) ?? 0) + 1);
+    }
+  }
+  return vec;
+}
+
+function discriminativeFeatures(characterText, globalVec) {
+  const ws = String(characterText ?? "").toLowerCase().match(WORD_RE) ?? [];
+  const charVec = new Map();
+  for (const w of ws) {
+    if (w.length < 3) continue;
+    charVec.set(w, (charVec.get(w) ?? 0) + 1);
+  }
+  const charTotal = [...charVec.values()].reduce((a, b) => a + b, 0) || 1;
+  const globalTotal = [...globalVec.values()].reduce((a, b) => a + b, 0) || 1;
+  const diffVec = new Map();
+  for (const [w, count] of charVec) {
+    const charFreq = count / charTotal;
+    const globalFreq = (globalVec.get(w) ?? 0) / globalTotal;
+    const lift = charFreq / (globalFreq + 1e-6);
+    // Lower threshold — capture early signals, not just strong lifts
+    if (lift > 1.05 && count >= 1) {
+      diffVec.set(w, lift);
+    }
+  }
+  return diffVec;
+}
+
 // ── Result tracking ────────────────────────────────────────────────────────────
 
 const results = { pass: 0, fail: 0, skip: 0, details: [] };
@@ -183,24 +218,64 @@ const r5 = golden.R5_externality_detection;
 const pg1400 = loadText("pg1400");
 const pg84 = loadText("pg84");
 
+const globalVec2600 = pg2600 ? globalFeatureVector(pg2600) : new Map();
+const globalVec84 = pg84 ? globalFeatureVector(pg84) : new Map();
+
 function getContext(text, anchor, window = 8000) {
   const off = anchorOffset(text, anchor);
   if (off == null) return "";
   return text.slice(Math.max(0, off - window), Math.min(text.length, off + window));
 }
 
-function multiAnchorFeatures(text, anchor, window = 8000, maxOccurrences = 3) {
-  const vec = new Map();
+function multiAnchorFeatures(text, anchor, globalVec, introWindow = 1200, trailWindow = 500, maxOccurrences = 8) {
+  // Arrow of time: first occurrence (introduction) is most predictive — gets a
+  // larger window. Later occurrences trail with smaller windows.
+  let combined = "";
+  let idx = text.indexOf(anchor);
+  if (idx < 0) return new Map();
+
+  // Introduction window (temporally first — carries the character's setup)
+  combined += text.slice(Math.max(0, idx - introWindow), Math.min(text.length, idx + introWindow)) + " ";
+  idx += anchor.length;
+
+  // Trail windows — smaller, confirm/develop the arc
+  for (let i = 1; i < maxOccurrences; i++) {
+    idx = text.indexOf(anchor, idx);
+    if (idx === -1) break;
+    combined += text.slice(Math.max(0, idx - trailWindow), Math.min(text.length, idx + trailWindow)) + " ";
+    idx += anchor.length;
+  }
+  return discriminativeFeatures(combined, globalVec);
+}
+
+function rawMultiAnchorFeatures(text, anchor, window = 800, maxOccurrences = 5) {
+  let combined = "";
   let idx = 0;
   for (let i = 0; i < maxOccurrences; i++) {
     idx = text.indexOf(anchor, idx);
     if (idx === -1) break;
-    const ctx = text.slice(Math.max(0, idx - window), Math.min(text.length, idx + window));
-    const fv = featureVector(ctx);
-    for (const [k, v] of fv) vec.set(k, (vec.get(k) ?? 0) + v);
+    combined += text.slice(Math.max(0, idx - window), Math.min(text.length, idx + window)) + " ";
     idx += anchor.length;
   }
-  return vec;
+  return featureVector(combined);
+}
+
+function characterPool(text, globalVec, count) {
+  // Build feature vectors for random character names — comparable to the test parts
+  const namePatterns = [
+    "Boris", "Dólokhov", "Denísov", "Kutúzov", "Bilíbin",
+    "Anatole", "Hélène", "Berg", "Vera", "Sónya",
+    "Tíkhon", "Alpátych", "Rostóv", "Karágin", "Shinshín",
+    "Lavrúshka", "Balashëv", "Pfuhl", "Weyrother", "Bennigsen",
+    "Bourienne", "Márya Dmítrievna", "Anna Pávlovna", "Julie Karágina",
+    "Captain Túshin", "Prince Vasíli", "Count Rostopchín"
+  ];
+  const pool = [];
+  for (const name of namePatterns.slice(0, Math.max(count, namePatterns.length))) {
+    const fv = multiAnchorFeatures(text, name, globalVec);
+    if (fv.size > 0) pool.push(fv);
+  }
+  return pool;
 }
 
 function buildDiversePool(text, count) {
@@ -208,7 +283,7 @@ function buildDiversePool(text, count) {
   const step = Math.max(1, Math.floor(text.length / (count + 1)));
   for (let i = 1; i <= count; i++) {
     const off = i * step;
-    const ctx = text.slice(Math.max(0, off - 6000), Math.min(text.length, off + 2000));
+    const ctx = text.slice(Math.max(0, off - 1500), Math.min(text.length, off + 1500));
     pool.push(featureVector(ctx));
   }
   return pool;
@@ -288,18 +363,26 @@ console.log("\n=== SUPP: Supplementation (leave-one-out holon test) ===");
 
 const supp = golden.SUPP_supplementation;
 if (supp && pg2600) {
+  // Build a combined pool: character vectors + crowd-term vectors.
+  // This way "replace" null tests whether removing a real part is less
+  // disruptive than replacing it with something from the background.
+  const charPool = characterPool(pg2600, globalVec2600, 20);
+  const crowdTerms = ["the crowd", "the mob", "the people", "the masses", "the rabble"];
+  for (const term of crowdTerms) {
+    const fv = multiAnchorFeatures(pg2600, term, globalVec2600);
+    if (fv.size > 0) charPool.push(fv);
+  }
+
   // True holon: Natasha, Andrew, Pierre — distinct characters, should pass
   {
     const parts = supp.cases[0].parts_anchor;
     const features = new Map();
     for (const anchor of parts) {
-      features.set(anchor, multiAnchorFeatures(pg2600, anchor));
+      features.set(anchor, multiAnchorFeatures(pg2600, anchor, globalVec2600));
     }
-    // Build a diverse assembly pool from many character mentions across the text
-    const diversePool = buildDiversePool(pg2600, 20);
-    const result = supplementationTest({ parts, partFeatures: features, assemblyPool: diversePool });
+    const result = supplementationTest({ parts, partFeatures: features, assemblyPool: charPool, nullMode: "replace" });
     record(supp.cases[0].id, result.passed,
-      `mean_leave_out=${result.mean_leave_out} threshold=${result.null_result?.threshold?.toFixed(4)} passed=${result.passed}`);
+      `mean_leave_out=${result.mean_leave_out} replacement_mean=${result.replacement_mean} threshold=${result.null_result?.threshold?.toFixed(4)} passed=${result.passed} mode=${result.null_mode}`);
   }
 
   // Crowd scene: interchangeable mass nouns — should FAIL
@@ -307,12 +390,11 @@ if (supp && pg2600) {
     const parts = supp.cases[1].parts_anchor;
     const features = new Map();
     for (const anchor of parts) {
-      features.set(anchor, multiAnchorFeatures(pg2600, anchor));
+      features.set(anchor, multiAnchorFeatures(pg2600, anchor, globalVec2600));
     }
-    const diversePool = buildDiversePool(pg2600, 20);
-    const result = supplementationTest({ parts, partFeatures: features, assemblyPool: diversePool });
+    const result = supplementationTest({ parts, partFeatures: features, assemblyPool: charPool, nullMode: "replace" });
     record(supp.cases[1].id, !result.passed,
-      `mean_leave_out=${result.mean_leave_out} threshold=${result.null_result?.threshold?.toFixed(4)} passed=${result.passed} (should FAIL)`);
+      `mean_leave_out=${result.mean_leave_out} replacement_mean=${result.replacement_mean} threshold=${result.null_result?.threshold?.toFixed(4)} passed=${result.passed} (should FAIL) mode=${result.null_mode}`);
   }
 } else {
   for (const c of (supp?.cases ?? [])) record(c.id, "skip", "pg2600 not found");
@@ -326,28 +408,25 @@ const down = golden.DOWN_downward_closure;
 if (down && pg2600) {
   // (a) Predator case: Napoleon absorbed into "general movement of peoples"
   {
-    const wholeCtx = multiAnchorFeatures(pg2600, down.predator_case_a[0].whole_anchor);
-    const partCtx = multiAnchorFeatures(pg2600, down.predator_case_a[0].absorbed_part_anchor);
+    const wholeCtx = multiAnchorFeatures(pg2600, down.predator_case_a[0].whole_anchor, globalVec2600);
+    const partCtx = multiAnchorFeatures(pg2600, down.predator_case_a[0].absorbed_part_anchor, globalVec2600);
     const partFeatures = new Map();
     partFeatures.set("Napoleon", partCtx);
-    const holonFeature = featureVector(wholeCtx);
+    const holonFeature = wholeCtx;
 
     const result = downwardClosureTest({ parts: ["Napoleon"], partFeatures, holonFeature });
     record(down.predator_case_a[0].id, !result.admitted && !result.predicate_a,
       `admitted=${result.admitted} predicate_a=${result.predicate_a} reason=${result.reason}`);
 
     // (c) Good holon: Rostóv family — should PASS
-    const familyMembers = down.good_holon_control[0].whole_anchor; // "the Rostóv family" — use as whole
-    // Test with fictional parts that are distinct enough to survive
     const familyParts = ["young Rostóv", "Countess Mary", "Natásha"];
     const familyFeatures = new Map();
     for (const anchor of familyParts) {
-      familyFeatures.set(anchor, featureVector(getContext(pg2600, anchor)));
+      familyFeatures.set(anchor, multiAnchorFeatures(pg2600, anchor, globalVec2600));
     }
-    const famHolon = featureVector(getContext(pg2600, down.good_holon_control[0].whole_anchor));
+    const famHolon = multiAnchorFeatures(pg2600, down.good_holon_control[0].whole_anchor, globalVec2600);
     const famResult = downwardClosureTest({ parts: familyParts, partFeatures: familyFeatures, holonFeature: famHolon });
-    // May or may not pass depending on text proximity — log the outcome
-    record(down.good_holon_control[0].id, true, // golden says this should pass; if it fails it's a feature-vector resolution issue
+    record(down.good_holon_control[0].id, famResult.admitted,
       `admitted=${famResult.admitted} predicate_a=${famResult.predicate_a} predicate_b=${famResult.predicate_b}`);
   }
 

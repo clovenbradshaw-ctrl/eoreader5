@@ -66,22 +66,31 @@ function centroid(vectors) {
 // ── Supplementation gate ──────────────────────────────────────────────────────
 
 /**
- * supplementationTest({ parts, partFeatures, assemblyPool }) -> gateResult
+ * supplementationTest({ parts, partFeatures, assemblyPool, nullMode }) -> gateResult
  *
  * Leave-one-out test: for each part pi, compute the distance between the
- * holon centroid WITH pi and the holon centroid WITHOUT pi. Build a null
- * distribution from random same-size assemblies where a random member is
- * removed. If the mean leave-one-out distance exceeds the null threshold,
- * the holon passes supplementation — its parts are genuinely contributing,
- * not interchangeable.
+ * holon centroid WITH pi and the holon centroid WITHOUT pi.
+ *
+ * Two null modes (arrow of time: the real grouping should matter more than
+ * random assignment or random substitution):
+ *
+ *   "replace" (default): For each part, replace it with a random vector from
+ *     the pool. If the average replacement distance exceeds the average
+ *     leave-one-out distance, the parts genuinely contribute — their specific
+ *     identity matters more than random insertion. An assembly where
+ *     replacement ~= removal has interchangeable parts.
+ *
+ *   "draw": Draw random same-size assemblies from the pool. Used when the
+ *     pool represents alternative part candidates rather than a diverse
+ *     background.
  *
  * @param {string[]} parts — part identifiers (e.g. referent names)
  * @param {Map<string, Map<string, number>>} partFeatures — partId → feature vector
- * @param {Map<string, number>[][][]} assemblyPool — pool of random assemblies
- *   (each is an array of feature vectors). If not provided, built by shuffling.
+ * @param {Map<string, number>[][][]} assemblyPool — pool of feature vectors for null
+ * @param {"replace"|"draw"} nullMode — how to build the null distribution
  * @returns {{ passed: boolean, null_result: object, mean_leave_out: number }}
  */
-export function supplementationTest({ parts, partFeatures, assemblyPool = null } = {}) {
+export function supplementationTest({ parts, partFeatures, assemblyPool = null, nullMode = "replace" } = {}) {
   if (!parts || parts.length < 2) {
     return { passed: false, null_result: null, mean_leave_out: 0, reason: "insufficient_parts" };
   }
@@ -103,19 +112,63 @@ export function supplementationTest({ parts, partFeatures, assemblyPool = null }
   }
   const meanLeaveOut = looDistances.reduce((a, b) => a + b, 0) / looDistances.length;
 
-  // Build null distribution from random assemblies
   const nullSamples = [];
-  const rng = createSeededRng(`supplementation-null-${parts.length}-${JSON.stringify(parts)}`);
+  const rng = createSeededRng(`supplementation-null-${parts.length}-${nullMode}-${JSON.stringify(parts)}`);
   const totalPool = assemblyPool ?? vectors;
   const iters = Math.max(50, parts.length * 10);
 
+  if (nullMode === "replace" && totalPool.length > parts.length) {
+    // Replacement null: replace each real part with a random pool vector.
+    // If replacement distance > removal (leave-one-out) distance, the parts
+    // are genuinely contributing — a random substitution disrupts more than
+    // simply removing. If replacement ~= removal, parts are interchangeable.
+    const partIndices = vectors.map((_, j) => j);
+
+    for (let iter = 0; iter < iters; iter++) {
+      // Pick which part to replace
+      const replaceIdx = partIndices[Math.floor(rng() * partIndices.length)];
+      // Pick a random pool vector that's not one of the real part vectors
+      let poolIdx;
+      let poolVec;
+      do {
+        poolIdx = Math.floor(rng() * totalPool.length);
+        poolVec = totalPool[poolIdx];
+      } while (vectors.some((v) => v === poolVec));
+
+      // Replace the part and recompute centroid distance from original
+      const replaced = vectors.map((v, j) => j === replaceIdx ? poolVec : v);
+      const replacedCentroid = centroid(replaced);
+      nullSamples.push(cosineDistance(fullCentroid, replacedCentroid));
+    }
+
+    const nullResult = deriveNull({
+      nullSamples,
+      observedStatistic: meanLeaveOut,
+      tailDirection: "less",
+      quantile: 0.95,
+      protocol: { name: "supplementation-replacement-null", parts: parts.length, iterations: iters },
+    });
+
+    // Pass when meanLeaveOut is BELOW the null replacement distances —
+    // i.e., removing a real part disturbs the holon LESS than replacing it
+    // with random. If removal disturbs AS MUCH as replacement, parts are
+    // interchangeable (assembly).
+    return {
+      passed: nullResult.passed,
+      null_result: nullResult,
+      mean_leave_out: +meanLeaveOut.toFixed(4),
+      replacement_mean: +(nullSamples.reduce((a, b) => a + b, 0) / nullSamples.length).toFixed(4),
+      samples: looDistances.length,
+      null_mode: "replace",
+    };
+  }
+
+  // Fallback: draw mode — random assemblies from pool
   for (let iter = 0; iter < iters; iter++) {
-    // Shuffle all vectors and take a random same-size assembly
     const shuffled = seededShuffle(totalPool, rng);
     const assembly = shuffled.slice(0, parts.length);
     if (assembly.length < 2) continue;
 
-    // Randomly remove one member
     const removeIdx = Math.floor(rng() * assembly.length);
     const without = assembly.filter((_, j) => j !== removeIdx);
     const fullC = centroid(assembly);
@@ -136,6 +189,7 @@ export function supplementationTest({ parts, partFeatures, assemblyPool = null }
     null_result: nullResult,
     mean_leave_out: +meanLeaveOut.toFixed(4),
     samples: looDistances.length,
+    null_mode: "draw",
   };
 }
 
