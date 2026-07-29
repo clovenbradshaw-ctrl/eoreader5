@@ -61,7 +61,11 @@
 // it dominated the whole organ before being folded into one regex.
 const DIA_RE = /[áàâäéèêëíìîïóòôöúùûü]/g;
 const DIA_TO = { á:"a",à:"a",â:"a",ä:"a",é:"e",è:"e",ê:"e",ë:"e",í:"i",ì:"i",î:"i",ï:"i",ó:"o",ò:"o",ô:"o",ö:"o",ú:"u",ù:"u",û:"u",ü:"u" };
-const diaNorm = (t) => String(t ?? "").toLowerCase().trim().replace(DIA_RE, (c) => DIA_TO[c]);
+// Exported so other organs needing the SAME single-pass normalisation (e.g.
+// relationship-graph.js locating a surface's character offset) reuse this
+// copy instead of writing a third one — see CLAUDE.md's "consistently
+// reinvented" list.
+export const diaNorm = (t) => String(t ?? "").toLowerCase().trim().replace(DIA_RE, (c) => DIA_TO[c]);
 
 // Frames are normalised once and cached on the frame object; every surface test
 // then reads the cached string instead of re-normalising 2000 chars per call.

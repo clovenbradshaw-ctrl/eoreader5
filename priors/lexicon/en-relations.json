@@ -1,0 +1,16 @@
+{
+  "$schema": "English-language relation-category lexicon — TEMPORARY location under repo-root /priors; will move to eoPriors when that package exists. This is LANGUAGE knowledge (which English words imply which relation category), not TEXT knowledge — it carries no character names and is reusable across any English-language work. A different-language text needs a different lexicon file, not a change to the engine code that consumes it.",
+  "categories": {
+    "kinship_parent_child": ["father", "mother", "son", "daughter", "papa", "mamma", "parent", "child of", "guardian", "ward"],
+    "kinship_sibling": ["brother", "sister", "siblings"],
+    "kinship_extended": ["uncle", "aunt", "cousin", "nephew", "niece", "grandfather", "grandmother", "grandson", "granddaughter", "kinsman", "kinswoman", "family"],
+    "marriage": ["marry", "married", "marriage", "wedding", "husband", "wife", "bride", "bridegroom", "betrothed", "engagement", "engaged", "wedded", "widow", "widower"],
+    "romance": ["love", "loved", "loves", "loving", "beloved", "kiss", "kissed", "embrace", "embraced", "adore", "adored", "sweetheart", "courtship", "flirt", "passion", "infatuat", "jealous"],
+    "friendship": ["friend", "friendship", "comrade", "companion", "confidant"],
+    "military_command": ["general", "commander", "colonel", "captain", "regiment", "battalion", "adjutant", "aide-de-camp", "ordered", "command", "commanded", "staff", "officer", "orderly", "reported to", "under his command"],
+    "conflict": ["duel", "challenged", "quarrel", "quarrelled", "insult", "enemy", "hatred", "hated", "rival", "fought", "struck", "wounded him", "shot at"],
+    "care_nursing": ["nursed", "tended", "nurse", "cared for", "looked after", "sick-room", "bedside"],
+    "death_loss": ["died", "death of", "killed", "mourned", "grief for", "buried"],
+    "social_patronage": ["presented", "introduced", "protégé", "patroness", "invited", "received at", "salon"]
+  }
+}
