@@ -5,7 +5,12 @@ identity lives in the REFERENT, never in a string; surfaces are scoped
 evidence admitted by explicit events; witness-tier knowledge is injected as
 priors, never derived. Every coref regression in this project came from
 forgetting it. The companion principle is omnimodal design: an organ must
-make sense for a nameless leitmotif in music, or it is string-thinking.
+make sense for a nameless leitmotif in music, or it is string-thinking. The
+third is `docs/holon-level.md`: whether one entity is above, below, or a peer
+of another is DISCOVERED (existence-dependency + possibility-constraint,
+Born-null gated), never assigned by naming a scale ("chapter," "scene").
+Read it before writing any cross-entity containment, ranking, or hierarchy
+logic.
 
 ## Organs and their status (2026-07)
 

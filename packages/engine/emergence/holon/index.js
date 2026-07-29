@@ -18,6 +18,11 @@
 
 import { deriveNull, createSeededRng, seededShuffle } from "../nulls/index.js";
 import { sense } from "../stigmergy/index.js";
+import {
+  existenceDependencyTest,
+  possibilityConstraintTest,
+  classifyHolonLevelRelation,
+} from "../holon-level/index.js";
 
 // ── Feature extraction ────────────────────────────────────────────────────────
 
@@ -279,6 +284,68 @@ export function downwardClosureTest({ parts: partIds, partFeatures, holonFeature
   };
 }
 
+// ── Holon-level confirmation ───────────────────────────────────────────────────
+//
+// composeHolon used to assume SYN composition always produces a ladder rung.
+// It doesn't get to assume that (docs/holon-level.md) — confirm it instead,
+// per part, using data composeHolon already has:
+//
+//   existence-dependency — does the HOLON depend on part P? Leave-one-out
+//     centroid distance when P is excluded (the same statistic
+//     supplementationTest already computes internally, just kept per-part
+//     here) against the leave-one-out distances of the OTHER parts as the
+//     null population — the exact, enumerable null at this scale, no
+//     sampling needed (the same idiom supplementationTest's own "draw" mode
+//     uses: real siblings from the same pool, not invented noise).
+//   possibility-constraint — does the HOLON constrain part P? Reuses the
+//     "pull" statistic independently derived in eoPriors'
+//     src/vendor/eoreader/core/spectral.js for exactly this relation:
+//     pull = cos^2(part, whole), "the fraction of the part's energy the
+//     whole sets." Compared against the pull observed for sibling parts.
+//
+// With very few parts, or a highly symmetric holon, many/most parts will
+// legitimately confirm as "peer" even though the holon as a WHOLE passed
+// supplementation and downward-closure — that certifies a genuine holon
+// exists; this certifies WHICH parts show a discoverable individual
+// asymmetry against their siblings, a different and honestly narrower
+// question. Never assume "above" just because composition succeeded.
+function confirmLevelRelations({ parts, partFeatures, holonVec }) {
+  if (!partFeatures || parts.length < 2) return [];
+
+  const vectors = parts.map((p) => partFeatures.get(p));
+  const leaveOneOut = parts.map((_, i) => {
+    const without = vectors.filter((_, j) => j !== i);
+    return cosineDistance(holonVec, centroid(without));
+  });
+  const pulls = parts.map((p) => {
+    const similarity = 1 - cosineDistance(holonVec, partFeatures.get(p));
+    return similarity * similarity;
+  });
+
+  return parts.map((part, i) => {
+    const nullDegradations = leaveOneOut.filter((_, j) => j !== i);
+    const nullNarrowings = pulls.filter((_, j) => j !== i);
+
+    const existence = existenceDependencyTest({
+      observedDegradation: leaveOneOut[i],
+      nullDegradations,
+      protocol: { name: "compose-holon-leave-one-out-degradation", part },
+    });
+    const constraint = possibilityConstraintTest({
+      observedNarrowing: pulls[i],
+      nullNarrowings,
+      protocol: { name: "compose-holon-part-pull", part },
+    });
+    const classification = classifyHolonLevelRelation({
+      existence,
+      constraint,
+      subject_id: "holon",
+      candidate_id: part,
+    });
+    return Object.freeze({ part, ...classification });
+  });
+}
+
 // ── Full holon composition ────────────────────────────────────────────────────
 
 /**
@@ -318,12 +385,15 @@ export function composeHolon({ parts, partFeatures, medium = null, holonTrace = 
     });
   }
 
+  const levelRelations = confirmLevelRelations({ parts, partFeatures, holonVec });
+
   return Object.freeze({
     admitted: true,
     holon: Object.freeze({
       schema: "Holon@1",
       parts: Object.freeze([...parts]),
       featureVector: Object.freeze(new Map(holonVec)),
+      level_relations: Object.freeze(levelRelations),
     }),
     supplementation: supp,
     downward_closure: down,

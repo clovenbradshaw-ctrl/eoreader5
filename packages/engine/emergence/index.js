@@ -2,6 +2,14 @@ export { evaluate } from "./evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./nulls/index.js";
 export { jaccardDistance, computeBoundaryStabilityGate } from "./boundaries/index.js";
 export {
+  existenceDependencyTest,
+  possibilityConstraintTest,
+  classifyHolonLevelRelation,
+  holonTick,
+  appendHolonLevelTick,
+  checkHolonLevelStability,
+} from "./holon-level/index.js";
+export {
   evalNode,
   evaluateProgram,
   predictWith,

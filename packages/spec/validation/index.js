@@ -202,6 +202,28 @@ export function validateIndividuationResult(value, name = "IndividuationResult")
   return v;
 }
 
+const HOLON_LEVEL_RELATIONS = new Set(["above", "peer", "unstable"]);
+
+export function validateHolonLevelRelation(value, name = "HolonLevelRelation") {
+  const v = object(value, name);
+  if (v.schema !== "HolonLevelRelation@1") fail(name, "schema must be HolonLevelRelation@1");
+  if (!HOLON_LEVEL_RELATIONS.has(v.relation)) fail(name, `invalid relation ${v.relation}`);
+  if (v.subject_id !== null && typeof v.subject_id !== "string") fail(name, "subject_id must be a string or null");
+  if (v.candidate_id !== null && typeof v.candidate_id !== "string") fail(name, "candidate_id must be a string or null");
+  const existence = object(v.existence, `${name}.existence`);
+  if (typeof existence.observed_degradation !== "number") fail(name, "existence.observed_degradation must be a number");
+  if (typeof existence.passed !== "boolean") fail(name, "existence.passed must be a boolean");
+  validateNullProtocol(existence.null_result, `${name}.existence.null_result`);
+  string(existence.reason, name, "existence.reason");
+  const constraint = object(v.constraint, `${name}.constraint`);
+  if (typeof constraint.observed_narrowing !== "number") fail(name, "constraint.observed_narrowing must be a number");
+  if (typeof constraint.passed !== "boolean") fail(name, "constraint.passed must be a boolean");
+  validateNullProtocol(constraint.null_result, `${name}.constraint.null_result`);
+  string(constraint.reason, name, "constraint.reason");
+  string(v.reason, name, "reason");
+  return v;
+}
+
 export function validateReadingSnapshot(value, name = "ReadingSnapshot") {
   const v = object(value, name);
   if (v.schema_version !== "ReadingSnapshot@1") fail(name, "schema_version must be ReadingSnapshot@1");
