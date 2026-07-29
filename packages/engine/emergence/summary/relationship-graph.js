@@ -8,13 +8,19 @@
 // union-find name-merging: identity here is event-sourced through the
 // referents organ, never a string match.
 //
-// Nothing text- or language-specific is hardcoded here. The cast (who the
-// referents are, and their per-text coref aliases) and the relation lexicon
-// (which words in THIS language imply which relation category) are both
-// passed in as data — see priors/coref/*.json and priors/lexicon/*.json.
-// This keeps the module honest to the omnimodal principle: the same code
-// would build a relationship graph for any cast + any language's lexicon,
-// over any text.
+// The cast (who the referents are, and their per-text coref aliases) and the
+// relation lexicon (which words in THIS language imply which relation
+// category) are both passed in as data — see priors/coref/*.json and
+// priors/lexicon/*.json — never hardcoded. The one MEDIUM-specific piece
+// this module needs (some notion of a sub-sentence unit, to tell "the
+// keyword describes THIS pair" from "the keyword is about a neighboring
+// clause") is injected too, via `segmentUnits` (default: text-organ.js's
+// punctuation-based clause splitter) — a musical or video organ would pass
+// its own phrase/shot segmenter through the same slot rather than this file
+// assuming commas exist. What's left after both are supplied — co-
+// occurrence, the conditional-independence significance null, chain-
+// adjacency evidence gating, emergent kind profiles — has no text or
+// language baked in.
 //
 // Edge "reliability" is not a raw co-occurrence count. Two high-frequency
 // referents co-occur often by base rate alone (Pierre is in half the book),
@@ -25,7 +31,7 @@
 // two rare-but-paired characters and two ubiquitous-but-unrelated characters
 // are judged on their own rates, not one global constant.
 
-import { extractSurfaces } from "./text-organ.js";
+import { extractSurfaces, splitClauses as textClauseSegmenter, unitIndexOf } from "./text-organ.js";
 import { admitReferent, presenceByFrame, diaNorm } from "../../perceiver/text/presence.js";
 import { extractRelations } from "../../perceiver/text/extraction.js";
 
@@ -80,57 +86,40 @@ function surfacePositions(sentenceText, surfaces) {
   return out;
 }
 
-/** Split a sentence into clauses at the punctuation a reader pauses at.
- * Heuristic (no grammar), like the rest of the perceiver's English patterns
- * — but it is the actual unit a person parses in, not a distance threshold
- * tuned to make numbers come out right. */
-function splitClauses(sentenceText) {
-  const clauses = [];
-  const boundary = /[,;:]|--|—|–/g;
-  let start = 0;
-  let m;
-  while ((m = boundary.exec(sentenceText))) {
-    clauses.push({ start, end: m.index });
-    start = m.index + m[0].length;
-  }
-  clauses.push({ start, end: sentenceText.length });
-  return clauses;
-}
-
-function clauseIndexOf(clauses, pos) {
-  for (let i = 0; i < clauses.length; i++) {
-    if (pos >= clauses[i].start && pos < clauses[i].end) return i;
-  }
-  return clauses.length - 1;
-}
-
 /** Does this keyword occurrence plausibly describe the A-B relation, rather
- * than something incidental elsewhere in a multi-clause sentence? The
+ * than something incidental elsewhere in a multi-unit sentence? The
  * appositive/relative-clause shape a reader binds a descriptor with is a
- * CHAIN across consecutive clauses — "Andrew's father, [A, clause i] the
- * old colonel, [keyword, clause i+1] greeted Pierre [B, clause i+2]" — so
- * this requires A and B to sit in DIFFERENT clauses with the keyword's
- * clause falling inside that span, tightly (at most one clause between
- * them). Critically, if A and B already share ONE clause together
- * ("Pierre danced with Natásha, while Denísov's regiment marched east"),
- * their relation is whatever that shared clause's own verb says — a
- * keyword in a merely-adjacent clause about a third party is not evidence
- * about the two of them, no matter how close it sits. */
-function keywordEvidencesPair(sentenceText, keyword, posA, posB) {
+ * CHAIN across consecutive sub-sentence units — "Andrew's father, [A, unit
+ * i] the old colonel, [keyword, unit i+1] greeted Pierre [B, unit i+2]" —
+ * so this requires A and B to sit in DIFFERENT units with the keyword's
+ * unit falling inside that span, tightly (at most one unit between them).
+ * Critically, if A and B already share ONE unit together ("Pierre danced
+ * with Natásha, while Denísov's regiment marched east"), their relation is
+ * whatever that shared unit's own verb says — a keyword in a merely-
+ * adjacent unit about a third party is not evidence about the two of them,
+ * no matter how close it sits.
+ *
+ * `segmentUnits(sentenceText) -> [{start,end}]` is WHICH sub-sentence unit
+ * this check reasons over — injected, not assumed, because "clause" is
+ * meaningful only for punctuated written language (see text-organ.js's
+ * splitClauses header). The chain-adjacency logic itself has no punctuation
+ * or English baked in; it would run identically over units supplied by a
+ * different medium's own segmenter. */
+function keywordEvidencesPair(sentenceText, keyword, posA, posB, segmentUnits) {
   if (!posA.length || !posB.length) return false;
   const hay = diaNorm(sentenceText);
-  const clauses = splitClauses(sentenceText);
-  const keywordClauses = wholeWordPositions(hay, diaNorm(keyword)).map((k) => clauseIndexOf(clauses, k));
-  if (!keywordClauses.length) return false;
+  const units = segmentUnits(sentenceText);
+  const keywordUnits = wholeWordPositions(hay, diaNorm(keyword)).map((k) => unitIndexOf(units, k));
+  if (!keywordUnits.length) return false;
   for (const pa of posA) {
-    const aClause = clauseIndexOf(clauses, pa);
+    const aUnit = unitIndexOf(units, pa);
     for (const pb of posB) {
-      const bClause = clauseIndexOf(clauses, pb);
-      if (aClause === bClause) continue; // already share a clause; a neighbor isn't evidence about THEM
-      const lo = Math.min(aClause, bClause);
-      const hi = Math.max(aClause, bClause);
+      const bUnit = unitIndexOf(units, pb);
+      if (aUnit === bUnit) continue; // already share a unit; a neighbor isn't evidence about THEM
+      const lo = Math.min(aUnit, bUnit);
+      const hi = Math.max(aUnit, bUnit);
       if (hi - lo > 2) continue;
-      if (keywordClauses.some((kc) => kc >= lo && kc <= hi)) return true;
+      if (keywordUnits.some((ku) => ku >= lo && ku <= hi)) return true;
     }
   }
   return false;
@@ -294,7 +283,8 @@ export function annotateSignificance(edges, nodeById, sentenceCount, options = {
  * surfaces so both checks can locate mentions inside a sentence, not just
  * know the pair co-occurred somewhere in it.
  */
-export function classifyEdges(edges, lexicon = {}, cast = new Map()) {
+export function classifyEdges(edges, lexicon = {}, cast = new Map(), options = {}) {
+  const { segmentUnits = textClauseSegmenter } = options;
   const categories = Object.entries(lexicon);
   return edges.map((e) => {
     const admissionA = cast.get(e.a)?.admission;
@@ -309,7 +299,7 @@ export function classifyEdges(edges, lexicon = {}, cast = new Map()) {
       if (!posA.length || !posB.length) continue; // both should be here; skip defensively if not
 
       for (const [category, keywords] of categories) {
-        const hit = keywords.some((kw) => keywordEvidencesPair(s.text, kw, posA, posB));
+        const hit = keywords.some((kw) => keywordEvidencesPair(s.text, kw, posA, posB, segmentUnits));
         if (hit) {
           categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
           (categoryEvidence[category] ??= []).push({ offset: s.offset, text: s.text });
@@ -376,7 +366,7 @@ export function computeNodeKindProfiles(nodes, edges, options = {}) {
  * @param {object} [options.significance] - { minCount, minLift } thresholds
  */
 export function buildRelationshipGraph(fullText, corefPriors, options = {}) {
-  const { sentences, lexicon = {}, significance = {} } = options;
+  const { sentences, lexicon = {}, significance = {}, segmentUnits } = options;
   const sents = sentences ?? [];
   const { cast } = admitCast(fullText, corefPriors);
   const presence = presenceBySentence(sents, cast);
@@ -384,7 +374,7 @@ export function buildRelationshipGraph(fullText, corefPriors, options = {}) {
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const coOccurrence = buildCoOccurrenceEdges(sents, presence);
   const withSignificance = annotateSignificance(coOccurrence, nodeById, sents.length, significance);
-  const edges = classifyEdges(withSignificance, lexicon, cast).map(({ sentences: evidence, ...rest }) => ({
+  const edges = classifyEdges(withSignificance, lexicon, cast, { segmentUnits }).map(({ sentences: evidence, ...rest }) => ({
     ...rest,
     evidence,
   }));

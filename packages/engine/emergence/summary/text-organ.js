@@ -298,6 +298,37 @@ function splitSentencesInRange(s, rangeStart, rangeEnd, out) {
   pushSentence(s, start, rangeEnd, out);
 }
 
+// ── Clause segmentation (a TEXT-MEDIUM-SPECIFIC sub-sentence unit) ──
+// A "clause" bounded by comma/semicolon/colon/dash is meaningful only for
+// punctuated written language — it has no equivalent for a musical leitmotif
+// or a video shot. This is exactly why it lives here, in the text perceiver,
+// and not in relationship-graph.js's cross-entity edge logic: that module
+// needs SOME sub-sentence unit to test whether a descriptor sits in the
+// clause chain between two mentions, but which segmenter supplies those
+// units is medium-specific and must be injected, not assumed. A future
+// audio/video organ would supply its own unit boundaries (a phrase, a shot)
+// through the same options slot.
+export function splitClauses(sentenceText) {
+  const s = String(sentenceText ?? "");
+  const units = [];
+  const boundary = /[,;:]|--|—|–/g;
+  let start = 0;
+  let m;
+  while ((m = boundary.exec(s))) {
+    units.push({ start, end: m.index });
+    start = m.index + m[0].length;
+  }
+  units.push({ start, end: s.length });
+  return units;
+}
+
+export function unitIndexOf(units, pos) {
+  for (let i = 0; i < units.length; i++) {
+    if (pos >= units[i].start && pos < units[i].end) return i;
+  }
+  return units.length - 1;
+}
+
 export function splitSentences(text) {
   const s = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const paragraphs = [];
