@@ -3,3 +3,6 @@ node_modules/
 # Local scratch archive (contains a 70MB audio essay; history has the scripts)
 /_archive/
 .DS_Store
+
+# Generated pipeline outputs (reproducible from priors/ + a source text; not committed)
+/out/
