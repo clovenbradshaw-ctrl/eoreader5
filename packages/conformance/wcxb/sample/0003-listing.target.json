@@ -1,0 +1,23 @@
+{
+  "schema_version": "wcxb-normalized@1",
+  "synthetic": true,
+  "note": "Synthetic fixture in WCXB v2.0 ground-truth shape. NOT from the CC-BY dataset; authored here so the scorer runs offline. Materialize real pages with scripts/wcxb-convert.mjs.",
+  "file_id": "sample-0003",
+  "url": "https://example.test/meetings/planning-commission",
+  "page_type": "Listing",
+  "title": "Planning Commission Meeting Index",
+  "author": null,
+  "publish_date": null,
+  "with": [
+    "January 9 2026 Regular Meeting agenda minutes",
+    "February 13 2026 Regular Meeting agenda minutes",
+    "March 12 2026 Special Session agenda",
+    "April 9 2026 Regular Meeting agenda minutes"
+  ],
+  "without": [
+    "This site uses cookies",
+    "Print this page",
+    "Contact the clerk's office",
+    "Sign up for meeting alerts"
+  ]
+}

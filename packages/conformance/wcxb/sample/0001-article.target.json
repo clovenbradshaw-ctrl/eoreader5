@@ -1,0 +1,23 @@
+{
+  "schema_version": "wcxb-normalized@1",
+  "synthetic": true,
+  "note": "Synthetic fixture in WCXB v2.0 ground-truth shape. NOT from the CC-BY dataset; authored here so the scorer runs offline. Materialize real pages with scripts/wcxb-convert.mjs.",
+  "file_id": "sample-0001",
+  "url": "https://example.test/news/harbor-dredging-approved",
+  "page_type": "Article",
+  "title": "City Council Approves Harbor Dredging Contract",
+  "author": "Staff Reporter",
+  "publish_date": "2026-05-14",
+  "with": [
+    "council approved the harbor dredging",
+    "contract awarded to Tidewater Marine",
+    "work begins in September",
+    "estimated cost of 4.2 million dollars"
+  ],
+  "without": [
+    "Accept all cookies to continue",
+    "Subscribe to our newsletter",
+    "Related: Five things to know",
+    "Follow us on social media"
+  ]
+}

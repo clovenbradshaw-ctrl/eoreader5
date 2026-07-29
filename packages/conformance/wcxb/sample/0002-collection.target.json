@@ -1,0 +1,25 @@
+{
+  "schema_version": "wcxb-normalized@1",
+  "synthetic": true,
+  "note": "Synthetic fixture in WCXB v2.0 ground-truth shape. NOT from the CC-BY dataset; authored here so the scorer runs offline. Materialize real pages with scripts/wcxb-convert.mjs.",
+  "file_id": "sample-0002",
+  "url": "https://example.test/permits/2026/open",
+  "page_type": "Collection",
+  "title": "Open Building Permits — 2026",
+  "author": null,
+  "publish_date": null,
+  "with": [
+    "Permit 2026-0417 New Roof",
+    "Permit 2026-0418 Electrical Service Upgrade",
+    "Permit 2026-0419 Deck Addition",
+    "Permit 2026-0420 Fence Replacement",
+    "status Under Review",
+    "status Approved"
+  ],
+  "without": [
+    "Accept all cookies to continue",
+    "Sort by relevance",
+    "You may also be interested in",
+    "Back to top"
+  ]
+}
