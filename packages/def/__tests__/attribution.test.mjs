@@ -120,3 +120,24 @@ test("with no cast, a disagreement is reported but never asserted", async () => 
   assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "still reported");
   assert.ok(r.gaps.some((g) => /no cast supplied/.test(g)), "and the reason is stated");
 });
+
+test("a named actor the evidence never mentions is a hard veto", async () => {
+  // Measured on a real essay: "his half-brother, Prince Vasily Kuragin, had
+  // been disinherited" passed with attribution 0.00, because the relation
+  // merely went unmatched and unmatched is soft by design. An actor the
+  // evidence never NAMES is a different failure from an act the extractor
+  // failed to pair, and it is checkable by occurrence.
+  const ev = "Pierre inherited his father's vast fortune after the count died.";
+  const cast = ["pierre", "prince vasily kuragin", "count"];
+
+  const invented = await checkAttribution(
+    "Prince Vasily Kuragin was disinherited by his father.", ev, { cast });
+  const hard = invented.vetoes.filter((v) => v.severity === "hard");
+  assert.equal(hard.length, 1);
+  assert.equal(hard[0].id, "unsourced-actor");
+
+  // An agent the evidence DOES name stays soft — the extractor is not reliable
+  // enough for an unmatched act to prove invention on its own.
+  const present = await checkAttribution("Pierre travelled to Petersburg.", ev, { cast });
+  assert.deepEqual(present.vetoes.filter((v) => v.severity === "hard"), []);
+});

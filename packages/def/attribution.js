@@ -189,6 +189,10 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     stem: verbStem,
   });
 
+  // Lowercased evidence, for the occurrence test below.
+  const diaNormLower = (x) => String(x || "").toLowerCase();
+  const evidenceNorm = diaNormLower(evidenceText);
+
   const claimRels = extractSVO(claim);
   const evidenceRels = extractSVO(evidenceText);
   const vetoes = [];
@@ -241,6 +245,35 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     }
 
     if (!matches.length) {
+      // An actor the evidence never NAMES is a different failure from an act
+      // the extractor failed to pair.
+      //
+      // unsupported-relation is soft on purpose: this extractor mangles real
+      // clauses often enough that "no matching relation" is weak evidence of
+      // invention. But if the claim's agent is a known referent who does not
+      // occur ANYWHERE in the cited passages, the claim has introduced a named
+      // actor out of nothing, and that is checkable by simple occurrence —
+      // the same evidence gate retrieval already applies to terms.
+      //
+      // Measured: an essay about Pierre's inheritance asserted "his
+      // half-brother, Prince Vasily Kuragin, had been disinherited". Vasily is
+      // neither, and the sentence passed with attribution 0.00 because the
+      // relation merely went unmatched.
+      const agentInEvidence = evidenceNorm.includes(diaNormLower(claimAgent)) ||
+        aliases.some((g) => g.map((x) => String(x).toLowerCase()).includes(claimAgent) &&
+                            g.some((x) => evidenceNorm.includes(diaNormLower(x))));
+
+      if (castSet && inCast(claimAgent) && !agentInEvidence) {
+        vetoes.push({
+          id: "unsourced-actor",
+          severity: "hard",
+          message: `claim makes "${c.subject}" the agent of "${c.verb} ${c.object}", but "${c.subject}" appears nowhere in the cited evidence`,
+          claim: c,
+        });
+        checked++;
+        continue;
+      }
+
       vetoes.push({
         id: "unsupported-relation",
         severity: "soft",
