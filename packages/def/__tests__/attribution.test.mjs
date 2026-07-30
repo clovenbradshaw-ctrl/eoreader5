@@ -72,3 +72,34 @@ test("a verb the evidence never uses is reported softly, not called invention", 
   assert.equal(un.severity, "soft",
     "this extractor may simply have failed to pair the clause; that is not proof of fabrication");
 });
+
+test("junk relations do not become confident vetoes", async () => {
+  // Measured when this was first wired into a real essay: the extractor
+  // manufactures relations from ordinary prose — "Frankenstein's feelings"
+  // splits the possessive into verb "s", "War and Peace" parses as
+  // War/and/Peace, "This suggests that" makes "This" an agent. Every one of
+  // them mismatched whatever the evidence said and fired a HARD veto, so the
+  // assembler dropped every section including the correct ones.
+  const ev = "Victor beheld the wretch whom he had created.";
+  for (const junk of [
+    "Frankenstein's feelings toward it were complex.",
+    "War and Peace is a different novel entirely.",
+    "This suggests that the relationship is troubled.",
+  ]) {
+    const r = await checkAttribution(junk, ev, { narratorSpans: CREATURE_NARRATES });
+    assert.deepEqual(
+      r.vetoes.filter((v) => v.severity === "hard"), [],
+      `"${junk}" produced a hard veto from a tokenizer artifact`
+    );
+  }
+});
+
+test("an unresolved evidence agent yields silence, not an asserted swap", async () => {
+  // "he" is referential but unresolved — resolving it is admitReferent's job.
+  // A hard veto would be asserting a swap that cannot be established, which is
+  // the cardinal regression pointed at the author instead of the reader.
+  const r = await checkAttribution("Victor grasped his throat.", "He grasped his throat.", {});
+  const hard = r.vetoes.filter((v) => v.severity === "hard");
+  assert.deepEqual(hard, []);
+  assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "it must still be REPORTED");
+});

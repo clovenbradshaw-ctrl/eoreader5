@@ -39,6 +39,44 @@ import { createLemmatizer } from "./morphology.js";
 // function of WHO IS SPEAKING rather than of the token itself.
 const FIRST_PERSON = new Set(["i", "me", "my", "mine", "myself", "we", "us", "our"]);
 
+// Third-person pronouns are referential but unresolved here — resolving them is
+// presence.js::admitReferent's job, and re-implementing it is the reinvention
+// this project warns about most loudly.
+const PRONOUNS = new Set(["he", "she", "it", "they", "him", "her", "them", "his", "its", "their"]);
+
+// Sentence-initial capitals that are not agents. Measured: without this,
+// "This suggests that", "However it does" and "In his first encounter" all
+// became relations with "This"/"However"/"In" as the agent, and every one of
+// them mismatched whatever the evidence said, firing a hard veto apiece.
+const NON_AGENTS = new Set([
+  "this", "that", "these", "those", "there", "here", "it", "however", "moreover",
+  "furthermore", "therefore", "thus", "then", "when", "while", "although",
+  "though", "because", "since", "if", "in", "on", "at", "by", "for", "with",
+  "from", "to", "and", "but", "or", "so", "as", "the", "a", "an", "war",
+  "based", "according", "overall", "additionally", "finally", "first",
+]);
+
+// Fragments a naive tokenizer produces that are never verbs: the possessive
+// "'s" split off its noun ("Frankenstein's feelings" -> verb "s"), and
+// conjunctions inside a title ("War and Peace" -> War/and/Peace).
+const NON_VERBS = new Set(["s", "and", "or", "of", "in", "on", "at", "the", "a", "an", "that", "which"]);
+
+/**
+ * Can this surface stand as an agent we could hold a claim to?
+ *
+ * A veto says "the evidence attributes this act to someone ELSE". That claim is
+ * only meaningful when both sides name something. Comparing "War" against
+ * "nearer" establishes nothing about who acted.
+ */
+function isAgentLike(surface) {
+  const w = String(surface || "").trim().toLowerCase();
+  if (!w || w.length < 2) return false;
+  if (NON_AGENTS.has(w)) return false;
+  if (FIRST_PERSON.has(w) || PRONOUNS.has(w)) return true;
+  // A name: capitalized in the original surface, and not a stop word.
+  return /^[A-ZÀ-Ÿ]/.test(String(surface).trim());
+}
+
 /**
  * Resolve a subject surface to a referent.
  *
@@ -56,11 +94,11 @@ export function resolveSubject(surface, offset, { narratorSpans = [], outerNarra
   const s = String(surface || "").trim().toLowerCase();
   if (!s) return { referent: null, basis: "absent", gap: "no subject surface" };
 
-  if (!FIRST_PERSON.has(s)) return { referent: s, basis: "surface" };
+  if (!FIRST_PERSON.has(s)) return { referent: s, basis: "surface", surface };
 
   const containing = narratorSpans.find((sp) => offset >= sp.start && offset < sp.end);
-  if (containing) return { referent: String(containing.referent).toLowerCase(), basis: "narrator-span" };
-  if (outerNarrator) return { referent: String(outerNarrator).toLowerCase(), basis: "outer-narrator" };
+  if (containing) return { referent: String(containing.referent).toLowerCase(), basis: "narrator-span", surface };
+  if (outerNarrator) return { referent: String(outerNarrator).toLowerCase(), basis: "outer-narrator", surface };
 
   return {
     referent: null,
@@ -154,6 +192,17 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
       }
     }
 
+    // A relation whose verb is a tokenizer artifact is not evidence of
+    // anything. Reported so the count is honest, never escalated.
+    if (NON_VERBS.has(String(c.verb).toLowerCase())) {
+      gaps.push(`skipped "${c.subject} ${c.verb} ${c.object}" — "${c.verb}" is a tokenizer artifact, not an act`);
+      continue;
+    }
+    if (!isAgentLike(c.subject)) {
+      gaps.push(`skipped "${c.subject} ${c.verb} ${c.object}" — "${c.subject}" does not name an agent`);
+      continue;
+    }
+
     if (!matches.length) {
       vetoes.push({
         id: "unsupported-relation",
@@ -175,16 +224,48 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     }
     checked++;
 
-    if (!supported && seen.length) {
+    // Only referent-vs-referent disagreement is a misattribution.
+    //
+    // A hard veto asserts the act belongs to someone ELSE. Where the evidence
+    // agent is itself unresolved — a bare "he", a fragment — that assertion
+    // cannot be established, and making it anyway is the fabrication this
+    // project treats as the cardinal regression, merely pointed at the author
+    // instead of the reader. Measured: without this gate every junk relation
+    // produced a confident hard veto and the assembler dropped every section,
+    // including the correct ones.
+    // A referent resolved THROUGH A NARRATOR SPAN is named by construction —
+    // that is the whole point of the prior, and its label is lowercase, so
+    // testing capitalization here rejected exactly the case this module was
+    // built for. Basis is the signal; case is not.
+    const namedDisagreements = seen.filter((r) => {
+      if (!r.referent) return false;
+      if (r.basis === "narrator-span" || r.basis === "outer-narrator") return true;
+      return isAgentLike(r.surface) && !PRONOUNS.has(r.referent) && !FIRST_PERSON.has(r.referent);
+    });
+
+    if (!supported && !namedDisagreements.length && seen.length) {
+      vetoes.push({
+        id: "unresolved-agent",
+        severity: "soft",
+        message:
+          `claim attributes "${c.verb} ${c.object}" to "${c.subject}", but the evidence agent is unresolved ` +
+          `(${seen.map((r) => r.referent).join(", ")}) — a swap cannot be established, so none is asserted`,
+        claim: c,
+      });
+      continue;
+    }
+
+    if (!supported && namedDisagreements.length) {
+      const seenNamed = namedDisagreements;
       vetoes.push({
         id: "misattribution",
         severity: "hard",
         message:
           `claim attributes "${c.verb} ${c.object}" to "${c.subject}", but the evidence states it of ` +
-          seen.map((r) => `"${r.referent}" (${r.basis})`).join(" / ") +
+          seenNamed.map((r) => `"${r.referent}" (${r.basis})`).join(" / ") +
           ` — agent and patient are not interchangeable`,
         claim: c,
-        evidenceAgents: seen,
+        evidenceAgents: seenNamed,
       });
     }
   }
