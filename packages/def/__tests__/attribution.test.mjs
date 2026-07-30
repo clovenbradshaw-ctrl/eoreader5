@@ -12,9 +12,13 @@ const EVIDENCE =
 // The creature narrates chapters 11-16; these offsets stand for that span.
 const CREATURE_NARRATES = [{ referent: "creature", start: 0, end: 1000 }];
 
+// The cast, as a coref prior supplies it. A hard veto requires naming both
+// sides; without this the organ reports disagreement but asserts nothing.
+const CAST = ["creature", "frankenstein", "victor frankenstein", "victor"];
+
 test("catches the agent swap that every bag-of-words check passes", async () => {
   const claim = "Frankenstein grasped its throat and silenced it.";
-  const r = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES });
+  const r = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES, cast: CAST });
 
   const mis = r.vetoes.find((v) => v.id === "misattribution");
   assert.ok(mis, "the swap must be caught");
@@ -51,12 +55,13 @@ test("an unresolvable first person is a typed gap, not a guessed attribution", (
 test("aliases let one referent be named more than one way", async () => {
   const claim = "Victor Frankenstein grasped his throat.";
   // Without the alias, "victor frankenstein" vs "creature" is a mismatch...
-  const strict = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES });
+  const strict = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES, cast: CAST });
   assert.ok(strict.vetoes.some((v) => v.id === "misattribution"));
 
   // ...and naming the creature's own surfaces does not rescue a wrong agent.
   const aliased = await checkAttribution(claim, EVIDENCE, {
     narratorSpans: CREATURE_NARRATES,
+    cast: CAST,
     aliases: [["creature", "the monster", "the wretch"]],
   });
   assert.ok(aliased.vetoes.some((v) => v.id === "misattribution"),
@@ -102,4 +107,16 @@ test("an unresolved evidence agent yields silence, not an asserted swap", async 
   const hard = r.vetoes.filter((v) => v.severity === "hard");
   assert.deepEqual(hard, []);
   assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "it must still be REPORTED");
+});
+
+test("with no cast, a disagreement is reported but never asserted", async () => {
+  // Capitalization is not identity. Without referents from a prior, the only
+  // available signal is a capital letter, and successive real runs turned that
+  // into confident vetoes on "Initially", "This", "War", "You", "that i".
+  const r = await checkAttribution("Frankenstein grasped its throat.", EVIDENCE, {
+    narratorSpans: CREATURE_NARRATES,
+  });
+  assert.deepEqual(r.vetoes.filter((v) => v.severity === "hard"), []);
+  assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "still reported");
+  assert.ok(r.gaps.some((g) => /no cast supplied/.test(g)), "and the reason is stated");
 });

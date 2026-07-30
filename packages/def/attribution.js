@@ -42,7 +42,8 @@ const FIRST_PERSON = new Set(["i", "me", "my", "mine", "myself", "we", "us", "ou
 // Third-person pronouns are referential but unresolved here — resolving them is
 // presence.js::admitReferent's job, and re-implementing it is the reinvention
 // this project warns about most loudly.
-const PRONOUNS = new Set(["he", "she", "it", "they", "him", "her", "them", "his", "its", "their"]);
+const PRONOUNS = new Set(["he", "she", "it", "they", "him", "her", "them", "his", "its", "their",
+  "you", "your", "yours", "yourself", "one", "who", "someone", "anyone", "everyone"]);
 
 // Sentence-initial capitals that are not agents. Measured: without this,
 // "This suggests that", "However it does" and "In his first encounter" all
@@ -69,6 +70,9 @@ const NON_VERBS = new Set([
   "s", "and", "or", "of", "in", "on", "at", "the", "a", "an", "that", "which",
   // Relative pronouns: "Justine who was accused" parsed verb="who".
   "who", "whom", "whose", "where", "when", "while",
+  // Prepositions: "come with him" parsed verb="with".
+  "with", "without", "from", "into", "onto", "upon", "about", "against",
+  "toward", "towards", "through", "between", "among", "before", "after",
 ]);
 
 /**
@@ -164,7 +168,21 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     // bring, saw/see, spoke/speak, fled/flee — seven of eight measured pairs,
     // and "he lay dead at my feet" is in the passage this was built against.
     morphology = null,
+    // Known referents, from the coref prior. A hard veto asserts that an act
+    // belongs to someone ELSE — which requires being able to NAME both. With
+    // no cast, capitalization is the only signal available, and capitalization
+    // is not identity: measured across successive runs it produced a fresh
+    // crop of confident vetoes on "Initially", "This", "War", "You", "that i".
+    // Patching each one is chasing symptoms of an extractor that cannot carry
+    // a gate. So: no cast => the organ still REPORTS every disagreement, but
+    // nothing is hard, because nothing can be established.
+    cast = null,
   } = options;
+
+  const castSet = cast
+    ? new Set([...cast].map((x) => String(x).toLowerCase()))
+    : null;
+  const inCast = (label) => !castSet || castSet.has(String(label || "").toLowerCase());
 
   const lemmatizer = createLemmatizer(morphology?.irregular ?? morphology, {
     fallback: (a, b) => verbStem(a) === verbStem(b),
@@ -274,6 +292,25 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
       continue;
     }
 
+    // Both agents must be nameable before a swap is asserted.
+    const establishable = castSet
+      ? inCast(claimAgent) && namedDisagreements.some((r) => inCast(r.referent))
+      : false;
+
+    if (!supported && namedDisagreements.length && !establishable) {
+      vetoes.push({
+        id: "unresolved-agent",
+        severity: "soft",
+        message:
+          `claim attributes "${c.verb} ${c.object}" to "${c.subject}", evidence states it of ` +
+          namedDisagreements.map((r) => `"${r.referent}"`).join(" / ") +
+          (castSet ? " — one of these is not a known referent, so no swap is asserted"
+                   : " — no cast supplied, so no swap can be established"),
+        claim: c,
+      });
+      continue;
+    }
+
     if (!supported && namedDisagreements.length) {
       const seenNamed = namedDisagreements;
       vetoes.push({
@@ -290,5 +327,6 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
   }
 
   if (lemmatizer.gap) gaps.push(lemmatizer.gap);
+  if (!castSet) gaps.push("no cast supplied — disagreements are reported but none is asserted as a misattribution");
   return { vetoes, checked, gaps, passed: vetoes.every((v) => v.severity !== "hard") };
 }
