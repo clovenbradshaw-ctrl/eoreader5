@@ -18,8 +18,19 @@
 // that — if the EO geometric structure is real — should separate by Q1 axis
 // (Differentiating/Relating/Generating).
 
-import { lazyEncoder } from "./embedder.js";
-import { shadowDelta, deltaCosine, deltaMagnitude } from "./shadow.js";
+// The encoder and the shadow helpers are imported LAZILY, inside the two
+// functions that need them.
+//
+// extractSVO / verbStem are pure string work and are the whole of the lexical
+// path an attribution check uses by default. A top-level import made loading
+// this module also load @huggingface/transformers and a 22MB ONNX model, so a
+// consumer that never computes a delta still paid for one — and could not run
+// at all where the encoder was unavailable. Deltas are opt-in; their cost
+// should be too.
+let _encoderMod = null;
+const encoderMod = async () => (_encoderMod ??= await import("./embedder.js"));
+let _shadowMod = null;
+const shadowMod = async () => (_shadowMod ??= await import("./shadow.js"));
 
 const MASK = "[MASK]";
 
@@ -154,7 +165,7 @@ export function extractSVO(text) {
  * delta means the verb actively transforms the S-O relation.
  */
 export async function verbDelta(clauseText, subject, verb, object, options = {}) {
-  const enc = options.encoder || await lazyEncoder();
+  const enc = options.encoder || await (await encoderMod()).lazyEncoder();
 
   // Full clause embedding
   const fullVec = await enc.encode(clauseText);
@@ -182,7 +193,7 @@ export async function verbDelta(clauseText, subject, verb, object, options = {})
  * (Differentiating/Relating/Generating for verb).
  */
 export async function roleDeltas(clauseText, subject, verb, object, options = {}) {
-  const enc = options.encoder || await lazyEncoder();
+  const enc = options.encoder || await (await encoderMod()).lazyEncoder();
   const fullVec = await enc.encode(clauseText);
 
   const mask = (role) => {
@@ -206,4 +217,6 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export { deltaCosine, deltaMagnitude };
+// Re-exported as async thunks so importing this module never loads shadow.js.
+export async function deltaCosine(a, b) { return (await shadowMod()).deltaCosine(a, b); }
+export async function deltaMagnitude(a) { return (await shadowMod()).deltaMagnitude(a); }

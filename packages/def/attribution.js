@@ -150,7 +150,7 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
           verbDelta(c.text, c.subject, c.verb, c.object),
           verbDelta(e.text, e.subject, e.verb, e.object),
         ]);
-        if (deltaCosine(dc, de) >= verbThreshold) matches.push(e);
+        if ((await deltaCosine(dc, de)) >= verbThreshold) matches.push(e);
       }
     }
 
