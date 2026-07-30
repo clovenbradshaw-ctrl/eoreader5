@@ -32,7 +32,8 @@
 // relations the evidence states, and reports where the agent does not match.
 // Missing narrator prior => typed gap, never a guessed attribution.
 
-import { extractSVO, verbDelta, deltaCosine } from "./svo.js";
+import { extractSVO, verbDelta, deltaCosine, verbStem } from "./svo.js";
+import { createLemmatizer } from "./morphology.js";
 
 // First-person surfaces. These are the only tokens whose referent is a
 // function of WHO IS SPEAKING rather than of the token itself.
@@ -109,7 +110,18 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     evidenceOffset = 0,
     useEmbeddings = false,
     verbThreshold = 0.55,
+    // UniMorph-derived form->lemma prior (eoPriors/priors/morphology-eng.json).
+    // Absent => falls back to suffix stemming and SAYS so, because that
+    // fallback silently misses every irregular: lay/lie, went/go, brought/
+    // bring, saw/see, spoke/speak, fled/flee — seven of eight measured pairs,
+    // and "he lay dead at my feet" is in the passage this was built against.
+    morphology = null,
   } = options;
+
+  const lemmatizer = createLemmatizer(morphology?.irregular ?? morphology, {
+    fallback: (a, b) => verbStem(a) === verbStem(b),
+    stem: verbStem,
+  });
 
   const claimRels = extractSVO(claim);
   const evidenceRels = extractSVO(evidenceText);
@@ -126,7 +138,9 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
       : String(c.subject).toLowerCase();
     if (!claimAgent) continue;
 
-    let matches = evidenceRels.filter((e) => e.verb.toLowerCase() === c.verb.toLowerCase());
+    // Compare acts by LEMMA. "grasp"/"grasped" a rule can reach; "lay"/"lie"
+    // and "went"/"go" it cannot, and those are the verbs prose is made of.
+    let matches = evidenceRels.filter((e) => lemmatizer.sameAct(e.verb, c.verb));
 
     if (!matches.length && useEmbeddings) {
       // Same act, different word. The delta IS the relation (svo.js), so verbs
@@ -175,5 +189,6 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     }
   }
 
+  if (lemmatizer.gap) gaps.push(lemmatizer.gap);
   return { vetoes, checked, gaps, passed: vetoes.every((v) => v.severity !== "hard") };
 }

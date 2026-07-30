@@ -23,6 +23,38 @@ import { shadowDelta, deltaCosine, deltaMagnitude } from "./shadow.js";
 
 const MASK = "[MASK]";
 
+// Infinitive marker and auxiliaries. These stand in front of the verb that
+// actually names the act, and an attribution check compares acts.
+const AUXILIARIES = new Set([
+  "to", "will", "would", "shall", "should", "can", "could", "may", "might",
+  "must", "is", "was", "are", "were", "be", "been", "being", "has", "have",
+  "had", "do", "does", "did", "not", "never",
+]);
+
+/**
+ * Crude verb stem, for comparing acts across inflections.
+ *
+ * "grasp" and "grasped" are the same act; a check that compares raw surfaces
+ * treats them as unrelated, which is exactly how a paraphrase of a passage
+ * escapes an attribution check that should have caught it. This is not
+ * lemmatization and does not need to be — it needs to make regular English
+ * inflections of the same verb collide.
+ */
+export function verbStem(v) {
+  const w = String(v || "").toLowerCase();
+  if (w.length <= 3) return w;
+  for (const suf of ["ingly", "edly", "ing", "ies", "ied", "ed", "es", "s"]) {
+    if (w.endsWith(suf) && w.length - suf.length >= 3) {
+      let stem = w.slice(0, -suf.length);
+      if (suf === "ies" || suf === "ied") stem += "y";
+      // "grasp"+"ped" style doubling: collapse a doubled final consonant.
+      if (/([bdfglmnprt])\1$/.test(stem)) stem = stem.slice(0, -1);
+      return stem;
+    }
+  }
+  return w;
+}
+
 /**
  * extractSVO(text) -> [{ subject, verb, object, polarity, offset }]
  *
@@ -79,8 +111,21 @@ export function extractSVO(text) {
       if (subjEnd + 2 >= tokens.length) continue;
 
       const subject = tokens.slice(i, subjEnd + 1).map((t) => t.word).join(" ");
-      const verb = tokens[subjEnd + 1];
-      const obj = tokens[subjEnd + 2];
+
+      // Step over the infinitive marker and auxiliaries to reach the verb that
+      // carries the act.
+      //
+      // Measured on real generated prose: "prompting Frankenstein to grasp its
+      // throat" parsed as verb="to", object="grasp", so it matched nothing in
+      // evidence that said "grasped" and the misattribution passed unchecked.
+      // The lexical VERB is the thing an attribution check compares; an
+      // auxiliary is scaffolding around it.
+      let vIdx = subjEnd + 1;
+      while (vIdx + 1 < tokens.length - 1 && AUXILIARIES.has(tokens[vIdx].word.toLowerCase())) vIdx++;
+      if (vIdx + 1 >= tokens.length) continue;
+
+      const verb = tokens[vIdx];
+      const obj = tokens[vIdx + 1];
 
       results.push({
         subject,
