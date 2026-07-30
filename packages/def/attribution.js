@@ -54,12 +54,22 @@ const NON_AGENTS = new Set([
   "though", "because", "since", "if", "in", "on", "at", "by", "for", "with",
   "from", "to", "and", "but", "or", "so", "as", "the", "a", "an", "war",
   "based", "according", "overall", "additionally", "finally", "first",
+  // Discourse adverbs. These open sentences, take the capital, and are not
+  // agents: "Initially he is horrified" made "Initially" the actor.
+  "initially", "later", "ultimately", "eventually", "meanwhile", "instead",
+  "similarly", "conversely", "subsequently", "throughout", "despite", "during",
+  "afterward", "afterwards", "consequently", "nevertheless", "nonetheless",
+  "indeed", "perhaps", "clearly", "notably", "importantly", "specifically",
 ]);
 
 // Fragments a naive tokenizer produces that are never verbs: the possessive
 // "'s" split off its noun ("Frankenstein's feelings" -> verb "s"), and
 // conjunctions inside a title ("War and Peace" -> War/and/Peace).
-const NON_VERBS = new Set(["s", "and", "or", "of", "in", "on", "at", "the", "a", "an", "that", "which"]);
+const NON_VERBS = new Set([
+  "s", "and", "or", "of", "in", "on", "at", "the", "a", "an", "that", "which",
+  // Relative pronouns: "Justine who was accused" parsed verb="who".
+  "who", "whom", "whose", "where", "when", "while",
+]);
 
 /**
  * Can this surface stand as an agent we could hold a claim to?
@@ -200,6 +210,15 @@ export async function checkAttribution(claim, evidenceText, options = {}) {
     }
     if (!isAgentLike(c.subject)) {
       gaps.push(`skipped "${c.subject} ${c.verb} ${c.object}" — "${c.subject}" does not name an agent`);
+      continue;
+    }
+    // Symmetric with the evidence side: a bare pronoun names something, but
+    // WHICH thing is admitReferent's answer, not this module's. A swap between
+    // an unresolved "He" and a named agent cannot be established, so it is not
+    // asserted. Applying the rule to only one side was the remaining source of
+    // confident-but-empty vetoes.
+    if (PRONOUNS.has(claimAgent)) {
+      gaps.push(`skipped "${c.subject} ${c.verb} ${c.object}" — claim agent "${c.subject}" is an unresolved pronoun`);
       continue;
     }
 
