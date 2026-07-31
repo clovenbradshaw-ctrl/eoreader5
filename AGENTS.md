@@ -1,13 +1,25 @@
 # EOReader5 — engine map for agents
 
-Read `docs/nameless-referent.md` first. It is the foundational principle:
-identity lives in the REFERENT, never in a string; surfaces are scoped
-evidence admitted by explicit events; witness-tier knowledge is injected as
-priors, never derived. Every coref regression in this project came from
-forgetting it. The companion principle is omnimodal design: an organ must
-make sense for a nameless leitmotif in music, or it is string-thinking. The
-third is `docs/holon-level.md`: whether one entity is above, below, or a peer
-of another is DISCOVERED (existence-dependency + possibility-constraint,
+> **Legacy.** This repo is the `legacy` domain of the EO constitution
+> (`../eo-constitution/CONSTITUTION.md`): frozen reference and measured dead
+> ends. Trust the dead-end logs; never port from here — the current engine is
+> `eoreader6`, where every organ is re-earned.
+
+The mission is `docs/reader-experience-spec.md`: **to joyfully experience
+meaningful surprise.** This is the universal invariant — every organ, every
+selector, every gate exists to serve an earned, measured, faithful encounter
+with a source. Read it first; it frames why the other principles exist.
+
+The foundational principle is `docs/nameless-referent.md`: identity lives in
+the REFERENT, never in a string; surfaces are scoped evidence admitted by
+explicit events; witness-tier knowledge is injected as priors, never derived.
+Every coref regression in this project came from forgetting it.
+
+The companion principle is omnimodal design: an organ must make sense for a
+nameless leitmotif in music, or it is string-thinking.
+
+The third is `docs/holon-level.md`: whether one entity is above, below, or a
+peer of another is DISCOVERED (existence-dependency + possibility-constraint,
 Born-null gated), never assigned by naming a scale ("chapter," "scene").
 Read it before writing any cross-entity containment, ranking, or hierarchy
 logic.
