@@ -12,7 +12,7 @@
 // other's deposits. Agreement is witnessed, never optimized toward.
 //
 // Output: coincident passages, convergence fraction, and correlation with
-// the altitude oracle's top scenes.
+// the altitude assay's top scenes.
 //
 // Usage: node scripts/run-convergence-pipeline.mjs
 
@@ -305,18 +305,18 @@ console.log(`Top coincident passages with character names: ${charHits}/${ranked.
 console.log(`Top coincident passages with philosophical terms: ${philHits}/${ranked.length} (${(philHits/ranked.length*100).toFixed(0)}%)`);
 console.log(`(Both should be high — these are the dual-signal passages the convergence organ detects)\n`);
 
-// ── Correlation with altitude oracle ──────────────────────────────────────
-// The altitude oracle's multi-altitude-fold produces top scenes for each entity.
-// We check: of the coincident passages, how many fall within the oracle's scene windows?
+// ── Correlation with altitude assay ───────────────────────────────────────
+// The altitude assay's multi-altitude-fold produces top scenes for each entity.
+// We check: of the coincident passages, how many fall within the assay's scene windows?
 
-console.log("=== Altitude oracle correlation ===\n");
+console.log("=== Altitude assay correlation ===\n");
 
 try {
   const { multiAltitudeFold } = await import("../packages/engine/emergence/summary/multi-altitude-fold.js");
   const { buildStore } = await import("../packages/engine/emergence/store/index.js");
   const { default: frameText } = await import("../packages/engine/emergence/summary/text-organ.js");
 
-  // Use the engine's own framing to match the oracle's view
+  // Use the engine's own framing to match the assay's view
   const frames = frameText(text, { window: 2000, hop: 1000 });
   const store = buildStore(frames, { idfFloor: 2.0, edgeSlots: 24 });
 
@@ -349,23 +349,23 @@ try {
     } catch { /* entity not found in text */ }
   }
 
-  // Check: how many coincident passages are near the oracle's top scenes?
-  const WINDOW = 5000; // ±5000 chars around oracle scene offset
-  let oracleHits = 0;
+  // Check: how many coincident passages are near the assay's top scenes?
+  const WINDOW = 5000; // ±5000 chars around assay scene offset
+  let assayHits = 0;
   for (const [blockId] of ranked) {
     const pasIdx = parseInt(blockId.replace("pas-", ""));
     const passage = passages[pasIdx];
     for (const sceneOff of topSceneOffsets) {
       if (Math.abs(passage.offset - sceneOff) < WINDOW) {
-        oracleHits++;
+        assayHits++;
         break;
       }
     }
   }
 
-  console.log(`Oracle top scenes (across ${entities.length} entities): ~${topSceneOffsets.size} unique offsets`);
-  console.log(`Coincident passages near oracle top scenes (±${WINDOW} chars): ${oracleHits}/${ranked.length} (${(oracleHits/ranked.length*100).toFixed(0)}%)`);
-  console.log(`(Higher = convergence organ detects passages the oracle independently scored as significant)\n`);
+  console.log(`Assay top scenes (across ${entities.length} entities): ~${topSceneOffsets.size} unique offsets`);
+  console.log(`Coincident passages near assay top scenes (±${WINDOW} chars): ${assayHits}/${ranked.length} (${(assayHits/ranked.length*100).toFixed(0)}%)`);
+  console.log(`(Higher = convergence organ detects passages the assay independently scored as significant)\n`);
 } catch (e) {
   console.log(`Altitude correlation skipped: ${e.message}\n`);
 }

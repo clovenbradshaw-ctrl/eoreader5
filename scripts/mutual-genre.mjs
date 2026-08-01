@@ -171,6 +171,13 @@ function main() {
     version: "1.0.0",
     parameters: { corpus_dir: args.corpusDir.split("/").filter(Boolean).pop(), books: books.length,
       idf_floor: args.idfFloor, edge_slots: args.edgeSlots, surface_top: args.surfaceTop },
+    // What this artifact is ABOUT, declared so consumers don't have to infer
+    // scope from the filename (see eoreader-chat/priors-source.js::scopeOf).
+    generated_from: {
+      corpus_dir_basename: args.corpusDir.split("/").filter(Boolean).pop(),
+      books: books.length,
+      generator: "eoreader5/scripts/mutual-genre.mjs",
+    },
     matrix_hash: hash,
     distribution: { max: allMutuals[0], p99, p95, p90, median: allMutuals[Math.floor(allMutuals.length / 2)] },
     threshold_analysis: thresholds.map(t => {

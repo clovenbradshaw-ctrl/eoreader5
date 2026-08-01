@@ -1,0 +1,19 @@
+{
+  "name": "@eoreader/def",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Differential Embedding Functions: shadow-embedding module for EOReader5. Consumes tiny NLP models (MiniLM, E5) as DEFs — differential sensors, not ground-truth semantic sources. Produces delta vectors the engine consumes as data.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./embedder": "./embedder.js",
+    "./shadow": "./shadow.js",
+    "./svo": "./svo.js",
+    "./cell": "./cell.js",
+    "./transition": "./transition.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.4.0"
+  }
+}

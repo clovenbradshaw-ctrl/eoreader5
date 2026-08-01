@@ -579,6 +579,16 @@ function main() {
       signal_k: 2,
       loaded_clusters: args.loadClusters ?? null,
     },
+    // What this artifact is ABOUT, declared so consumers don't have to infer
+    // scope from the filename (see eoreader-chat/priors-source.js::scopeOf).
+    generated_from: {
+      corpus_dir_basename: args.corpusDir.split("/").filter(Boolean).pop(),
+      books: l0Entities.length,
+      target: args.target?.split("/").filter(Boolean).pop() ?? null,
+      target_frames: targetFrames?.length ?? 0,
+      loaded_clusters: args.loadClusters ?? null,
+      generator: "eoreader5/scripts/kind-discovery.mjs",
+    },
     discovery_hash: hash,
     fold_count: discoveredLevels.length - 1,
     levels: levelsOut,

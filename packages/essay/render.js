@@ -1,14 +1,4 @@
-import { canonicalHashSync } from "@eoreader/spec/canonical-json";
-
-const id = (prefix, value) => `${prefix}:${canonicalHashSync(value)}`;
-
-function splitSentences(text) {
-  return text
-    .replace(/\n+/g, ' ')
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-}
+const PARA_BREAK = /\n\s*\n+/;
 
 function attributionPhrase(sourceCount, sourceIds) {
   if (sourceCount >= 3) return 'Across multiple sources';
@@ -25,13 +15,46 @@ function conflictPhrase(conflict) {
   return ` (${conflict.source_a} and ${conflict.source_b} differ by ${delta})`;
 }
 
+// Detect paragraph boundaries directly in the source text rather than
+// imposing a fixed spacing rule. A paragraph break is wherever the source
+// had one (blank line between verses, chapters, scenes) — never a hardcoded
+// count of sentences.
+function splitParagraphs(text) {
+  if (!text) return [''];
+  const parts = text.split(PARA_BREAK);
+  return parts.map(p => p.trim()).filter(Boolean);
+}
+
 export function renderText(commitments, { thesis, sectionIntent } = {}) {
   if (commitments.length === 0) return '';
 
   const sorted = [...commitments].sort((a, b) => (b.confidence ?? 0.5) - (a.confidence ?? 0.5));
-  const sentences = [];
+  const paragraphGroups = [];
+  const commitmentGroupCounts = [];
+  let currentGroup = [];
+
+  function flushGroup() {
+    if (currentGroup.length > 0) {
+      paragraphGroups.push(currentGroup.join(' '));
+      currentGroup = [];
+    }
+  }
+
+  function addToGroup(sentence) {
+    const hasBreak = PARA_BREAK.test(sentence);
+    if (hasBreak) {
+      const segments = splitParagraphs(sentence);
+      for (let si = 0; si < segments.length; si++) {
+        if (si > 0) flushGroup();
+        currentGroup.push(segments[si]);
+      }
+    } else {
+      currentGroup.push(sentence);
+    }
+  }
 
   for (const commitment of sorted) {
+    const before = paragraphGroups.length + (currentGroup.length > 0 ? 1 : 0);
     const prop = commitment.proposition;
     const sources = [...new Set(commitment.spanRefs.map(sr => sr.source_id))];
     const attr = attributionPhrase(sources.length, sources);
@@ -43,48 +66,69 @@ export function renderText(commitments, { thesis, sectionIntent } = {}) {
       const qtyText = prop.quantities.map(q => q.raw).join(' and ');
       const timeText = prop.time ? ` in ${prop.time}` : '';
       sentence = `${attr ? attr + ', ' : ''}${prop.entities.join(' and ')} ${prop.relation === 'record' ? 'records' : prop.relation + 's'} ${qtyText}${timeText}.${conflict ? ' However, sources disagree' + conflict + '.' : ''}`;
+      addToGroup(sentence);
     } else if (prop.entities.length > 0) {
-      const witness = commitment.spanRefs[0]?.span_text ?? '';
-      if (witness && witness.length > 10 && witness.length < 200) {
+      const witness = commitment.spanRefs[0]?.span_raw ?? commitment.spanRefs[0]?.span_text ?? '';
+      if (witness && witness.length > 10) {
         sentence = `${attr ? attr + ': ' : ''}${witness}${witness.endsWith('.') ? '' : '.'}`;
+        addToGroup(sentence);
       } else {
         sentence = `${attr ? attr + ', ' : ''}${prop.entities.join(' and ')} ${prop.relation}s.${conflict ? ' However, sources disagree' + conflict + '.' : ''}`;
+        addToGroup(sentence);
       }
     } else {
-      const witness = commitment.spanRefs[0]?.span_text ?? '';
+      const witness = commitment.spanRefs[0]?.span_raw ?? commitment.spanRefs[0]?.span_text ?? '';
       if (witness && witness.length > 10) {
         sentence = witness.endsWith('.') ? witness : witness + '.';
+        addToGroup(sentence);
       } else {
         continue;
       }
     }
-
-    sentences.push({ text: sentence, commitment_id: commitment.commitment_id, is_glue: false });
+    const after = paragraphGroups.length + (currentGroup.length > 0 ? 1 : 0);
+    commitmentGroupCounts.push(after - before);
   }
 
-  const transitions = [];
-  for (let i = 1; i < sentences.length; i++) {
-    const prev = sentences[i - 1];
-    const curr = sentences[i];
-    const prevSources = new Set(sorted[i - 1].spanRefs.map(sr => sr.source_id));
-    const currSources = new Set(sorted[i].spanRefs.map(sr => sr.source_id));
-    const shared = [...prevSources].filter(s => currSources.has(s));
+  flushGroup();
 
-    if (shared.length === 0 && prevSources.size > 0 && currSources.size > 0) {
-      const fromSrc = [...prevSources][0];
-      const toSrc = [...currSources][0];
-      transitions.push({ index: i, text: `Looking beyond ${fromSrc}, ${toSrc} reveals a different picture.` });
-    } else if (sorted[i - 1].conflict && !sorted[i].conflict) {
-      transitions.push({ index: i, text: 'Despite this discrepancy, other findings are consistent.' });
+  // Transitions between paragraph groups emerge naturally wherever the
+  // source changes — each becomes the first sentence of the new paragraph,
+  // bridging the reader between sources rather than hanging in isolation.
+  const groupSource = (gIdx) => {
+    for (let ci = 0; ci < sorted.length; ci++) {
+      const groupsForCommitment = commitmentGroupCounts[ci];
+      if (gIdx < groupsForCommitment) return sorted[ci].spanRefs.map(sr => sr.source_id);
+      gIdx -= groupsForCommitment;
+    }
+    return [];
+  };
+
+  for (let gi = 1; gi < paragraphGroups.length; gi++) {
+    const prevSrcs = new Set(groupSource(gi - 1));
+    const currSrcs = new Set(groupSource(gi));
+    const shared = [...prevSrcs].filter(s => currSrcs.has(s));
+
+    if (shared.length === 0 && prevSrcs.size > 0 && currSrcs.size > 0) {
+      const fromSrc = [...prevSrcs][0];
+      const toSrc = [...currSrcs][0];
+      paragraphGroups[gi] =
+        `Looking beyond ${fromSrc}, ${toSrc} reveals a different picture. ${paragraphGroups[gi]}`;
     }
   }
 
-  for (let j = transitions.length - 1; j >= 0; j--) {
-    const t = transitions[j];
-    sentences.splice(t.index, 0, { text: t.text, commitment_id: 'glue', is_glue: true });
+  // Conflict-to-no-conflict transitions across paragraph boundaries
+  for (let ci = 1; ci < sorted.length; ci++) {
+    if (sorted[ci - 1].conflict && !sorted[ci].conflict) {
+      let groupStart = 0;
+      for (let pc = 0; pc < ci; pc++) groupStart += commitmentGroupCounts[pc];
+      if (groupStart < paragraphGroups.length) {
+        paragraphGroups[groupStart] =
+          `Despite this discrepancy, other findings are consistent. ${paragraphGroups[groupStart]}`;
+      }
+    }
   }
 
-  return sentences.map(s => s.text).join(' ');
+  return paragraphGroups.join('\n\n');
 }
 
 export function renderChart(commitments, { thesis } = {}) {
@@ -195,13 +239,21 @@ export function renderSection(section, commitments, { thesis } = {}) {
   }
 
   const prose = renderText(sectionCommitments, { thesis, sectionIntent: section.intent });
-  const sentences = splitSentences(prose).map(text => {
-    const matching = sectionCommitments.find(c => prose.includes(c.claim.slice(0, 30)));
-    return {
-      text,
-      commitment_id: matching?.commitment_id ?? 'glue',
-      is_glue: !matching,
-    };
-  });
+  const paragraphs = splitParagraphs(prose);
+  const sentences = [];
+  for (const para of paragraphs) {
+    const sents = para
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    for (const text of sents) {
+      const matching = sectionCommitments.find(c => prose.includes(c.claim.slice(0, 30)));
+      sentences.push({
+        text,
+        commitment_id: matching?.commitment_id ?? 'glue',
+        is_glue: !matching,
+      });
+    }
+  }
   return { prose, modality: 'text', sentences };
 }

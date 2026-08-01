@@ -95,7 +95,7 @@ function jaccard(sigA, sigB) {
 /**
  * Discover entity equivalence classes through co-occurrence clustering.
  *
- * @param {Array} entities - from discoverEntities (or any list of { word, frames })
+ * @param {Array} entities - from discoverMotifs (or any list of { word, frames })
  * @param {Array} frames - signal frames from frameText
  * @param {object} options - { similarityThreshold, minCooccurrence }
  * @returns {{

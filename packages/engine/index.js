@@ -101,7 +101,37 @@ export {
   fold,
   foldReadingSnapshot,
   scoreChunk,
+  declareOccasionGrain,
+  computeResidual,
+  resolveFoldPhase,
+  phaseWeights,
+  andCompletion,
+  FOLD_PHASES,
 } from "./emergence/fold/index.js";
+
+// Surplus channel (Spec 2): four-gate anti-sycophancy apparatus
+export {
+  gateDataSurplus,
+  gateSycophancyNull,
+  gateTransferHeldOut,
+  gateCorroborationFloor,
+  admitSurplus,
+} from "./emergence/surplus/index.js";
+
+// Play mode (Spec 3.3): epistemic wandering with no pragmatic term
+export {
+  playMode,
+  asPlayFold,
+} from "./emergence/play/index.js";
+
+// Witness log (Spec 3.5): walled-off surface, write-only from the system
+export {
+  recordWitnessEvent,
+  recordPlayRun,
+  recordConvergenceEvent,
+  recordSurplusEvent,
+  configureWitnessLog,
+} from "./witness/index.js";
 
 // Born salience: exemplar scoring, relax settling, route decision.
 // Ported from4.2: src/weave/chorus/born.js, src/weave/longgen/relax.js.

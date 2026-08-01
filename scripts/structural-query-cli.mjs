@@ -47,7 +47,11 @@ try {
   process.exit(1);
 }
 
-const cache = buildFoldCache(corpusFile, text, opts);
+// The engine has no clock: this CLI is the host, so it is the one that reads
+// the wall clock and hands `ts` down. Engine-side the field would just be null.
+const ts = Date.now();
+
+const cache = buildFoldCache(corpusFile, text, { ...opts, ts });
 console.error(`  indexed ${cache.nWindows} windows from ${cache.nUnits} units`);
 if (cache.nWindows === 0) {
   console.error(`  text too short for window size ${opts.windowUnits ?? 16} — use --window-units to reduce`);
@@ -59,6 +63,7 @@ const result = structuralQuery(corpusFile, archetypeRef, {
   windowUnits: opts.windowUnits,
   stride: opts.stride,
   permutationSamples: 200,
+  ts,
 });
 
 console.log(JSON.stringify(result, null, 2));

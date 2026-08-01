@@ -1,4 +1,4 @@
-// scripts/test-altitudes.mjs — structural oracle for multi-level summary packets.
+// scripts/test-altitudes.mjs — structural assay for multi-level summary packets.
 //
 // No hand-written golden. No model calls. Pure structural verification:
 // the engine's multiAltitudeFold passes iff every altitude layer is
@@ -13,7 +13,7 @@
 //   ENTITY-FAITHFUL — every span mentions the entity (or a known surface)
 //   MONOTONICITY    — L0 spans ⊆ L1 ⊆ L2 ⊆ L3 ⊆ L4 (cumulative by offset)
 //
-// The oracle hypothesis: a correctly-functioning engine always produces
+// The assay hypothesis: a correctly-functioning engine always produces
 // a packet that passes all three. A regression in presence, store, fold,
 // or any wired organ will surface as a failure in at least one check.
 
@@ -111,9 +111,9 @@ function flatten(t) {
   return String(t ?? "").replace(/\s+/g, " ").trim();
 }
 
-// ── Oracle ──
+// ── Assay ──
 
-function oracle(packet, text, entityDef) {
+function assay(packet, text, entityDef) {
   const altitudeLabels = Object.keys(packet.altitudes).map(Number).sort((a, b) => a - b);
   const surfaces = entityDef.surfaces;
   const results = { grounded: 0, total: 0, faithful: 0, monotoneHops: 0, monotoneTotal: 0, gaps: packet.gaps || [] };
@@ -228,7 +228,7 @@ function main() {
     }
 
     const packet = multiAltitudeFold(text, ed.entity, options);
-    const { results, failures } = oracle(packet, text, ed);
+    const { results, failures } = assay(packet, text, ed);
 
     const grounded = results.total > 0 ? (results.grounded / results.total * 100).toFixed(1) : "N/A";
     const faithful = results.total > 0 ? (results.faithful / results.total * 100).toFixed(1) : "N/A";

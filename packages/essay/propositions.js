@@ -89,7 +89,7 @@ function measureConfidence(proposition) {
 }
 
 export function propositionFromSpan(span, { source_id, event_id, block_id, anchor } = {}) {
-  const text = span.text ?? span;
+  const text = span.text ?? span.raw;
   const entities = extractEntities(text);
   const quantities = extractQuantities(text);
   const time = extractTime(text);
@@ -107,6 +107,7 @@ export function propositionFromSpan(span, { source_id, event_id, block_id, ancho
       block_id: block_id ?? span.block_id ?? undefined,
       anchor: anchor ?? span.anchor ?? undefined,
       span_text: text,
+      span_raw: span.raw ?? null,
     }],
   };
   proposition.confidence = measureConfidence(proposition);

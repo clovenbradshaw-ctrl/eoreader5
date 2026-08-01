@@ -1,3 +1,24 @@
+// Cross-modal structural similarity search: index a corpus into shape
+// descriptors (novelty / recurrence / operator distribution) and rank windows
+// against an archetype, with two nulls as gates.
+//
+// THE ENGINE HAS NO CLOCK, AND NO AMBIENT RANDOMNESS
+//
+// `ts` is supplied by the host and never generated here, exactly as the
+// reaction channel does it (packages/engine/reaction/index.js). A query that
+// stamped an ambient wall-clock read would not be the same query twice, which
+// breaks byte-identical replay and makes golden/workflow resume
+// unreproducible. A host that does not supply `ts` gets `timestamp: null` —
+// a typed gap, not a fabricated reading of a clock the engine does not have.
+//
+// Randomness is likewise seeded from content, never ambient. The operator
+// distribution of a synthesized archetype used to be drawn from the ambient
+// PRNG, which meant `synth:sonata-allegro-form` was a DIFFERENT archetype on
+// every call and the gates scored against a moving target.
+//
+// Both rules are enforced by source-text scan in
+// packages/conformance/invariants/forbidden-dependencies.test.js, so this
+// module may not even name the forbidden calls in a comment.
 import { createSeededRng, seededShuffle, deriveNull } from "../nulls/index.js";
 import { extractTextFieldVectors, cosineSimilarity } from "../../perceiver/text/text-signal.js";
 import { canonicalHashSync } from "@eoreader/spec/canonical-json";
@@ -189,6 +210,7 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
     kindRegistry = null,
     instanceRegistry = null,
     useCalculus = false,
+    ts = null,
   } = options;
 
   const archetype = resolveArchetype(archetypeRef, { kindRegistry, instanceRegistry });
@@ -201,7 +223,7 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
       coldStart: true,
       needed: archetype.missing ? { archetypeRef } : {},
       results: [],
-      timestamp: Date.now(),
+      timestamp: ts,
     };
   }
 
@@ -214,14 +236,14 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
       coldStart: true,
       needed: { corpusId, action: "ingest-and-fold" },
       results: [],
-      timestamp: Date.now(),
+      timestamp: ts,
     };
   }
 
   if (archetype.kind === "synthesized") {
     const resolved = synthesizeArchetype(foldCache, archetype.description, { resampleLen });
     if (resolved.error) {
-      return { schema: "StructuralQueryResult@1", corpusId, archetypeRef, error: resolved.error, results: [], timestamp: Date.now() };
+      return { schema: "StructuralQueryResult@1", corpusId, archetypeRef, error: resolved.error, results: [], timestamp: ts };
     }
     archetype.descriptors = resolved.descriptors;
   }
@@ -235,7 +257,7 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
       coldStart: true,
       needed: { archetypeRef, action: "induce-descriptors" },
       results: [],
-      timestamp: Date.now(),
+      timestamp: ts,
     };
   }
 
@@ -300,7 +322,7 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
     stride,
     gateResults,
     topK: results,
-    timestamp: Date.now(),
+    timestamp: ts,
     agent: "eo-query",
   };
 
@@ -315,8 +337,19 @@ export function structuralQuery(corpusId, archetypeRef, options = {}) {
     nCandidates: scored.length,
     nPassed: results.length,
     event,
-    timestamp: Date.now(),
+    timestamp: ts,
   };
+}
+
+// The sonata and fugue templates specify novelty and recurrence shapes but
+// say nothing about an operator mix, so the operator distribution is filler.
+// Filler still has to be the SAME filler every time: it is 20% of
+// shapeDistance, so drawing it fresh per call made two queries for the same
+// archetype incomparable. Seeded on the description, so one description is
+// one archetype.
+function syntheticOperatorDist(description, label) {
+  const rng = createSeededRng(canonicalHashSync({ description, label, purpose: "structural-query-synthesize-operator-dist" }));
+  return normalize(new Float64Array(OPERATOR_DIMS).map(() => rng()));
 }
 
 export function synthesizeArchetype(foldCache, description, options = {}) {
@@ -337,7 +370,7 @@ export function synthesizeArchetype(foldCache, description, options = {}) {
       descriptors: {
         novelty: themeA,
         recurrence: themeB,
-        operatorDist: normalize(new Float64Array(OPERATOR_DIMS).map(() => Math.random())),
+        operatorDist: syntheticOperatorDist(description, "sonata-allegro-form"),
       },
       label: "sonata-allegro-form",
       experimental: true,
@@ -354,7 +387,7 @@ export function synthesizeArchetype(foldCache, description, options = {}) {
       descriptors: {
         novelty: entries,
         recurrence: entries.map((v) => 1 - v * 0.5),
-        operatorDist: normalize(new Float64Array(OPERATOR_DIMS).map(() => Math.random())),
+        operatorDist: syntheticOperatorDist(description, "fugue-form"),
       },
       label: "fugue-form",
       experimental: true,
@@ -479,6 +512,10 @@ export function runGateB(topCandidates, allScored, archetype, options = {}) {
 
 export function buildFoldCache(corpusId, text, options = {}) {
   const foldVersion = options.foldVersion ?? "v1";
+  // Host-supplied; null when the host does not stamp one. See the clock note
+  // at the top of this module — `builtAt` is provenance, not a cache key, and
+  // a wall-clock read here would make two identical folds unequal.
+  const builtAt = options.ts ?? null;
   const descriptors = buildShapeDescriptors(text, options);
   return {
     corpusId,
@@ -487,7 +524,7 @@ export function buildFoldCache(corpusId, text, options = {}) {
     units: descriptors.units,
     nUnits: descriptors.units.length,
     nWindows: descriptors.windows.length,
-    builtAt: Date.now(),
+    builtAt,
   };
 }
 

@@ -37,6 +37,18 @@ export { induceEntityKinds, buildKindVocabulary, pluralize } from "./entity-kind
 export { induceCalculus, induceExtensions } from "./calculus/index.js";
 export { structuralQuery, buildFoldCache, buildShapeDescriptors, resolveArchetype, synthesizeArchetype, runGateA, runGateB, shapeDistance } from "./structural-query/index.js";
 
+// Surplus channel (Spec 2) — four-gate anti-sycophancy apparatus
+export {
+  gateDataSurplus,
+  gateSycophancyNull,
+  gateTransferHeldOut,
+  gateCorroborationFloor,
+  admitSurplus,
+} from "./surplus/index.js";
+
+// Play mode (Spec 3.3) — epistemic wandering with no pragmatic term
+export { playMode, asPlayFold } from "./play/index.js";
+
 // Surprise measure (portedsurprise/index.js from4.2 src/core/surprise.js)
 export {
   klDivergence,
@@ -53,6 +65,12 @@ export {
   fold,
   foldReadingSnapshot,
   scoreChunk,
+  declareOccasionGrain,
+  computeResidual,
+  resolveFoldPhase,
+  phaseWeights,
+  andCompletion,
+  FOLD_PHASES,
 } from "./fold/index.js";
 
 // Born salience (ported from4.2 src/weave/chorus/born.js)
@@ -90,13 +108,18 @@ export { buildGraph, detectFigures } from "./summary/graph.js";
 export {
   frameText,
   detectBoundaries,
-  discoverEntities,
+  discoverMotifs,
   extractEvents,
   TURNING_EVENT_TYPES,
 } from "./summary/text-organ.js";
 
 // Fabrication veto (ported from4.2 tiny-LLM contract + row-veto)
 export { veto } from "./veto/index.js";
+
+// Intuition composition — WorkingMemoryBuffer: store + discourse + prediction +
+// holon-level gate + forward-novelty, producing {possible, probable, gap-type}
+// spectrum per turn.
+export { WorkingMemoryBuffer, IntuitionItem } from "./intuition/working-memory.js";
 
 // The former physics-derivation re-exports (fokkerPlanckEvolve, navierStokesFlow,
 // michaelisMentenSaturation, schrodingerEvolve, …) were removed here. That module

@@ -47,10 +47,10 @@
 // restored stratified spine. Re-measured: 5/21, per-entity identical to
 // 0ef01f1. No entity regressed (Natasha 0→1, Pierre 0→0, creature 1→4).
 //
-// Why the altitude oracle missed it: multiAltitudeFold has its own
-// selection path and never exercises entityFold's top-up. The oracle's
+// Why the altitude assay missed it: multiAltitudeFold has its own
+// selection path and never exercises entityFold's top-up. The assay's
 // numbers are byte-identical before and after this fix (ground 100%,
-// faith 80.4–95.9%, mono 100%). The oracle does not subsume this scorer.
+// faith 80.4–95.9%, mono 100%). The assay does not subsume this scorer.
 //
 // Usage: node scripts/score-span-golden.mjs
 // Texts: pg2600 = ~/Downloads/pg2600.txt (War and Peace),

@@ -420,6 +420,58 @@ export function admitReferent(frames, prior, options = {}) {
 }
 
 /**
+ * Auto-discover referents from ranked surfaces without requiring a per-text prior.
+ *
+ * Universal coref: surfaces that pass the rank filter (not openers, sufficient
+ * spread, plausible name ratio) are auto-seeded as referents. Surfaces that
+ * corefer (containment or shared final token) are merged into the same referent.
+ *
+ * This makes the engine work on any text without pre-supplied knowledge — the
+ * prior becomes an enrichment, not a requirement.
+ */
+export function autoDiscoverReferents(frames, rankedSurfaces, { minFrames = 2 } = {}) {
+  const events = [];
+  const referentMap = new Map(); // surface -> referent_id
+
+  for (const { surface, frames: frameCount, mentions } of rankedSurfaces) {
+    if (frameCount < minFrames) continue;
+
+    // Check if this surface corefers with an existing referent
+    let matchedReferent = null;
+    for (const [existingSurface, referentId] of referentMap) {
+      if (namesCorefer(surface, existingSurface)) {
+        matchedReferent = referentId;
+        break;
+      }
+    }
+
+    if (matchedReferent) {
+      // Merge this surface into the existing referent
+      events.push({
+        type: "DEF.admit",
+        referent_id: matchedReferent,
+        surface,
+        provenance: "auto-discovery coref",
+      });
+      referentMap.set(surface, matchedReferent);
+    } else {
+      // Create a new referent for this surface
+      const referentId = `ref:auto:${diaNorm(surface).replace(/\s+/g, "_")}`;
+      events.push({
+        type: "DEF.admit",
+        referent_id: referentId,
+        surface,
+        provenance: "auto-discovery seed",
+      });
+      referentMap.set(surface, referentId);
+    }
+  }
+
+  const projection = projectReferents(events);
+  return { events, projection, referentMap };
+}
+
+/**
  * Observables the individuation gate consumes: mass (sightings) and coupling
  * (how many OTHER surfaces share the referent's frames), plus the named bit.
  */

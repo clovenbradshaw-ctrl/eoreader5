@@ -259,6 +259,15 @@ export function entityFold(text, entityName = null, options = {}) {
   //   - It created a NEW reading-created holon (delta exceeded threshold)
   //   - An existing holon CLIMBED the ontological ladder
   //   - The delta was very high (major prediction error ≈ major surprise)
+  //
+  // MEASURED 2026-07-29: on W&P and Frankenstein the field surfer returns
+  // ZERO significant sentences (Natasha 702 target frames → 0, creature 231
+  // → 0), so this top-up was a silent no-op and the fold emitted only the
+  // 4 event-dedup moments. Recall on the span golden fell 5/21 → 1/21. The
+  // field is kept (it is the only organ here that reads prediction error
+  // rather than lexis) but it no longer gets to leave the budget unspent:
+  // when it surfaces nothing, fall back to the stratified significance
+  // spine below, which is the selector the 5/21 was measured with.
   if (sceneMoments.length < sceneCount && targetFrames.length) {
     const { significantSentences } = readEntityField(
       normText, targetSurface, targetFrames, boundaries
@@ -266,6 +275,68 @@ export function entityFold(text, entityName = null, options = {}) {
     if (significantSentences.length >= 2) {
       selectTopFieldMoments(significantSentences, sceneMoments, sceneCount);
     }
+  }
+
+  // Fallback top-up: one-per-type event dedup can leave far fewer moments
+  // than asked for (4 types → 4 moments regardless of sceneCount), and the
+  // holon field above can surface nothing at all. Fill the remainder from
+  // the significance spine — STRATIFIED across the entity's presence extent.
+  // Forward surprise is measured against an accumulating history, so early
+  // text scores high by construction; taking globally-ranked peaks confines
+  // every moment to the opening chapters (measured: 12/12 spans in the first
+  // 27.5% of W&P). One winner per stratum spends the budget across the whole
+  // arc instead.
+  //
+  // Frame forward-surprise x referent presence, stratified, is the best
+  // MEASURED selector on the span golden (5/21). Variants measured and
+  // rejected — do not silently retry them:
+  //   presence-only ............................ 4/21
+  //   cold-start mask (minHistory) ............. 4/21 (kills exposition
+  //     scenes — a theme's first statement is canonical, not noise)
+  //   sentence-stream reduction ................ 3/21 (per-sentence bags
+  //     are too small to carry a KL)
+  // The residual gap to the golden is a MISSING OBSERVABLE (what the entity
+  // does/feels — relations, dialogue, affect), not a rearrangement of this.
+  if (sceneMoments.length < sceneCount && targetFrames.length) {
+    const spine = significanceSpine(targetFrames, { budget: targetFrames.length, k: sceneCount * 3 });
+    const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
+    const candidates = [...spine.scoreByPos.entries()]
+      .map(([pos, score]) => {
+        const f = targetFrames[pos];
+        return {
+          idx: f.order,
+          offset: f.offset,
+          text: f.text,
+          context: f.text,
+          score: (score || 1e-6) * Math.log1p(presence.get(f.order) ?? 0),
+        };
+      })
+      .filter((m) => m.offset != null && !sceneMoments.some((s) => near(s.offset, m.offset)));
+
+    const lo = targetFrames[0].offset;
+    const hi = targetFrames[targetFrames.length - 1].offset + 1;
+    const slots = sceneCount - sceneMoments.length;
+    const strata = Array.from({ length: slots }, () => []);
+    for (const m of candidates) {
+      const s = Math.min(slots - 1, Math.floor(((m.offset - lo) / (hi - lo)) * slots));
+      strata[s].push(m);
+    }
+    const picked = strata
+      .map((bucket) => bucket.sort((a, b) => b.score - a.score)[0])
+      .filter(Boolean);
+    // Strata the entity never peaks in stay empty; backfill by global score.
+    for (const m of candidates.sort((a, b) => b.score - a.score)) {
+      if (picked.length >= slots) break;
+      if (!picked.includes(m) && !picked.some((p) => near(p.offset, m.offset))) picked.push(m);
+    }
+    for (const m of picked.slice(0, slots)) {
+      sceneMoments.push({
+        ...m,
+        text: snapToSentences(m.text),
+        context: snapToSentences(m.context ?? m.text),
+      });
+    }
+    sceneMoments.sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0));
   }
 
   // 9. Build EOT packet. Absence is reported, never papered over: an entity

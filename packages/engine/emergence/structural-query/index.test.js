@@ -142,6 +142,40 @@ test("identical descriptors yield distance 0", () => {
   assert.ok(shapeDistance(d, d) < 1e-10);
 });
 
+test("synthesizeArchetype is a pure function of its description", () => {
+  const a = synthesizeArchetype({ windows: [] }, "sonata-allegro-form");
+  const b = synthesizeArchetype({ windows: [] }, "sonata-allegro-form");
+  assert.deepEqual(Array.from(a.descriptors.operatorDist), Array.from(b.descriptors.operatorDist));
+  const other = synthesizeArchetype({ windows: [] }, "sonata-allegro-form, but slower");
+  assert.notDeepEqual(Array.from(a.descriptors.operatorDist), Array.from(other.descriptors.operatorDist));
+});
+
+test("timestamps are host-supplied: absent ts is a null, never a clock read", () => {
+  const cache = buildFoldCache("test", SAMPLE_TEXT, { windowUnits: 4, stride: 2 });
+  assert.equal(cache.builtAt, null);
+  assert.equal(buildFoldCache("test", SAMPLE_TEXT, { windowUnits: 4, stride: 2, ts: 42 }).builtAt, 42);
+
+  const cold = structuralQuery("unknown-corpus", "synth:sonata-allegro-form", { foldCache: null });
+  assert.equal(cold.timestamp, null);
+  assert.equal(
+    structuralQuery("unknown-corpus", "synth:sonata-allegro-form", { foldCache: null, ts: 42 }).timestamp,
+    42,
+  );
+
+  const hot = structuralQuery("test", "synth:sonata-allegro-form", { foldCache: cache, topK: 3, permutationSamples: 20, ts: 42 });
+  assert.equal(hot.timestamp, 42);
+  assert.equal(hot.event.timestamp, 42);
+});
+
+test("whole query result is byte-identical across calls with the same host ts", () => {
+  const cache = buildFoldCache("test", SAMPLE_TEXT, { windowUnits: 4, stride: 2, ts: 7 });
+  const opts = { foldCache: cache, topK: 3, permutationSamples: 20, ts: 7 };
+  assert.equal(
+    JSON.stringify(structuralQuery("test", "synth:sonata-allegro-form", opts)),
+    JSON.stringify(structuralQuery("test", "synth:sonata-allegro-form", opts)),
+  );
+});
+
 test("results are deterministic: same inputs produce same outputs", () => {
   const cache = buildFoldCache("test", SAMPLE_TEXT, { windowUnits: 4, stride: 2 });
   const a = structuralQuery("test", "synth:sonata-allegro-form", { foldCache: cache, topK: 3, permutationSamples: 20 });

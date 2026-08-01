@@ -1,4 +1,4 @@
-// scripts/test-structured-nexrad.mjs — structural oracle for structured data.
+// scripts/test-structured-nexrad.mjs — structural assay for structured data.
 //
 // Processes the NEXRAD Level 3 S3 bucket listing through the structured
 // perceiver → state detection → holonic tree pipeline, and verifies that

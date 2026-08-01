@@ -102,9 +102,25 @@ export function detectBoundaries(frames, options = {}) {
   return boundaries;
 }
 
-// ── Entity discovery (co-occurrence) ──
-
-export function discoverEntities(frames, options = {}) {
+// ── Motif discovery (co-occurrence) ──
+//
+// This ranks MOTIFS — recurring lowercased terms whose distribution across
+// frames is far from uniform — and NOT entities. It reads `f.dist`, which is
+// already case-folded, so the only signal capitalization carries is gone
+// before this function sees the text. What it returns is what a document is
+// ABOUT, not who is IN it.
+//
+// It was called `discoverEntities` until 2026-07, and the name cost real
+// work: asked for the entities of the King James Bible it answered
+// "sanctuary, generations, iron, oxen, famine" — accurate motifs, and
+// nobody in the book. Anything wanting the names in a document wants
+// `perceiver/text/surfaces.js::rankSurfaces`, which keeps the capitalization
+// physics this deliberately discards.
+//
+// The distinction is not English-specific bookkeeping: a motif is a
+// recurrence in the signal and a referent is a thing the signal is about,
+// and conflating them is the same error in a score as in a novel.
+export function discoverMotifs(frames, options = {}) {
   const { minFrames = 3 } = options;
   if (frames.length < minFrames) return [];
   const wordFrames = new Map();

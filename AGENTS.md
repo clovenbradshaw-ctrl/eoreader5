@@ -38,14 +38,14 @@ logic.
 | reaction channel | `packages/engine/reaction/index.js` | `ReactionEvent@1` in its OWN append-only content-addressed log — never the semantic ledger (a reaction is an observation of a READER, not an inference; it carries no operator, no prior_id, no epoch). `ts`/`seq` are host-supplied; the engine has no clock. `salienceRanking` is a zero-weight TALLY, not a model — inferring from this channel is deliberately out of scope until it has data. Firewall: `conformance/invariants/reaction-channel-firewall.test.js`. |
 | relationship graph | `packages/engine/emergence/summary/relationship-graph.js` | cross-entity edges over a WHOLE text, not one entity's fold: `admitCast`/`presenceBySentence` reuse `admitReferent`/`presenceByFrame` per referent (never graph.js's union-find name-merging — a multi-word seed like "Prince Vasíli" must strip single-word nameSurfaces first, or it absorbs every OTHER prince's bare "Prince" vocative via containment; measured, see the comment in `admitCast`). `annotateSignificance` is a per-pair CONDITIONAL null (`N·pA·pB` from each referent's own presence rate, not one global mean/sd — see dead-ends). `classifyEdges` types each edge from an injected `{category:[keyword,...]}` lexicon gated by sub-sentence-unit adjacency: a keyword counts only if A and B sit in DIFFERENT units with the keyword's unit inside that (tight) span — modeling how a reader actually binds an appositive ("Andrew's father, the old colonel, greeted Pierre") across a clause chain, not a character-distance threshold, and never counting a keyword when A and B already share one unit (their own unit's verb IS the relation, a neighboring aside isn't). WHICH segmenter supplies those units is injected (`options.segmentUnits`, default `text-organ.js::splitClauses`/`unitIndexOf` — comma/semicolon/dash clausing is punctuated-WRITTEN-LANGUAGE-specific and has no meaning for a musical leitmotif, so it lives in the text perceiver, not in this module); the chain-adjacency logic itself is medium-agnostic. Plus subject/object-resolved SVO `statedRelations`, stronger evidence than any keyword. `computeNodeKindProfiles` is an emergent `advisoryKind`-argmax amplitude vector per node — never a gate, same discipline as the cube. Cast + lexicon are DATA (`priors/coref/*.json`, `priors/lexicon/*.json` — temporary repo-root location, moves to `eoPriors/` later); the module itself has no text or language baked in. `text-organ.js::splitSentences` gained a full-document sentence splitter where a paragraph break is a harder boundary than any terminator (a chapter heading has no period and must not glue onto the next paragraph). Driven by `scripts/build-relationship-graph.mjs <textPath> <corefPriorPath> [lexiconPath] [outPath]`. **The cast in `priors/coref/war-and-peace.json` is currently HAND-TYPED from literary knowledge (grep-verified against the text), not auto-discovered — this is a known, acknowledged gap. Auto-discovery would mean clustering `extractSurfaces` output via `namesCorefer` into candidate referents, then gating each through `referents/individuation.js`'s mass×coupling Born-null (not asserting holon status). Not yet built.** Scored against `golden/relationship-golden.json` (an EXTERNAL reference — Wikipedia's character list — never text-derived, never fitted to) via `scripts/score-relationship-golden.mjs`: current baseline 15/26 present-recall, 10/26 dominant-category recall, on facts whose referents exist in the cast (4 of 30 golden facts are REFERENT-GAPs: Lise Bolkónskaya, Nikólenka, Kiríll Bezúkhov, and Dolokhov's mother are not yet in the cast). |
 
-## Structural oracle (the score that matters)
+## Structural assay (the score that matters)
 
 No hand-written goldens. The engine's correctness is verified by a structural
-oracle: `scripts/test-altitudes.mjs` (run from repo root). It produces a
+assay: `scripts/test-altitudes.mjs` (run from repo root). It produces a
 five-altitude entity summary packet (L0 line → L4 dossier) for 4+ entities
 across 2+ texts and scores the stack on three mechanical invariants:
 
-Legacy goldens (kept for reference; the oracle is the primary gate):
+Legacy goldens (kept for reference; the assay is the primary gate):
 - `summary/golden/span-golden.json` + `scripts/score-span-golden.mjs` —
   significance. Current best **5/21** (forward-surprise × presence,
   stratified). 21 scenes, 3 entities, 3 arc kinds.
@@ -65,7 +65,7 @@ Legacy goldens (kept for reference; the oracle is the primary gate):
 | MONOTONICITY | L0 ⊆ L1 ⊆ L2 ⊆ L3 ⊆ L4 by construction | 100% |
 
 The altitude test replaces the old span-golden (significance, 5/21 ceiling,
-hand-picked scenes) and memory-golden (store recall, 4 events). The oracle
+hand-picked scenes) and memory-golden (store recall, 4 events). The assay
 is the hypothesis test: any regression in the organs (presence, fold, store,
 spine, referent admission) will surface as a failure of grounding, faith-
 fulness, or monotonicity. No model call, no hand-labelled golden, no tuning.
@@ -194,7 +194,7 @@ you are regressing:
   selectors must select across the WHOLE extent, never `slice(0, N)` in
   document order.
 
-## What the altitude oracle reveals
+## What the altitude assay reveals
 
 The altitude test (`scripts/test-altitudes.mjs`) surfaces three measured gaps:
 
@@ -217,7 +217,7 @@ The altitude test (`scripts/test-altitudes.mjs`) surfaces three measured gaps:
    coref prior produces exactly one typed gap (`descriptor_aliases_unresolved`)
    and zero silently-wrong spans. The tier boundary is holding.
 
-Vision: the oracle is the discipline. Not tuning against a hand-picked 21.
+Vision: the assay is the discipline. Not tuning against a hand-picked 21.
 Not fitting a scorer to one entity's arc. Every engine change either passes
-the oracle or provably improves it by adding an observable the oracle can
+the assay or provably improves it by adding an observable the assay can
 measure.
