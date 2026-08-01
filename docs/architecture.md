@@ -256,6 +256,9 @@ eoreader5/
       ledger/
       observations/
       referents/
+      discourse/         — turn-based working memory buffer
+                           (motif activation, pronoun channelling,
+                           topic stack, reading location)
       frames/
       provenance/
       authority/

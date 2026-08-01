@@ -1,72 +1,89 @@
 # EOReader5 — engine map for agents
 
-Read `docs/nameless-referent.md` first. It is the foundational principle:
-identity lives in the REFERENT, never in a string; surfaces are scoped
-evidence admitted by explicit events; witness-tier knowledge is injected as
-priors, never derived. Every coref regression in this project came from
-forgetting it. The companion principle is omnimodal design: an organ must
-make sense for a nameless leitmotif in music, or it is string-thinking.
+> **Legacy.** This repo is the `legacy` domain of the EO constitution
+> (`../eo-constitution/CONSTITUTION.md`): frozen reference and measured dead
+> ends. Trust the dead-end logs; never port from here — the current engine is
+> `eoreader6`, where every organ is re-earned.
+
+The mission is `docs/reader-experience-spec.md`: **to joyfully experience
+meaningful surprise.** This is the universal invariant — every organ, every
+selector, every gate exists to serve an earned, measured, faithful encounter
+with a source. Read it first; it frames why the other principles exist.
+
+The foundational principle is `docs/nameless-referent.md`: identity lives in
+the REFERENT, never in a string; surfaces are scoped evidence admitted by
+explicit events; witness-tier knowledge is injected as priors, never derived.
+Every coref regression in this project came from forgetting it.
+
+The companion principle is omnimodal design: an organ must make sense for a
+nameless leitmotif in music, or it is string-thinking.
+
+The third is `docs/holon-level.md`: whether one entity is above, below, or a
+peer of another is DISCOVERED (existence-dependency + possibility-constraint,
+Born-null gated), never assigned by naming a scale ("chapter," "scene").
+Read it before writing any cross-entity containment, ranking, or hierarchy
+logic.
 
 ## Organs and their status (2026-07)
 
 | organ | file | status |
-|---|---|---|
+|---|---|---|---|
 | cube classifier | `packages/engine/cube/index.js` | scored amplitudes over all 9×9×9 (was first-match-wins regex; that made Atmosphere/Lens/Paradigm unreachable). `classifyAmplitudes()` = the uncollapsed fold; `classify()` = its argmax. |
 | referent presence | `packages/engine/perceiver/text/presence.js` | `admitReferent` — event-sourced via `referents/projectReferents`; name variants structural (holons); descriptor aliases + narrator spans from per-text coref priors (`eoPriors/priors/coref/*.json`, anchor-quoted scopes). Emanons/first-person handled; missing prior ⇒ typed gap. |
 | associative memory | `packages/engine/emergence/store/index.js` | Hebbian edges at co-occurrence; sparse-BAND keys (idf ≥ floor AND df ≥ 2); keyword and phrase stores separate; index all, wire top-k; one CA3 completion hop. Biology notes in header are load-bearing. |
 | entity fold | `packages/engine/emergence/summary/entity-fold.js` | offset-grounded spans (verified round-trip), presence-based frames, stratified whole-arc selection, `withRelations`, `referent` prior option, `echoes` (spans carry offset-anchored recalled antecedents from the store). |
+| multi-altitude fold | `packages/engine/emergence/summary/multi-altitude-fold.js` | one-pass five-altitude entity summary (L0 line → L4 dossier); monotone by construction (cumulative prefixes of globally-ranked candidate pool); discourse-aware scene selection (location + motif bias). |
+| discourse | `packages/engine/discourse/index.js` | turn-based working memory: motif activation with exponential decay (25 cap, same physics as quantum), pronoun channelling (0.5 weight), topic stack (5 cap), commitment lifecycle, reading-location tracking. Clock is logical turns, not wall time. |
 | spine | `summary/spine.js` | `scoreByPos` exposes ALL sampled scores (not just peaks); `minHistory` cold-start mask exists but masking kills exposition scenes — see dead-ends. |
 | reaction channel | `packages/engine/reaction/index.js` | `ReactionEvent@1` in its OWN append-only content-addressed log — never the semantic ledger (a reaction is an observation of a READER, not an inference; it carries no operator, no prior_id, no epoch). `ts`/`seq` are host-supplied; the engine has no clock. `salienceRanking` is a zero-weight TALLY, not a model — inferring from this channel is deliberately out of scope until it has data. Firewall: `conformance/invariants/reaction-channel-firewall.test.js`. |
 | relationship graph | `packages/engine/emergence/summary/relationship-graph.js` | cross-entity edges over a WHOLE text, not one entity's fold: `admitCast`/`presenceBySentence` reuse `admitReferent`/`presenceByFrame` per referent (never graph.js's union-find name-merging — a multi-word seed like "Prince Vasíli" must strip single-word nameSurfaces first, or it absorbs every OTHER prince's bare "Prince" vocative via containment; measured, see the comment in `admitCast`). `annotateSignificance` is a per-pair CONDITIONAL null (`N·pA·pB` from each referent's own presence rate, not one global mean/sd — see dead-ends). `classifyEdges` types each edge from an injected `{category:[keyword,...]}` lexicon gated by sub-sentence-unit adjacency: a keyword counts only if A and B sit in DIFFERENT units with the keyword's unit inside that (tight) span — modeling how a reader actually binds an appositive ("Andrew's father, the old colonel, greeted Pierre") across a clause chain, not a character-distance threshold, and never counting a keyword when A and B already share one unit (their own unit's verb IS the relation, a neighboring aside isn't). WHICH segmenter supplies those units is injected (`options.segmentUnits`, default `text-organ.js::splitClauses`/`unitIndexOf` — comma/semicolon/dash clausing is punctuated-WRITTEN-LANGUAGE-specific and has no meaning for a musical leitmotif, so it lives in the text perceiver, not in this module); the chain-adjacency logic itself is medium-agnostic. Plus subject/object-resolved SVO `statedRelations`, stronger evidence than any keyword. `computeNodeKindProfiles` is an emergent `advisoryKind`-argmax amplitude vector per node — never a gate, same discipline as the cube. Cast + lexicon are DATA (`priors/coref/*.json`, `priors/lexicon/*.json` — temporary repo-root location, moves to `eoPriors/` later); the module itself has no text or language baked in. `text-organ.js::splitSentences` gained a full-document sentence splitter where a paragraph break is a harder boundary than any terminator (a chapter heading has no period and must not glue onto the next paragraph). Driven by `scripts/build-relationship-graph.mjs <textPath> <corefPriorPath> [lexiconPath] [outPath]`. **The cast in `priors/coref/war-and-peace.json` is currently HAND-TYPED from literary knowledge (grep-verified against the text), not auto-discovered — this is a known, acknowledged gap. Auto-discovery would mean clustering `extractSurfaces` output via `namesCorefer` into candidate referents, then gating each through `referents/individuation.js`'s mass×coupling Born-null (not asserting holon status). Not yet built.** Scored against `golden/relationship-golden.json` (an EXTERNAL reference — Wikipedia's character list — never text-derived, never fitted to) via `scripts/score-relationship-golden.mjs`: current baseline 15/26 present-recall, 10/26 dominant-category recall, on facts whose referents exist in the cast (4 of 30 golden facts are REFERENT-GAPs: Lise Bolkónskaya, Nikólenka, Kiríll Bezúkhov, and Dolokhov's mother are not yet in the cast). |
 
-## Goldens and scorers (frozen — the discipline is the point)
+## Structural assay (the score that matters)
 
+No hand-written goldens. The engine's correctness is verified by a structural
+assay: `scripts/test-altitudes.mjs` (run from repo root). It produces a
+five-altitude entity summary packet (L0 line → L4 dossier) for 4+ entities
+across 2+ texts and scores the stack on three mechanical invariants:
+
+Legacy goldens (kept for reference; the assay is the primary gate):
 - `summary/golden/span-golden.json` + `scripts/score-span-golden.mjs` —
   significance. Current best **5/21** (forward-surprise × presence,
-  stratified). 21 scenes, 3 entities, 3 arc kinds. Never tune on one entity:
-  Cult×Atmo×density hit 5.5× chance on Natasha and 0.7× (worse than chance)
-  on Pierre.
+  stratified). 21 scenes, 3 entities, 3 arc kinds.
 - `summary/golden/memory-golden.json` + `scripts/score-memory-golden.mjs`
   (run from repo root) — associative memory. Current: engine 2/2 recalled,
   model-tier 2/2 correctly gapped.
 - `summary/golden/relationship-golden.json` + `scripts/score-relationship-
   golden.mjs` — cross-entity relationship typing. 30 facts from an EXTERNAL
   reference (Wikipedia's War and Peace character list — never text-derived,
-  never fitted to; the golden is edited only if the reference source
-  changes, the engine's output never edited to chase this number). Current:
-  15/26 present-recall, 10/26 dominant-category recall (4 of 30 facts are
-  REFERENT-GAPs — the hand-typed cast doesn't yet cover Lise Bolkónskaya,
-  Nikólenka, Kiríll Bezúkhov, or Dolokhov's mother). Failure modes so far are
-  informative, not noise: real marriages (Nikolai↔Mary, Vera↔Berg) score
-  `kinship_parent_child` because that category's raw keyword count edges out
-  `marriage` on ties; several sibling pairs produce a co-occurrence edge with
-  no category signal at all. Both point at the lexicon's coverage/tie-
-  breaking, not at the clause-adjacency gating mechanism, which is holding.
-- `summary/golden/natasha-rostova.js` — aspirational PROSE golden (Storgy
-  shape). Not machine-scored; the plan is EOT-first, prosify later by porting
-  `eoreader4.2/src/weave/write/brief.js` (phraser→talker: engine determines
-  content, model only makes it fluent, veto strips inventions).
-- `scripts/bench-retrieval-vs-colbert.mjs` + `scripts/bench/` — benchmarks
-  the associative-memory store (`buildStore`/`surface`) against a
-  ColBERT-style late-interaction retriever (MaxSim over WordLlama static
-  token embeddings — a substitute for the real ColBERTv2 checkpoint, whose
-  only host, huggingface.co, this sandbox's network policy blocks; see
-  `scripts/bench/README.md`) and a pooled-cosine dense baseline. On the 4
-  frozen memory-golden events, all three systems correctly hit both
-  engine-tier events and correctly GAP both model-tier ones (no leaks) — the
-  tier boundary held even against a semantic retriever. On 60 auto-derived
-  long-range verbatim-motif pairs per book (mined from `store.posting`,
-  mechanical, not hand-picked): engine ≥ colbert-maxsim ≥ dense-cosine on
-  both books (pg84 R@10 13/10/4 of 60; pg2600 R@10 4/3/2 of 60) — late
-  interaction beats pooled dense as ColBERT's own claim predicts, and the
-  Hebbian sparse code holds a small edge over it at the range these motifs
-  actually recur. All three are weak at long range; see
-  `scripts/bench/RESULTS.md` for the full table.
+  never fitted to). Current: 15/26 present-recall, 10/26 dominant-category
+  recall (4 of 30 facts are REFERENT-GAPs).
 
-Tests that must stay green: `cube/index.test.js`,
+| check | what it measures | invariant |
+|---|---|---|
+| GROUNDING | every span has a valid source offset | 100% |
+| ENTITY-FAITHFUL | every span comes from a frame where presence detected the entity | 80%+ |
+| MONOTONICITY | L0 ⊆ L1 ⊆ L2 ⊆ L3 ⊆ L4 by construction | 100% |
+
+The altitude test replaces the old span-golden (significance, 5/21 ceiling,
+hand-picked scenes) and memory-golden (store recall, 4 events). The assay
+is the hypothesis test: any regression in the organs (presence, fold, store,
+spine, referent admission) will surface as a failure of grounding, faith-
+fulness, or monotonicity. No model call, no hand-labelled golden, no tuning.
+
+The mechanism: `multiAltitudeFold` in `packages/engine/emergence/summary/multi-altitude-fold.js`
+builds all five levels in one pass from a globally-scored candidate pool,
+partitioning by scene count (3/6/12/24/all). Altitude layers are cumulative
+prefixes of the rank-sorted pool, guaranteeing monotonicity by construction.
+Layers that collapse to the same size (not enough candidates) signal that the
+event extraction or spine ranking needs more coverage.
+
+Tests that must stay green: `scripts/test-altitudes.mjs`,
+`discourse/discourse.test.js`, `cube/index.test.js`,
 `perceiver/text/presence.test.js`, `emergence/store/store.test.js` (the
 presence and store tests ENFORCE the principles — if one fails, you are
-probably re-deriving identity from strings).
+probably re-deriving identity from strings). Discourse must also stay green
+on the conformance purity gate: `forbidden-dependencies.test.js` (no
+Date.now, no I/O, no randomness).
 
 ## Tier discipline
 
@@ -153,8 +170,17 @@ you are regressing:
   `presence.js::resolveSpans`. Raw offsets rot; exact-string anchors break on
   line wraps. Both failures happened repeatedly.
 - **Provenance/offset threading**: spans carry `{offset, length}` into the
-  source, verified by round-trip. Offsets were silently dropped at three
-  layers once; any new span-shaped output must carry them from birth.
+  source, verified by round-trip via `text-organ.js::locateRawSpan` (whitespace-
+  tolerant collapsed-position mapping; wired through `multi-altitude-fold.js`
+  and `kernel.js`'s `resolveRawSpan` option). `span.raw` is the literal source
+  substring; `span.verified`/`span.drift` report whether resolution succeeded
+  and how far the approximate offset was from the true one — measured at
+  ~96% of spans nonzero-drift (up to 362 chars) on real W&P data, since
+  `frameText`'s window-trim and `snapToSentences`'s whitespace collapse both
+  decouple offset from text at birth. No match found ⇒ `verified: false,
+  raw: null`, a typed gap, never a guessed slice. Offsets were silently
+  dropped at three layers once; any new span-shaped output must carry them
+  from birth.
 - **Capitalized-surface false positives** ("Well", "Why", chapter headers as
   names): the cap/lower-ratio physics filter + newline/token-count rejection
   live in `entity-fold.js` and `presence.js`. Do not re-derive.
@@ -168,15 +194,30 @@ you are regressing:
   selectors must select across the WHOLE extent, never `slice(0, N)` in
   document order.
 
-## Open problem (the next real win)
+## What the altitude assay reveals
 
-Span-golden recall is capped ~5/21 by the lexical channel. The missing piece
-is a NON-LEXICAL observable: what the entity does (SVO relation stream — the
-extractor exists in `perceiver/text/extraction.js`), dialogue attribution,
-affect. Feed one of those into span selection and score against the golden
-before any tuning. Arc-kind labels in the golden are INPUTS (Pierre falsified
-single-scalar significance).
+The altitude test (`scripts/test-altitudes.mjs`) surfaces three measured gaps:
 
-Vision (agreed): one packet, five altitudes (L0 line → L4 full dossier),
-monotone (every claim at Ln appears at Ln+1), every claim offset-grounded,
-`heldOpen` never asserted. Prose is the last projection, behind the 4.2 veto.
+1. **Altitude collapse**. The multi-pass candidate pool (events + spine + field
+   reader) produces ~55 distinct moments per entity in W&P. The significance
+   spine covers the remaining gap, but its lexical-surprise peaks aren't
+   narrative turning points — they're unusual word clusters. The candidate pool
+   is deep but wide in the wrong dimension. A non-lexical observable (SVO
+   relation stream, dialogue attribution, affect) would push meaningful
+   candidates from the spine tier into the event tier.
+
+2. **80-96% entity-faithfulness**. The ~5-20% of spans where entity presence
+   wasn't recorded are edge cases: the entity is present in a nearby frame but
+   the span's offset falls at a boundary gap between frames. The frame organ's
+   windowed overlap doesn't guarantee continuous coverage. Fixing this would
+   require frame overlap to guarantee every character offset belongs to at
+   least one frame where any entity is present.
+
+3. **The creature gaps correctly**. The Frankenstein emanon with no per-text
+   coref prior produces exactly one typed gap (`descriptor_aliases_unresolved`)
+   and zero silently-wrong spans. The tier boundary is holding.
+
+Vision: the assay is the discipline. Not tuning against a hand-picked 21.
+Not fitting a scorer to one entity's arc. Every engine change either passes
+the assay or provably improves it by adding an observable the assay can
+measure.

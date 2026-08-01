@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eoreader.dev/spec/schemas/individuation-result.schema.json",
   "title": "IndividuationResult",
-  "description": "The Ground -> Figure gate result for one referent (spec section 13). A ReferentHypothesis is ambient material with a provisional handle; it becomes eligible to carry a figure history only once this gate's gate_result.admitted is true. See docs/individuation-gate.md.",
+  "description": "The Ground -> Figure gate result for one referent (spec section 13). A ReferentHypothesis is ambient material with a provisional handle; it becomes eligible to carry a figure history only once this gate's gate_result.admitted is true. The gate measures whether Tapas (concentration-energy) has converged enough on one locus to erect a real wall of exclusion. grounded_by records the asymmetric operator→instance grounding (what the nine operators supply to every fold). part_of records internal sub-region parthood within this referent's specific character. Cross-referent parthood is never asserted — two referents under the same lens share grounded_by, not a part_of relation. See docs/individuation-gate.md and docs/mereotopology-relations.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,6 +21,8 @@
     "dispersion_null",
     "subject_reentry",
     "boundary_stability",
+    "grounded_by",
+    "part_of",
     "gate_result"
   ],
   "properties": {
@@ -87,6 +89,62 @@
             },
             "null_result": {
               "$ref": "null-protocol.schema.json"
+            }
+          }
+        }
+      ]
+    },
+    "grounded_by": {
+      "description": "Asymmetric, instance→kernel. The operator that supplied this referent's generic character (NUL/SIG/SEG/CON/SYN/DEF/EVA/REC/INS). Two referents under the same lens share grounded_by, not a part_of relation with each other. Set at event time; null until populated.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operator", "operator_epoch"],
+          "properties": {
+            "operator": {
+              "type": "string",
+              "enum": ["NUL", "SIG", "SEG", "CON", "SYN", "DEF", "EVA", "REC", "INS"],
+              "description": "The EO operator that generated this referent."
+            },
+            "operator_epoch": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The operator epoch active when this referent was generated."
+            },
+            "event_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The SemanticEvent id that carried this grounding operation."
+            },
+            "lens_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The lens active when this referent was grounded."
+            }
+          }
+        }
+      ]
+    },
+    "part_of": {
+      "description": "Only within one instance's specific character. A sub-span within this referent's own region (e.g. a scene within a character's arc). Cross-referent parthood is never asserted here — two referents are peers, not parts of each other. Set when a sub-region relation is asserted; null until populated.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["referent_id"],
+          "properties": {
+            "referent_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The containing referent's id (must be THIS referent — part_of is only ever internal)."
+            },
+            "sub_region": {
+              "type": "object",
+              "description": "The sub-region within this referent's extent. Carries its own boundary stability evidence.",
+              "additionalProperties": true
             }
           }
         }

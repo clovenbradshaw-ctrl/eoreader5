@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/trace-deposit.schema.json",
+  "title": "TraceDeposit",
+  "description": "A single trace deposited into a stigmergic medium by one agent. Append-only, never mutated. Carries consequence-edges for R5 loop-closure. Schema mirrors the deposit() return shape in emergence/stigmergy/index.js.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "agentId",
+    "trace",
+    "turn"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Content-addressed stable id for this deposit."
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque agent identifier. Agents cannot address each other through this (R1)."
+    },
+    "trace": {
+      "type": "object",
+      "description": "Opaque payload — the trace content the agent deposited.",
+      "additionalProperties": true
+    },
+    "offGradient": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this deposit was exploratory (off-gradient, R4 stochastic exploration)."
+    },
+    "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic turn number when this deposit was appended."
+    }
+  }
+}

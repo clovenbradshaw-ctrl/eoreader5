@@ -1,13 +1,19 @@
 # EOReader5
 
 The pure semantic engine used by an EO Reader application. Not a full-stack
-app, not a model router, not a database — see `docs/architecture.md` for the
-full boundary and `docs/operator-epoch.md` for the P0 operator vocabulary
-decision. `docs/invariants.md`, `docs/priors-boundary.md`,
-`docs/compatibility.md`, and `docs/migration.md` define the separate-repo
-transfer boundaries for eoreader5, eoprior, and eoreaderapp.
-`docs/predictive-competency-phase0.md` documents the Phase 0 predictive-competency
-substrate (commit-before-reveal, proper scoring, baselines, competency ledger).
+app, not a model router, not a database.
+
+**Mission**: `docs/reader-experience-spec.md` — to joyfully experience
+meaningful surprise. Every organ, selector, and gate serves an earned,
+measured, faithful encounter with a source.
+
+See `docs/architecture.md` for the full boundary and `docs/operator-epoch.md`
+for the P0 operator vocabulary decision. `docs/invariants.md`,
+`docs/priors-boundary.md`, `docs/compatibility.md`, and `docs/migration.md`
+define the separate-repo transfer boundaries for eoreader5, eoprior, and
+eoreaderapp. `docs/predictive-competency-phase0.md` documents the Phase 0
+predictive-competency substrate (commit-before-reveal, proper scoring,
+baselines, competency ledger).
 
 ## Packages
 

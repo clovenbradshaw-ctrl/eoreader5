@@ -11,7 +11,18 @@ export { createState, applyCommand, appendEvents, replay, read, readTasks } from
 // The reaction channel. Its own append-only log, deliberately NOT the
 // semantic ledger: a reaction is an observation of a reader, not an engine
 // inference, and it must never mint an observation or a referent.
-export { mintReaction, createReactionLog, appendReactions, replayReactions, salienceRanking } from "./reaction/index.js";
+export { mintReaction, createReactionLog, appendReactions, replayReactions, salienceRanking, readerOrientationFromLog, REACTION_KINDS } from "./reaction/index.js";
+
+// The motivation organ. Drives and reader orientation — the engine's model
+// of what the reader actually cares about, derived deterministically from
+// their accumulated reaction history. Not an inference: an observation of
+// observed behaviour.
+export { createReaderOrientation, motivationalBias, tierDemandGap, drivesSummary } from "./motivation/index.js";
+
+// Gap-navigation system. Makes gaps enumerable, navigable, and actionable —
+// the truth-seeking impulse as a structural property of the interface between
+// the engine's known and unknown.
+export { navigableGap, navigableGaps, gapSeverity, gapActions, unresolvedClaims, gapSummary } from "./motivation/gaps.js";
 export { project, readingSnapshot } from "./projection/index.js";
 export { evaluate } from "./emergence/evaluate/index.js";
 export { deriveNull, createSeededRng, seededShuffle } from "./emergence/nulls/index.js";
@@ -90,7 +101,37 @@ export {
   fold,
   foldReadingSnapshot,
   scoreChunk,
+  declareOccasionGrain,
+  computeResidual,
+  resolveFoldPhase,
+  phaseWeights,
+  andCompletion,
+  FOLD_PHASES,
 } from "./emergence/fold/index.js";
+
+// Surplus channel (Spec 2): four-gate anti-sycophancy apparatus
+export {
+  gateDataSurplus,
+  gateSycophancyNull,
+  gateTransferHeldOut,
+  gateCorroborationFloor,
+  admitSurplus,
+} from "./emergence/surplus/index.js";
+
+// Play mode (Spec 3.3): epistemic wandering with no pragmatic term
+export {
+  playMode,
+  asPlayFold,
+} from "./emergence/play/index.js";
+
+// Witness log (Spec 3.5): walled-off surface, write-only from the system
+export {
+  recordWitnessEvent,
+  recordPlayRun,
+  recordConvergenceEvent,
+  recordSurplusEvent,
+  configureWitnessLog,
+} from "./witness/index.js";
 
 // Born salience: exemplar scoring, relax settling, route decision.
 // Ported from4.2: src/weave/chorus/born.js, src/weave/longgen/relax.js.
@@ -145,6 +186,10 @@ export {
   buildBinaryReading,
   buildTextReading,
 } from "./perceiver/dispatch.js";
+export {
+  buildStructuredReading,
+  STRUCTURED_FIELD_SPEC,
+} from "./perceiver/structured/reading.js";
 export {
   buildAudioReading,
   extractFrameFields,
@@ -230,6 +275,48 @@ export {
 } from "./perceiver/field-spec.js";
 export { TEXT_FIELD_SPEC, buildTextFieldText } from "./perceiver/text/text-signal.js";
 
+// Terrain discovery: modality-blind terrain analysis for any reading.
+// Attached automatically by buildReadingFromBytes; every reading carries
+// a TerrainReport@1 covering all 9 terrains.
+export {
+  buildTerrainReport,
+  attachTerrainReport,
+  bornGate,
+} from "./emergence/terrain/discovery.js";
+
+// State detection: find distinct modes in value distributions, recursively.
+// Modality-blind — works on any numeric series. No hand-set thresholds.
+export {
+  detectModes,
+  findTransitions,
+  findStateRuns,
+  detectSubModes,
+  detectPhases,
+  holonicDecompose,
+  analyzeStates,
+} from "./emergence/states/index.js";
+
+// Structured entity extraction: entities from tabular data, holonic trees,
+// cross-entity associations. The bridge from structured perceiver output to
+// the engine's entity model.
+export {
+  extractCategoricalEntities,
+  extractStateEntities,
+  extractEventEntities,
+  extractGapEntities,
+  detectTemporalRhythms,
+  buildHolonicTree,
+  buildEntityAssociations,
+  extractAllEntities,
+  structuredEntityFold,
+  detectVoidStructure,
+  detectNetworkStructure,
+  detectAtmosphereStructure,
+  detectLensStructure,
+  detectParadigmStructure,
+  terrainCoverage,
+} from "./emergence/structured/index.js";
+
 // Trajectory red shift and physics current density, unified: both are a
 // cosine comparison against a reference accumulated along an axis, so
 // they are one implementation over any field-spec sequence. The
@@ -277,6 +364,21 @@ export {
   inkTask,
   completionDiagnostic,
 } from "./emergence/genesis/index.js";
+
+// Cross-modal structural query: shape-based similarity search across folded corpora.
+// Given any two folded signals (text span, audio movement, video sequence),
+// measures structural similarity via novelty/recurrence/operator-distribution
+// shape descriptors, with Born-null (temporal shuffle) + specificity gates.
+export {
+  structuralQuery,
+  buildFoldCache,
+  buildShapeDescriptors,
+  resolveArchetype,
+  synthesizeArchetype,
+  runGateA,
+  runGateB,
+  shapeDistance,
+} from "./emergence/structural-query/index.js";
 
 // ── The invariant layer ──
 // The four constraints that define the system's legal state space.

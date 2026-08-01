@@ -14,6 +14,7 @@
 
 import { extractSurfaces, buildSurfaceMap, buildEntityRecords } from "../../perceiver/text/surfaces.js";
 import { cosineSimilarity } from "../../perceiver/text/text-signal.js";
+import { collapseWhitespace } from "../../perceiver/text/presence.js";
 
 export { cosineSimilarity };
 
@@ -101,9 +102,25 @@ export function detectBoundaries(frames, options = {}) {
   return boundaries;
 }
 
-// ── Entity discovery (co-occurrence) ──
-
-export function discoverEntities(frames, options = {}) {
+// ── Motif discovery (co-occurrence) ──
+//
+// This ranks MOTIFS — recurring lowercased terms whose distribution across
+// frames is far from uniform — and NOT entities. It reads `f.dist`, which is
+// already case-folded, so the only signal capitalization carries is gone
+// before this function sees the text. What it returns is what a document is
+// ABOUT, not who is IN it.
+//
+// It was called `discoverEntities` until 2026-07, and the name cost real
+// work: asked for the entities of the King James Bible it answered
+// "sanctuary, generations, iron, oxen, famine" — accurate motifs, and
+// nobody in the book. Anything wanting the names in a document wants
+// `perceiver/text/surfaces.js::rankSurfaces`, which keeps the capitalization
+// physics this deliberately discards.
+//
+// The distinction is not English-specific bookkeeping: a motif is a
+// recurrence in the signal and a referent is a thing the signal is about,
+// and conflating them is the same error in a score as in a novel.
+export function discoverMotifs(frames, options = {}) {
   const { minFrames = 3 } = options;
   if (frames.length < minFrames) return [];
   const wordFrames = new Map();
@@ -237,6 +254,63 @@ export function snapToSentences(text) {
   }
   const snapped = s.slice(start, end).trim();
   return snapped.length >= s.length * 0.4 ? snapped : s;
+}
+
+// ── Raw span provenance ──
+// A span's `offset` names a position in the SOURCE; its `text` is prose that
+// has been through frameText's window-trim and/or snapToSentences' whitespace
+// collapse — neither operation preserves the offset/text pairing exactly
+// (frameText.trim() strips leading whitespace without adjusting offset;
+// snapToSentences collapses interior whitespace runs to a single space).
+// locateRawSpan recovers the true `{offset, length}` such that
+// sourceText.slice(offset, offset+length), once its own whitespace is
+// collapsed the same way, reproduces displayText exactly — i.e. it finds
+// the literal raw substring the display text was derived from. Whitespace-
+// tolerant only: it does not diacritic-normalize (that's presence.js's job
+// for identity matching, not source fidelity). No match within the search
+// window is reported as a typed gap (`verified: false`), never a guess.
+
+export function locateRawSpan(sourceText, approxOffset, displayText, options = {}) {
+  const src = String(sourceText ?? "");
+  const disp = String(displayText ?? "");
+  const radius = options.radius ?? 2500;
+
+  if (!disp || approxOffset == null || approxOffset < 0 || !src) {
+    return { offset: approxOffset ?? null, length: 0, raw: null, verified: false, drift: null };
+  }
+
+  const winStart = Math.max(0, approxOffset - radius);
+  const winEnd = Math.min(src.length, approxOffset + disp.length + radius);
+  const window = src.slice(winStart, winEnd);
+
+  // Collapse whitespace runs to a single space, recording for every character
+  // emitted into `collapsed` the raw index (within `window`) it came from —
+  // the exact inverse of the frameText/snapToSentences transform. Shared with
+  // presence.js::resolveSpans, which uses the same mapping to make
+  // anchor-quote resolution whitespace-tolerant.
+  const { collapsed, map } = collapseWhitespace(window);
+
+  let bestCi = -1;
+  let bestDist = Infinity;
+  let idx = collapsed.indexOf(disp);
+  while (idx !== -1) {
+    const rawStart = winStart + map[idx];
+    const dist = Math.abs(rawStart - approxOffset);
+    if (dist < bestDist) { bestDist = dist; bestCi = idx; }
+    idx = collapsed.indexOf(disp, idx + 1);
+  }
+
+  if (bestCi === -1) {
+    return {
+      offset: approxOffset, length: disp.length, raw: null,
+      verified: false, drift: null, reason: "no_match_in_window",
+    };
+  }
+
+  const offset = winStart + map[bestCi];
+  const endCi = bestCi + disp.length - 1;
+  const end = winStart + map[endCi] + 1;
+  return { offset, length: end - offset, raw: src.slice(offset, end), verified: true, drift: offset - approxOffset };
 }
 
 // ── Entity-kinds boosting ──

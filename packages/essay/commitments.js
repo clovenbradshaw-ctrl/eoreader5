@@ -33,6 +33,7 @@ export function bindCommitment({ proposition, sectionId, spanRefs }) {
       source_id: e.source_id,
       event_id: e.event_id,
       span_text: e.span_text,
+      span_raw: e.span_raw ?? null,
       anchor: e.anchor,
     })),
     sectionId,
@@ -123,7 +124,7 @@ export function assembleCommitments(propositions, spine, matrix) {
           const commitment = bindCommitment({
             proposition: prop,
             sectionId: section.id,
-            spanRefs: [{ source_id: src, event_id: prop.source_evidence[0]?.event_id, span_text: evidence.span_text, anchor: evidence.anchor }],
+            spanRefs: [{ source_id: src, event_id: prop.source_evidence[0]?.event_id, span_text: evidence.span_text, span_raw: evidence.span_raw ?? null, anchor: evidence.anchor }],
           });
 
           const verdict = vetCommitment(commitment, {

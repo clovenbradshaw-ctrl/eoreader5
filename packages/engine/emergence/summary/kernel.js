@@ -25,6 +25,21 @@ import { forwardScore } from "../surprise/index.js";
 // organs only emit events at detected signal boundaries, so each one is
 // a boundary by construction.
 
+// Raw-span provenance is modality-specific (it re-slices SOURCE text, audio,
+// etc.), so the kernel never resolves it itself — it stays modality-agnostic
+// and just calls whatever resolver the organ supplies via
+// `options.resolveRawSpan(offset, text) -> {offset, length, raw, verified, drift}`.
+// When resolution succeeds, `offset`/`length` are corrected to the verified
+// raw span (the approximation was never guaranteed to be exact — see
+// text-organ.js::locateRawSpan); an unresolved moment keeps its approximate
+// offset/length and is marked unverified rather than silently "fixed" wrong.
+function withRawSpan(base, m, resolveRawSpan) {
+  if (!resolveRawSpan || m.offset == null || !m.text) return base;
+  const resolved = resolveRawSpan(m.offset, m.text);
+  if (!resolved.verified) return { ...base, raw: null, verified: false, drift: null };
+  return { ...base, offset: resolved.offset, length: resolved.length, raw: resolved.raw, verified: true, drift: resolved.drift };
+}
+
 function turningFilter(events, turningTypes) {
   if (!turningTypes) return events.slice();
   return events.filter((e) => turningTypes.includes(e.type));
@@ -203,7 +218,7 @@ export function orderChronologically(relations, events, temporalMarkers) {
  *
  * @param {{ relations, events, order }} ordered - from orderChronologically
  * @param {string} entityName
- * @param {object} options - { tokenBudget, maxRelations, connectionMap, focus, title, sceneMoments }
+ * @param {object} options - { tokenBudget, maxRelations, connectionMap, focus, title, sceneMoments, resolveRawSpan }
  * @returns {object} EOT packet
  */
 export function buildEntityPacket(ordered, entityName, options = {}) {
@@ -219,6 +234,7 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
     gaps = [],
     scope = "entity",
     place = null,
+    resolveRawSpan = null,
   } = options;
 
   const { relations, events, order } = ordered;
@@ -227,29 +243,32 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
   // these are the sentences of highest forward surprise, i.e. the document's
   // turning points, not just the first N events encountered.
   const spans = sceneMoments.length
-    ? sceneMoments.map((m, i) => ({
+    ? sceneMoments.map((m, i) => withRawSpan({
         idx: i,
         offset: m.offset ?? null,
         length: m.text?.length ?? 0,
         text: m.text,
         coord: classify(m.text),
         score: m.score,
-      }))
-    : events.slice(0, 8).map((e, i) => ({
+        foldGradient: m.foldGradient ?? null,
+        foldCAPE: m.foldCAPE ?? null,
+        foldShear: m.foldShear ?? null,
+      }, m, resolveRawSpan))
+    : events.slice(0, 8).map((e, i) => withRawSpan({
         idx: i,
         offset: e.offset ?? null,
         length: e.text?.length ?? 0,
         text: e.text,
         coord: classify(e.text),
         score: 0,
-      }));
+      }, e, resolveRawSpan));
 
   // Key moments: scene moments with surrounding context, ordered by narrative
   // position (not by score) so they read as a forward tour of the entity's arc.
   const keyMoments = sceneMoments
     .slice()
     .sort((a, b) => a.idx - b.idx)
-    .map((m) => ({
+    .map((m) => withRawSpan({
       idx: m.idx,
       offset: m.offset ?? null,
       length: m.text?.length ?? 0,
@@ -257,7 +276,10 @@ export function buildEntityPacket(ordered, entityName, options = {}) {
       text: m.text,
       context: m.context,
       score: m.score,
-    }));
+      foldGradient: m.foldGradient ?? null,
+      foldCAPE: m.foldCAPE ?? null,
+      foldShear: m.foldShear ?? null,
+    }, m, resolveRawSpan));
 
   // Build groups: settled = relations, heldOpen = none (biography is all settled),
   // turns = events that change the narrative state

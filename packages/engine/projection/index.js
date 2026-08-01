@@ -22,6 +22,11 @@ export function project(state, { frame = "frame:default", lens = "lens:neutral",
 
 export function readingSnapshot(state, { frame = "frame:default", lens = "lens:neutral", source_id } = {}) {
   const bundle = project(state, { frame, lens });
+  // Index observations by source_id for capture provenance lookup.
+  const obsBySource = new Map();
+  for (const obs of state.observations) {
+    obsBySource.set(obs.source_id, obs);
+  }
   const snapshot = {
     schema_version: "ReadingSnapshot@1",
     reading_id: id("reading", { head: state.semanticHead, frame, lens, prior: state.priorSnapshot.prior_id }),
@@ -34,10 +39,18 @@ export function readingSnapshot(state, { frame = "frame:default", lens = "lens:n
     semantic_head: state.semanticHead,
     provenance_layer: provenanceLayer(state),
     units: bundle.spans.map((span) => {
+      const obs = obsBySource.get(span.source_id);
       const operator_events = state.events
         .filter((event) => (event.payload?.envelope?.source_id ?? event.payload?.source_id) === span.source_id || (event.payload?.envelope?.fields ?? event.payload?.fields)?.some?.((field) => field.field_id === span.field_id) || event.inputs?.some((input) => state.events.some((candidate) => candidate.event_id === input && candidate.payload?.source_id === span.source_id)))
         .map((event) => event.event_id);
-      return { unit_id: span.span_id, operator_events, provenance: { source_id: span.source_id, field_id: span.field_id }, held: state.hypotheses.held.length > 0, alternatives: state.hypotheses.competing };
+      return {
+        unit_id: span.span_id,
+        operator_events,
+        provenance: { source_id: span.source_id, field_id: span.field_id },
+        capture_provenance: obs?.capture_provenance ?? null,
+        held: state.hypotheses.held.length > 0,
+        alternatives: state.hypotheses.competing,
+      };
     }),
   };
   return validateReadingSnapshot(snapshot);

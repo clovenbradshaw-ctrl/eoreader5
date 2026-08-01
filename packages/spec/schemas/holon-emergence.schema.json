@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/holon-emergence.schema.json",
+  "title": "HolonEmergence",
+  "description": "The result of composing parts into a higher holon through SYN. Two gates: supplementation (leave-one-out, each part must contribute individually) and downward-closure (the safety-critical gate — no absorption of parts, no unaccountable coordination). A failed holon is returned as an unpromoted assembly with the failure reason on the audit surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admitted",
+    "status"
+  ],
+  "properties": {
+    "admitted": {
+      "type": "boolean",
+      "description": "True if both gates passed. False means the composition is an unpromoted assembly."
+    },
+    "status": {
+      "enum": ["holon", "assembly"],
+      "description": "holon = admitted (genuine whole); assembly = failed gate (unpromoted)."
+    },
+    "reason": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "Failure reason on the audit surface when not admitted."
+        }
+      ]
+    },
+    "holon": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "parts"],
+          "properties": {
+            "schema": { "const": "Holon@1" },
+            "parts": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 2,
+              "description": "Part identifiers that compose this holon."
+            }
+          }
+        }
+      ]
+    },
+    "supplementation": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["passed", "mean_leave_out"],
+          "properties": {
+            "passed": { "type": "boolean" },
+            "mean_leave_out": { "type": "number" },
+            "null_result": { "$ref": "null-protocol.schema.json" },
+            "samples": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "downward_closure": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["admitted", "predicate_a", "predicate_b"],
+          "properties": {
+            "admitted": { "type": "boolean" },
+            "predicate_a": {
+              "type": "boolean",
+              "description": "Specific character preservation — no part absorbed with no remainder (anti-predator gate)."
+            },
+            "predicate_b": {
+              "type": "boolean",
+              "description": "Trace sensibility — holon traces are sensible by parts (anti-capture gate)."
+            },
+            "reason": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "string", "minLength": 1 }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

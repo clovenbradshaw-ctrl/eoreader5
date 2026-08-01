@@ -16,6 +16,7 @@ export const SUBASSEMBLY_KINDS = Object.freeze([
   "fold-compression",
   "born-salience",
   "fabrication-veto",
+  "paradigm-promotion",
 ]);
 
 export const REQUIRED_PORTS = Object.freeze({
@@ -34,6 +35,7 @@ export const REQUIRED_PORTS = Object.freeze({
   "fold-compression": Object.freeze({ inputs: ["reading-snapshot", "token-budget"], outputs: ["folded-reading"] }),
   "born-salience": Object.freeze({ inputs: ["content-score", "exemplar-basis"], outputs: ["salience-score", "route-decision"] }),
   "fabrication-veto": Object.freeze({ inputs: ["candidate-output", "grounding-propositions"], outputs: ["veto-decision"] }),
+  "paradigm-promotion": Object.freeze({ inputs: ["lens-registry", "candidate-kind", "null-protocol"], outputs: ["paradigm-gate-result"] }),
 });
 
 export function isSubassemblyKind(kind) {

@@ -21,12 +21,14 @@ import {
   extractEvents,
   extractSurfaces,
   snapToSentences,
+  locateRawSpan,
   TURNING_EVENT_TYPES,
 } from "./text-organ.js";
 import { classify, advisoryClassifyTerrain } from "../../cube/index.js";
 import { extractRelations as extractTextRelations } from "../../perceiver/text/extraction.js";
 import { admitReferent, presenceByFrame } from "../../perceiver/text/presence.js";
 import { buildStore, surface as surfaceMemory } from "../store/index.js";
+import { readEntityField, selectTopFieldMoments } from "./fold-field-surfer.js";
 
 // Diacritical mapping for engine-level entity name matching.
 // NOT signal-path normalization — this is the engine discovering
@@ -244,30 +246,58 @@ export function entityFold(text, entityName = null, options = {}) {
       .map((m) => ({ ...m, text: snapToSentences(m.text), context: snapToSentences(m.context ?? m.text) }));
   }
 
-  // Top up: one-per-type event dedup can leave far fewer moments than asked
-  // for (4 types → 4 moments regardless of sceneCount). Fill the remainder
-  // from the significance spine — STRATIFIED across the entity's presence
-  // extent. Forward surprise is measured against an accumulating history, so
-  // early text scores high by construction; taking globally-ranked peaks
-  // confines every moment to the opening chapters (measured: 12/12 spans in
-  // the first 27.5% of W&P). One winner per stratum spends the budget across
-  // the whole arc instead.
+  // Top up: entity-specific, prior-driven holon field.
+  // The entity's OWN holon field is seeded with the entity as a raw-span
+  // holon. Each entity-present sentence is folded against accumulated
+  // textual priors (the "human never reads a sentence blind" principle)
+  // and processed against the entity's holon field. The delta between
+  // the predicted fold (gravitational centroid of existing holons) and
+  // the actual fold generates NEW reading-created holons or reinforces
+  // existing ones.
+  //
+  // A sentence is significant when:
+  //   - It created a NEW reading-created holon (delta exceeded threshold)
+  //   - An existing holon CLIMBED the ontological ladder
+  //   - The delta was very high (major prediction error ≈ major surprise)
+  //
+  // MEASURED 2026-07-29: on W&P and Frankenstein the field surfer returns
+  // ZERO significant sentences (Natasha 702 target frames → 0, creature 231
+  // → 0), so this top-up was a silent no-op and the fold emitted only the
+  // 4 event-dedup moments. Recall on the span golden fell 5/21 → 1/21. The
+  // field is kept (it is the only organ here that reads prediction error
+  // rather than lexis) but it no longer gets to leave the budget unspent:
+  // when it surfaces nothing, fall back to the stratified significance
+  // spine below, which is the selector the 5/21 was measured with.
   if (sceneMoments.length < sceneCount && targetFrames.length) {
-    // Every presence frame is a candidate, scored by motif-self-surprise x
-    // presence: targetFrames are the entity's statements in order, so
-    // forwardScore reads "how unlike this entity's previous appearances is
-    // this one". This is the best MEASURED selector on the span golden
-    // (5/21); see golden/span-golden.json notes. Variants measured and
-    // rejected — do not silently retry them:
-    //   presence-only ............................ 4/21
-    //   cold-start mask (minHistory) ............. 4/21 (kills exposition
-    //     scenes — a theme's first statement is canonical, not noise)
-    //   sentence-stream reduction ................ 3/21 (per-sentence bags
-    //     are too small to carry a KL; the "instrument line" idea is right,
-    //     the lexical field vector is too weak an extractor for it)
-    // The residual gap to the golden is a MISSING OBSERVABLE (what the
-    // entity does/feels — relations, dialogue, affect channels), not a
-    // rearrangement of this one.
+    const { significantSentences } = readEntityField(
+      normText, targetSurface, targetFrames, boundaries
+    );
+    if (significantSentences.length >= 2) {
+      selectTopFieldMoments(significantSentences, sceneMoments, sceneCount);
+    }
+  }
+
+  // Fallback top-up: one-per-type event dedup can leave far fewer moments
+  // than asked for (4 types → 4 moments regardless of sceneCount), and the
+  // holon field above can surface nothing at all. Fill the remainder from
+  // the significance spine — STRATIFIED across the entity's presence extent.
+  // Forward surprise is measured against an accumulating history, so early
+  // text scores high by construction; taking globally-ranked peaks confines
+  // every moment to the opening chapters (measured: 12/12 spans in the first
+  // 27.5% of W&P). One winner per stratum spends the budget across the whole
+  // arc instead.
+  //
+  // Frame forward-surprise x referent presence, stratified, is the best
+  // MEASURED selector on the span golden (5/21). Variants measured and
+  // rejected — do not silently retry them:
+  //   presence-only ............................ 4/21
+  //   cold-start mask (minHistory) ............. 4/21 (kills exposition
+  //     scenes — a theme's first statement is canonical, not noise)
+  //   sentence-stream reduction ................ 3/21 (per-sentence bags
+  //     are too small to carry a KL)
+  // The residual gap to the golden is a MISSING OBSERVABLE (what the entity
+  // does/feels — relations, dialogue, affect), not a rearrangement of this.
+  if (sceneMoments.length < sceneCount && targetFrames.length) {
     const spine = significanceSpine(targetFrames, { budget: targetFrames.length, k: sceneCount * 3 });
     const near = (a, b) => a != null && b != null && Math.abs(a - b) < 2000;
     const candidates = [...spine.scoreByPos.entries()]
@@ -331,6 +361,7 @@ export function entityFold(text, entityName = null, options = {}) {
     gaps,
     scope: placeWindow ? "entity@place" : "entity",
     place: placeWindow,
+    resolveRawSpan: (offset, spanText) => locateRawSpan(normText, offset, spanText),
   });
 
   // 10. Echoes — associative memory (emergence/store). For each selected span,

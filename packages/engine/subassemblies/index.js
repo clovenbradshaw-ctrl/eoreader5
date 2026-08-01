@@ -93,6 +93,12 @@ export const CORE_SUBASSEMBLIES = assembleWatchmaker([
   // Ported from4.2 tiny-LLM contract + row-veto battery.
   // Depends on reading-snapshot (for grounding propositions).
   defineSubassembly({ id: "fabrication-veto", kind: "fabrication-veto", version: "0.1.0", inputs: ["candidate-output", "grounding-propositions"], outputs: ["veto-decision"], depends_on: ["reading-snapshot"], owns: ["safety net for small model outputs"] }),
+
+  // Paradigm promotion gate: when a corpus prior or Kind graduates from
+  // pocket-local to widely accepted across independent lenses.
+  // Three sub-gates (correlated-error, Blackwell-Dubins, Zollman), all
+  // thresholded by deriveNull — same discipline as the individuation gate.
+  defineSubassembly({ id: "paradigm-promotion", kind: "paradigm-promotion", version: "0.1.0", inputs: ["lens-registry", "candidate-kind", "null-protocol"], outputs: ["paradigm-gate-result"], depends_on: ["individuation-gate"], owns: ["Pocket-local → widely-accepted promotion gate: correlated-error floor, Blackwell-Dubins precondition, Zollman delay"] }),
 ]);
 
 function topoSort(items, byId) {

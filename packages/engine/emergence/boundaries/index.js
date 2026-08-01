@@ -1,6 +1,8 @@
-// Boundary stability (spec section 13.3): the individuation test. Mass
-// concentration alone is a clustering heuristic that will happily
-// individuate boilerplate; a figure is a place where the cut keeps landing.
+// Boundary stability (spec section 13.3): the individuation test. Tapas
+// concentration alone is a clustering heuristic that happily individuates
+// boilerplate; a figure is a place where the cut keeps landing. A wall of
+// exclusion must be REAL, not theatrical — if the cut won't stay put under
+// perturbation, the referent was never genuinely individuated.
 //
 //   for k perturbations of the segmentation (SEG):
 //       recompute the referent's boundary

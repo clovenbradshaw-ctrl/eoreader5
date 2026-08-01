@@ -45,6 +45,7 @@ export function materializeObservationIndex(observations = [], blockStore = new 
         value,
         selector: block?.selectors?.[index] ?? envelope.anchors?.selectors?.[field.field_id]?.[index] ?? null,
         axes: field.axes ?? [],
+        capture_provenance: envelope.capture_provenance ?? null,
       }));
     }
   }

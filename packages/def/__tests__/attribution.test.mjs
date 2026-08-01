@@ -1,0 +1,143 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { checkAttribution, resolveSubject } from "../attribution.js";
+
+// The real passage, and the real generated claim that motivated this module.
+// Frankenstein ch. 16, inside the creature's narrator span: the creature is
+// killing William. The generated prose handed the act to Victor.
+const EVIDENCE =
+  "He struggled violently. Let me go, he cried; monster! Ugly wretch! " +
+  "I grasped his throat to silence him, and in a moment he lay dead at my feet.";
+
+// The creature narrates chapters 11-16; these offsets stand for that span.
+const CREATURE_NARRATES = [{ referent: "creature", start: 0, end: 1000 }];
+
+// The cast, as a coref prior supplies it. A hard veto requires naming both
+// sides; without this the organ reports disagreement but asserts nothing.
+const CAST = ["creature", "frankenstein", "victor frankenstein", "victor"];
+
+test("catches the agent swap that every bag-of-words check passes", async () => {
+  const claim = "Frankenstein grasped its throat and silenced it.";
+  const r = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES, cast: CAST });
+
+  const mis = r.vetoes.find((v) => v.id === "misattribution");
+  assert.ok(mis, "the swap must be caught");
+  assert.equal(mis.severity, "hard");
+  assert.equal(r.passed, false);
+  // The evidence's "I" resolves to the creature BY SCOPE, not by the string.
+  assert.ok(mis.evidenceAgents.some((a) => a.referent === "creature" && a.basis === "narrator-span"));
+});
+
+test("the same claim is fine when the evidence really does say it", async () => {
+  const claim = "The creature grasped his throat.";
+  const r = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES });
+  assert.deepEqual(r.vetoes.filter((v) => v.id === "misattribution"), []);
+  assert.equal(r.passed, true);
+});
+
+test("a first-person subject resolves by scope, never by the token", () => {
+  const inside = resolveSubject("I", 500, { narratorSpans: CREATURE_NARRATES });
+  assert.equal(inside.referent, "creature");
+  assert.equal(inside.basis, "narrator-span");
+
+  const outside = resolveSubject("I", 5000, { narratorSpans: CREATURE_NARRATES, outerNarrator: "Walton" });
+  assert.equal(outside.referent, "walton");
+  assert.equal(outside.basis, "outer-narrator");
+});
+
+test("an unresolvable first person is a typed gap, not a guessed attribution", () => {
+  const r = resolveSubject("I", 5000, { narratorSpans: CREATURE_NARRATES });
+  assert.equal(r.referent, null);
+  assert.equal(r.basis, "unresolved");
+  assert.match(r.gap, /cannot be earned/);
+});
+
+test("aliases let one referent be named more than one way", async () => {
+  const claim = "Victor Frankenstein grasped his throat.";
+  // Without the alias, "victor frankenstein" vs "creature" is a mismatch...
+  const strict = await checkAttribution(claim, EVIDENCE, { narratorSpans: CREATURE_NARRATES, cast: CAST });
+  assert.ok(strict.vetoes.some((v) => v.id === "misattribution"));
+
+  // ...and naming the creature's own surfaces does not rescue a wrong agent.
+  const aliased = await checkAttribution(claim, EVIDENCE, {
+    narratorSpans: CREATURE_NARRATES,
+    cast: CAST,
+    aliases: [["creature", "the monster", "the wretch"]],
+  });
+  assert.ok(aliased.vetoes.some((v) => v.id === "misattribution"),
+    "an alias group must not launder an attribution to a different referent");
+});
+
+test("a verb the evidence never uses is reported softly, not called invention", async () => {
+  const r = await checkAttribution("Frankenstein forgave the creature.", EVIDENCE, {
+    narratorSpans: CREATURE_NARRATES,
+  });
+  const un = r.vetoes.find((v) => v.id === "unsupported-relation");
+  assert.ok(un);
+  assert.equal(un.severity, "soft",
+    "this extractor may simply have failed to pair the clause; that is not proof of fabrication");
+});
+
+test("junk relations do not become confident vetoes", async () => {
+  // Measured when this was first wired into a real essay: the extractor
+  // manufactures relations from ordinary prose — "Frankenstein's feelings"
+  // splits the possessive into verb "s", "War and Peace" parses as
+  // War/and/Peace, "This suggests that" makes "This" an agent. Every one of
+  // them mismatched whatever the evidence said and fired a HARD veto, so the
+  // assembler dropped every section including the correct ones.
+  const ev = "Victor beheld the wretch whom he had created.";
+  for (const junk of [
+    "Frankenstein's feelings toward it were complex.",
+    "War and Peace is a different novel entirely.",
+    "This suggests that the relationship is troubled.",
+  ]) {
+    const r = await checkAttribution(junk, ev, { narratorSpans: CREATURE_NARRATES });
+    assert.deepEqual(
+      r.vetoes.filter((v) => v.severity === "hard"), [],
+      `"${junk}" produced a hard veto from a tokenizer artifact`
+    );
+  }
+});
+
+test("an unresolved evidence agent yields silence, not an asserted swap", async () => {
+  // "he" is referential but unresolved — resolving it is admitReferent's job.
+  // A hard veto would be asserting a swap that cannot be established, which is
+  // the cardinal regression pointed at the author instead of the reader.
+  const r = await checkAttribution("Victor grasped his throat.", "He grasped his throat.", {});
+  const hard = r.vetoes.filter((v) => v.severity === "hard");
+  assert.deepEqual(hard, []);
+  assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "it must still be REPORTED");
+});
+
+test("with no cast, a disagreement is reported but never asserted", async () => {
+  // Capitalization is not identity. Without referents from a prior, the only
+  // available signal is a capital letter, and successive real runs turned that
+  // into confident vetoes on "Initially", "This", "War", "You", "that i".
+  const r = await checkAttribution("Frankenstein grasped its throat.", EVIDENCE, {
+    narratorSpans: CREATURE_NARRATES,
+  });
+  assert.deepEqual(r.vetoes.filter((v) => v.severity === "hard"), []);
+  assert.ok(r.vetoes.some((v) => v.id === "unresolved-agent"), "still reported");
+  assert.ok(r.gaps.some((g) => /no cast supplied/.test(g)), "and the reason is stated");
+});
+
+test("a named actor the evidence never mentions is a hard veto", async () => {
+  // Measured on a real essay: "his half-brother, Prince Vasily Kuragin, had
+  // been disinherited" passed with attribution 0.00, because the relation
+  // merely went unmatched and unmatched is soft by design. An actor the
+  // evidence never NAMES is a different failure from an act the extractor
+  // failed to pair, and it is checkable by occurrence.
+  const ev = "Pierre inherited his father's vast fortune after the count died.";
+  const cast = ["pierre", "prince vasily kuragin", "count"];
+
+  const invented = await checkAttribution(
+    "Prince Vasily Kuragin was disinherited by his father.", ev, { cast });
+  const hard = invented.vetoes.filter((v) => v.severity === "hard");
+  assert.equal(hard.length, 1);
+  assert.equal(hard[0].id, "unsourced-actor");
+
+  // An agent the evidence DOES name stays soft — the extractor is not reliable
+  // enough for an unmatched act to prove invention on its own.
+  const present = await checkAttribution("Pierre travelled to Petersburg.", ev, { cast });
+  assert.deepEqual(present.vetoes.filter((v) => v.severity === "hard"), []);
+});

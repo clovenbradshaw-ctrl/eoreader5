@@ -56,7 +56,7 @@ const relationSignature = (relations) => {
 //   medium confidence → "Pierre's lens MIGHT BE idealistic naivety"
 //   low confidence → "Pierre's lens is UNCERTAIN — he has changed too much"
 
-export const assertLens = (traj, prior, { confidenceFloor = 0.1 } = {}) => {
+export const assertLens = (traj, prior, { confidenceFloor = 0.1, readerHistory = null } = {}) => {
   if (!traj || !traj.focus) return null;
 
   const rs = redShift(traj);
@@ -72,8 +72,8 @@ export const assertLens = (traj, prior, { confidenceFloor = 0.1 } = {}) => {
   // The base confidence is INVERSELY proportional to the red shift
   const baseConfidence = evidence === 0 ? 0 : 1 - rs;
 
-  // The prior boosts confidence
-  const boost = prior ? priorConfidenceBoost(prior, {}) : 0;
+  // The prior boosts confidence — derived from reader's observed history, not constants
+  const boost = prior ? priorConfidenceBoost(prior, {}, readerHistory) : 0;
   const confidence = Math.min(1, baseConfidence + boost);
 
   // The assertion strength
@@ -177,3 +177,186 @@ export const speakLensAssertion = (assertion) => {
 
   return `${f} ${shiftDesc} (red shift: ${rs}). ${confDesc}${priorNote}${availableNote}${moved}${lost}`.trim();
 };
+
+// ── Unforced-convergence organ ───────────────────────────────────────────────
+//
+// Two (or more) lenses read the same text independently, walled by R1/R2:
+// neither reads the other's state, neither messages the other. Each deposits
+// traces into its own medium. When their traces coincide — both lenses
+// independently landing on the same passage, same motif, same salience —
+// that coincidence is meaningful precisely because it wasn't forced.
+//
+// This organ WITNESSES convergence on the audit surface. It never optimizes
+// toward it. The byte-identical guarantee (§5 of the stigmergy spec): a run
+// with convergence reporting disabled must produce the same deposits as a run
+// with it enabled. If disabling changes the deposits, optimization leaked in
+// and the signal is worthless. This is the Ananda-cannot-be-a-KPI constraint,
+// structural.
+
+function hashDeposits(mediaList) {
+  // Simple deterministic hash of deposit structure — avoids import
+  // dependency on @eoreader/spec/canonical-json so this module loads
+  // cleanly from test contexts.
+  const payload = JSON.stringify(mediaList.map((m) =>
+    m.deposits.map((d) => ({ id: d.id, turn: d.turn, trace: d.trace }))));
+  let h = 0x811c9dc5;
+  for (let i = 0; i < payload.length; i++) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
+}
+
+/**
+ * witnessConvergence(media, options) -> AuditReport
+ *
+ * Compares deposits across multiple independently-welled media and reports
+ * coincident traces. A coincidence is two deposits from different lenses
+ * that reference the same content (same block, same motifs, same offset)
+ * without any cross-lens communication.
+ *
+ * THIS IS READ-ONLY. The media are never modified. Set { enabled: false }
+ * to verify byte-identical deposits — the return is an empty report, and
+ * the caller confirms that deposit content is unchanged.
+ *
+ * @param {Array<object>} media — array of Medium objects (any lawful medium)
+ * @param {object} options
+ * @param {boolean} options.enabled — if false, returns empty report (safety gate)
+ * @param {number} options.minOverlap — minimum shared trace elements to count as coincidence (default 1)
+ * @param {string[]} options.label — human labels for each medium (e.g. ["gothic-lens", "romantic-lens"])
+ * @returns {{ coincidences: Array, coincidentPairs: Array, lensCount: number,
+ *            convergenceFraction: number, byteIdentical: boolean }}
+ */
+export function witnessConvergence(media, { enabled = true, minOverlap = 1, labels = [] } = {}) {
+  if (!enabled) {
+    // Byte-identical guarantee: when disabled, return empty — media untouched
+    return Object.freeze({
+      coincidences: [],
+      coincidentPairs: 0,
+      lensCount: media.length,
+      convergenceFraction: 0,
+      byteIdentical: true,
+      enabled: false,
+    });
+  }
+
+  if (!media || media.length < 2) {
+    return Object.freeze({
+      coincidences: [],
+      coincidentPairs: 0,
+      lensCount: media?.length ?? 0,
+      convergenceFraction: 0,
+      byteIdentical: true,
+      enabled: true,
+    });
+  }
+
+  const coincidences = [];
+
+  // Compare every pair of media (undirected pairs only)
+  for (let i = 0; i < media.length; i++) {
+    for (let j = i + 1; j < media.length; j++) {
+      const mA = media[i], mB = media[j];
+      const depositsA = mA.deposits ?? [];
+      const depositsB = mB.deposits ?? [];
+
+      for (const dA of depositsA) {
+        for (const dB of depositsB) {
+          const overlap = traceOverlap(dA.trace, dB.trace);
+          if (overlap.length >= minOverlap) {
+            coincidences.push(Object.freeze({
+              lensA: labels[i] ?? `lens-${i}`,
+              lensB: labels[j] ?? `lens-${j}`,
+              depositA_id: dA.id,
+              depositB_id: dB.id,
+              turnA: dA.turn,
+              turnB: dB.turn,
+              overlap,
+              overlapCount: overlap.length,
+            }));
+          }
+        }
+      }
+    }
+  }
+
+  // Total possible pairs: sum of (depositCount_i * depositCount_j) for i<j
+  let totalPairs = 0;
+  for (let i = 0; i < media.length; i++) {
+    for (let j = i + 1; j < media.length; j++) {
+      totalPairs += (media[i].deposits?.length ?? 0) * (media[j].deposits?.length ?? 0);
+    }
+  }
+
+  const convergenceFraction = totalPairs > 0
+    ? coincidences.length / totalPairs
+    : 0;
+
+  return Object.freeze({
+    coincidences,
+    coincidentPairs: coincidences.length,
+    lensCount: media.length,
+    convergenceFraction: +convergenceFraction.toFixed(6),
+    byteIdentical: true, // read-only guarantee
+    enabled: true,
+  });
+}
+
+/**
+ * Trace overlap: what content do two deposits share?
+ *
+ * For reaction media: matching block_ids with engagement kinds.
+ * For store media: matching motifs.
+ * Generic: matching string fields in the trace objects.
+ */
+function traceOverlap(traceA, traceB) {
+  if (!traceA || !traceB) return [];
+  const overlap = [];
+
+  // Block-level overlap (reactions) — primary signal
+  if (traceA.block_id && traceB.block_id && traceA.block_id === traceB.block_id) {
+    overlap.push(`block:${traceA.block_id}`);
+  }
+
+  // Motif overlap (store frames)
+  const motifsA = traceA.motifs ?? [];
+  const motifsB = traceB.motifs ?? [];
+  const motifSetB = new Set(motifsB);
+  for (const m of motifsA) {
+    if (motifSetB.has(m)) overlap.push(`motif:${m}`);
+  }
+
+  // Offset proximity (if both have numeric offsets within tolerance)
+  if (typeof traceA.offset === "number" && typeof traceB.offset === "number") {
+    const distance = Math.abs(traceA.offset - traceB.offset);
+    if (distance < 2000) {
+      overlap.push(`offset-proximity:${distance}`);
+    }
+  }
+
+  // Only count as overlap if there's content-level signal (block or motif),
+  // not just kind matching. Kind alone is not a coincidence — it's a
+  // reader behavior pattern, not a discovery.
+  return overlap.filter((o) => o.startsWith("block:") || o.startsWith("motif:") || o.startsWith("offset"));
+}
+
+/**
+ * verifyByteIdentical — safety assertion.
+ *
+ * Run the same deposit sequence with convergence enabled and disabled.
+ * The deposits must be identical. If they differ, convergence reporting
+ * contaminated the deposits (optimization leaked in).
+ *
+ * @param {Array<object>} mediaEnabled — media after deposits with convergence enabled
+ * @param {Array<object>} mediaDisabled — media after same deposits with convergence disabled
+ * @returns {{ identical: boolean, enabledHash: string, disabledHash: string }}
+ */
+export function verifyByteIdentical(mediaEnabled, mediaDisabled) {
+  const hashEnabled = hashDeposits(mediaEnabled);
+  const hashDisabled = hashDeposits(mediaDisabled);
+  return Object.freeze({
+    identical: hashEnabled === hashDisabled,
+    enabledHash: hashEnabled,
+    disabledHash: hashDisabled,
+  });
+}

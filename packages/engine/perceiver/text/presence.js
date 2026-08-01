@@ -249,21 +249,71 @@ export function presenceByFrame(frames, surfaces, options = {}) {
 }
 
 /**
+ * collapseWhitespace(str) -> { collapsed, map }
+ * Collapses whitespace runs in `str` to a single space, recording for every
+ * character emitted into `collapsed` the index in `str` it came from. This is
+ * the shared collapsed-position-mapping mechanism behind whitespace-tolerant
+ * span resolution: text-organ.js::locateRawSpan uses it to recover a raw
+ * offset-based span through frameText/snapToSentences whitespace churn, and
+ * resolveSpans (below) uses the same mapping to make anchor-quote resolution
+ * tolerant of line-wrap/whitespace differences between the stored anchor and
+ * the live text — two ends of the same "anchors rot when whitespace shifts"
+ * problem, one mechanism.
+ */
+export function collapseWhitespace(str) {
+  let collapsed = "";
+  const map = [];
+  let inWs = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (/\s/.test(ch)) {
+      if (!inWs) {
+        collapsed += " ";
+        map.push(i);
+        inWs = true;
+      }
+    } else {
+      collapsed += ch;
+      map.push(i);
+      inWs = false;
+    }
+  }
+  return { collapsed, map };
+}
+
+/** Find `anchor` in `text`, tolerating whitespace/line-wrap differences. */
+function locateAnchor(text, collapsedText, anchor) {
+  if (!anchor) return -1;
+  const exact = text.indexOf(anchor);
+  if (exact !== -1) return exact;
+  const { collapsed: needle } = collapseWhitespace(anchor);
+  if (!needle) return -1;
+  const idx = collapsedText.collapsed.indexOf(needle);
+  return idx === -1 ? -1 : collapsedText.map[idx];
+}
+
+/**
  * resolveSpans(text, spans) — turn durable anchors into offsets.
  * A prior stores { fromAnchor, toAnchor } quote strings (robust across
- * editions/whitespace churn); offsets are derived at apply time. A span whose
- * anchor no longer resolves is dropped and reported, never guessed.
+ * editions/whitespace churn); offsets are derived at apply time. Resolution
+ * tries an exact substring match first, then falls back to whitespace-
+ * flexible matching (via collapseWhitespace) so a line-wrap or spacing
+ * difference between the stored anchor and the live text doesn't rot the
+ * anchor. A span whose anchor still doesn't resolve is dropped and reported,
+ * never guessed.
  */
 export function resolveSpans(text, spans = []) {
   const resolved = [];
   const unresolved = [];
+  let collapsedText = null;
   for (const sp of spans) {
     if (typeof sp.from === "number" && typeof sp.to === "number") {
       resolved.push({ from: sp.from, to: sp.to });
       continue;
     }
-    const from = text.indexOf(sp.fromAnchor);
-    const to = sp.toAnchor ? text.indexOf(sp.toAnchor) : text.length;
+    collapsedText ??= collapseWhitespace(text);
+    const from = locateAnchor(text, collapsedText, sp.fromAnchor);
+    const to = sp.toAnchor ? locateAnchor(text, collapsedText, sp.toAnchor) : text.length;
     if (from === -1 || to === -1 || to <= from) unresolved.push(sp);
     else resolved.push({ from, to });
   }
@@ -367,6 +417,58 @@ export function admitReferent(frames, prior, options = {}) {
   const projection = projectReferents(events.filter((e) => e.type !== "SYN.merge" || e.from_ids));
 
   return { referentId, surfaces: scoped, events, projection, gaps };
+}
+
+/**
+ * Auto-discover referents from ranked surfaces without requiring a per-text prior.
+ *
+ * Universal coref: surfaces that pass the rank filter (not openers, sufficient
+ * spread, plausible name ratio) are auto-seeded as referents. Surfaces that
+ * corefer (containment or shared final token) are merged into the same referent.
+ *
+ * This makes the engine work on any text without pre-supplied knowledge — the
+ * prior becomes an enrichment, not a requirement.
+ */
+export function autoDiscoverReferents(frames, rankedSurfaces, { minFrames = 2 } = {}) {
+  const events = [];
+  const referentMap = new Map(); // surface -> referent_id
+
+  for (const { surface, frames: frameCount, mentions } of rankedSurfaces) {
+    if (frameCount < minFrames) continue;
+
+    // Check if this surface corefers with an existing referent
+    let matchedReferent = null;
+    for (const [existingSurface, referentId] of referentMap) {
+      if (namesCorefer(surface, existingSurface)) {
+        matchedReferent = referentId;
+        break;
+      }
+    }
+
+    if (matchedReferent) {
+      // Merge this surface into the existing referent
+      events.push({
+        type: "DEF.admit",
+        referent_id: matchedReferent,
+        surface,
+        provenance: "auto-discovery coref",
+      });
+      referentMap.set(surface, matchedReferent);
+    } else {
+      // Create a new referent for this surface
+      const referentId = `ref:auto:${diaNorm(surface).replace(/\s+/g, "_")}`;
+      events.push({
+        type: "DEF.admit",
+        referent_id: referentId,
+        surface,
+        provenance: "auto-discovery seed",
+      });
+      referentMap.set(surface, referentId);
+    }
+  }
+
+  const projection = projectReferents(events);
+  return { events, projection, referentMap };
 }
 
 /**

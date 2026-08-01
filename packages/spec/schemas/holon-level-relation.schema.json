@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eoreader.dev/spec/schemas/holon-level-relation.schema.json",
+  "title": "HolonLevelRelation",
+  "description": "A discovered relation between two candidate entities (docs/holon-level.md). Never assigned: 'above' requires both existence-dependency (the subject cannot exist without the candidate) and possibility-constraint (the candidate narrows the subject's possibility space) to clear their own Born-null thresholds. 'peer' means neither holds -- polycentric, no level exists. 'unstable' means they disagree -- a typed gap, never silently resolved into a level.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "relation", "existence", "constraint", "reason"],
+  "properties": {
+    "schema": { "const": "HolonLevelRelation@1" },
+    "relation": {
+      "enum": ["above", "peer", "unstable"],
+      "description": "'above' = candidate is above subject (both gates passed). 'peer' = polycentric, no level (neither gate passed). 'unstable' = gates disagree, a typed gap."
+    },
+    "subject_id": {
+      "type": ["string", "null"],
+      "description": "Audit label only. The actual direction is determined by which entity's degradation/narrowing was measured to produce `existence`/`constraint`, not by this field."
+    },
+    "candidate_id": {
+      "type": ["string", "null"],
+      "description": "Audit label only, paired with subject_id."
+    },
+    "existence": {
+      "description": "Result of existenceDependencyTest: does the subject depend on the candidate ('cannot exist without')?",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_degradation", "passed", "null_result", "reason"],
+      "properties": {
+        "observed_degradation": { "type": "number" },
+        "passed": { "type": "boolean" },
+        "null_result": { "$ref": "null-protocol.schema.json" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "constraint": {
+      "description": "Result of possibilityConstraintTest: does the candidate constrain the subject ('above constrains, below enables')?",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_narrowing", "passed", "null_result", "reason"],
+      "properties": {
+        "observed_narrowing": { "type": "number" },
+        "passed": { "type": "boolean" },
+        "null_result": { "$ref": "null-protocol.schema.json" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why this relation was discovered -- which gates agreed or disagreed."
+    }
+  }
+}

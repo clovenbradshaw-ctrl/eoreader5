@@ -9,8 +9,21 @@
 // fabricate: a relation's polarity is read from negation markers in the
 // clause, never asserted positive by default.
 
-const RELATION_VERBS =
+// The one list. It is exported because `emergence/summary/non-lexical-surfer`
+// needs the same verbs as a Set for O(1) per-frame lookup, and had re-typed all
+// 87 of them inline — a second copy of a lexicon is a drift waiting to happen,
+// and typing them as individually-quoted strings also trips the attribution-
+// verb conformance gate. Consumers that want membership testing should call
+// `relationVerbSet()` rather than re-splitting this themselves.
+//
+// Kept as a pipe-joined string because its primary use is regex alternation.
+export const RELATION_VERBS =
   "married|fought|led|wrote|built|destroyed|founded|ruled|served|worked|lived|died|born|moved|traveled|said|told|asked|gave|took|made|found|held|stood|sat|ran|walked|spoke|thought|knew|saw|heard|felt|wanted|needed|loved|hated|feared|hoped|believed|claimed|stated|argued|showed|proved|revealed|demonstrated|indicated|suggested|implied|meant|intended|planned|tried|attempted|managed|failed|succeeded|won|lost|beat|defeated|conquered|controlled|dominated|influenced|shaped|changed|transformed|developed|grew|improved|declined|fell|rose|increased|decreased|remained|stayed|became|turned|seemed|appeared|looked|sounded|tasted|smelled";
+
+// Membership view of RELATION_VERBS. Built once per call site, not per frame.
+export function relationVerbSet() {
+  return new Set(RELATION_VERBS.split("|"));
+}
 
 const NEGATION_BEFORE_VERB = /\b(?:not|never|no longer|hardly|scarcely|neither|nor|didn't|don't|doesn't|wouldn't|couldn't|shouldn't|won't|can't|cannot)\s+(?:\w+\s+){0,2}$/i;
 

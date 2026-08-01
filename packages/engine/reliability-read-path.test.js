@@ -81,6 +81,7 @@ function buildRequest(text, queries) {
     anchors: { scheme: "byte", selectors: { "paragraph:text": selectors } },
     source_content_hash: canonicalHashSync({ bytes: Buffer.from(normalized, "utf8").toString("base64") }),
     blocks_hash,
+    capture_provenance: [{ step_id: "step:plain-text:1", holon_id: "holon:test", lens_id: "lens:neutral" }],
   };
 
   const priorSnapshot = {

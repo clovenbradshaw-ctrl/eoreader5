@@ -112,6 +112,7 @@ export function assembleMatrix(propositions, { total_sources } = {}) {
         evidenceBySource.get(ev.source_id).push({
           proposition_id: prop.proposition_id,
           span_text: ev.span_text,
+          span_raw: ev.span_raw ?? null,
           confidence: prop.confidence,
           quantities: prop.quantities,
           time: prop.time,
